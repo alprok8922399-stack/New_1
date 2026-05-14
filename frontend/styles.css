@@ -1,0 +1,10 @@
+:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
+body{margin:0;display:flex;height:100vh;align-items:center;justify-content:center;background:#f3f4f6}
+.chat{width:100%;max-width:720px;background:#fff;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.08);display:flex;flex-direction:column;overflow:hidden;height:80vh}
+.messages{flex:1;padding:16px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.controls{display:flex;padding:12px;border-top:1px solid #eee}
+.controls input{flex:1;padding:10px;border:1px solid #ddd;border-radius:6px;margin-right:8px}
+.controls button{padding:10px 14px;border-radius:6px;border:none;background:#111;color:#fff}
+.msg{padding:10px;border-radius:8px;max-width:80%}
+.msg.user{align-self:flex-end;background:#111;color:#fff}
+.msg.bot{align-self:flex-start;background:#f1f1f1}
