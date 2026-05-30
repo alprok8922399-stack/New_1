@@ -1,4 +1,3 @@
-cat > backend/Dockerfile <<'EOF'
 FROM python:3.11-slim AS builder
 WORKDIR /app
 COPY backend/requirements.txt .
@@ -12,4 +11,3 @@ COPY tools /tools
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
 CMD ["/bin/sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
-EOF
