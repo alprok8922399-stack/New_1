@@ -10,4 +10,4 @@ COPY backend /app
 COPY tools /tools
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
-CMD ["/bin/sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["/tools/diagnose.sh"]
