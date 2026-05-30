@@ -1,9 +1,6 @@
 #!/bin/sh
-env
-echo LS_ROOT
-ls -la /
-echo LS_APP
+set -eux
+echo "Running diagnose.sh"
 ls -la /app || true
-echo CMDLINE
-tr '\0' ' ' < /proc/1/cmdline || true
-sleep 300
+cat /app/app/main.py || true
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000"
