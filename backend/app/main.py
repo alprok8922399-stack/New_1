@@ -1,16 +1,16 @@
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 import os
+from . import openai_client
 
 app = FastAPI()
 
-@app.post("/api/chat")
-async def chat(request: Request):
-    data = await request.json()
-    prompt = data.get("message", "")
-    return {"reply": f"Echo: {prompt}"}
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", "8000"))
-    uvicorn.run("app.main:app", host="0.0.0.0", port=port)
-  
+@app.post('/api/chat')
+async def chat_endpoint(req: Request):
+    data = await req.json()
+    prompt = data.get('prompt', '')
+    try:
+        reply = openai_client.get_reply(prompt)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={'error': str(e)})
+    return {'reply': reply}
