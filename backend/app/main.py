@@ -1,3 +1,5 @@
+
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import os
@@ -11,13 +13,11 @@ async def chat_endpoint(req: Request):
 data = await req.json()
 message = data.get("message", "")
 try:
-# prefer an async function if available
 if asyncio.iscoroutinefunction(getattr(openai_client, "get_reply", None)):
 reply = await openai_client.get_reply(message)
 elif asyncio.iscoroutinefunction(getattr(openai_client, "async_get_reply", None)):
 reply = await openai_client.async_get_reply(message)
 else:
-# run sync call in threadpool
 loop = asyncio.get_running_loop()
 sync_fn = getattr(openai_client, "send_message", None) or getattr(openai_client, "get_reply")
 reply = await loop.run_in_executor(None, sync_fn, message)
