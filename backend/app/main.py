@@ -1,31 +1,39 @@
-
-
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 import os
 import asyncio
-from . import openai_client
+from typing import Any, Dict
+
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
+import uvicorn
+
+from . import openai_client  # предполагается, что openai_client имеет async функцию `create_completion`
 
 app = FastAPI()
 
-@app.post("/api/chat")
-async def chat_endpoint(req: Request):
-data = await req.json()
-message = data.get("message", "")
-try:
-if asyncio.iscoroutinefunction(getattr(openai_client, "get_reply", None)):
-reply = await openai_client.get_reply(message)
-elif asyncio.iscoroutinefunction(getattr(openai_client, "async_get_reply", None)):
-reply = await openai_client.async_get_reply(message)
-else:
-loop = asyncio.get_running_loop()
-sync_fn = getattr(openai_client, "send_message", None) or getattr(openai_client, "get_reply")
-reply = await loop.run_in_executor(None, sync_fn, message)
-except Exception as e:
-return JSONResponse(status_code=500, content={"error": str(e)})
-return {"reply": reply}
 
-if name == "__main__":
-port = int(os.environ.get("PORT", "8000"))
-import uvicorn
-uvicorn.run("backend.app.main:app", host="0.0.0.0", port=port, log_level="info")
+class ChatRequest(BaseModel):
+    message: str
+
+
+class ChatResponse(BaseModel):
+    reply: str
+    meta: Dict[str, Any] = {}
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat_endpoint(req: ChatRequest):
+    prompt = req.message
+    try:
+        # ожидаем, что openai_client.create_completion — асинхронная функция, которая возвращает строку
+        reply = await openai_client.create_completion(prompt)
+    except Exception as e:
+        # логировать можно здесь при необходимости
+        raise HTTPException(status_code=500, detail="OpenAI error: " + str(e))
+    return ChatResponse(reply=reply, meta={"model": getattr(openai_client, "MODEL_NAME", "unknown")})
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", "8000"))
+    # uvicorn.run вызывает asyncio loop; при запуске в контейнере Render используйте host 0.0.0.0
+    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=port, log_level="info")
+  
