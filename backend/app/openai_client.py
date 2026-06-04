@@ -10,13 +10,11 @@ MODEL_NAME = "gpt-4o-mini"  # можно изменить
 # Берём ключ из окружения, но не бросаем исключение при импорте
 OPENAI_API_KEY: Optional[str] = os.environ.get("OPENAI_API_KEY")
 
-# Функция проверки наличия ключа (вызывается при реальном запросе)
-def _require_api_key():
+async def create_completion(prompt: str, timeout: int = 30) -> str:
+    # Проверка ключа только при реальном вызове
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is not set in environment")
 
-async def create_completion(prompt: str, timeout: int = 30) -> str:
-    _require_api_key()
     url = "https://api.openai.com/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENAI_API_KEY}",
@@ -39,8 +37,8 @@ async def create_completion(prompt: str, timeout: int = 30) -> str:
                 data = await resp.json()
         except asyncio.TimeoutError:
             raise RuntimeError("OpenAI request timed out")
+
     try:
         return data["choices"][0]["message"]["content"].strip()
     except Exception as e:
         raise RuntimeError("Malformed OpenAI response: " + str(e))
-        
