@@ -24,3 +24,75 @@ Copy .env.example → .env and set OPENAI_API_KEY if available.
 Build image: docker build -t new1-backend -f backend/Dockerfile .
 Run container: docker run --env-file .env -p 8000:8000 new1-backend
 Open frontend by serving frontend/ (or open frontend/index.html) and point API requests to http://localhost:8000/api/chat
+
+# PROJECT STATUS
+
+## Project
+
+New_1 — веб-чат с ИИ на базе FastAPI, Render и OpenRouter.
+
+## Current Status
+
+Project is operational and publicly accessible.
+
+Frontend:
+https://chat-ai-frontend-y1bt.onrender.com
+
+Backend:
+https://new-1-5155.onrender.com
+
+API Docs:
+https://new-1-5155.onrender.com/docs
+
+## Completed
+
+* GitHub repository configured
+* Backend deployed on Render
+* FastAPI configured and running
+* Docker deployment fixed
+* Import/package issues fixed
+* Exit 128 deployment issue resolved
+* OpenRouter integration completed
+* DeepSeek model connected
+* Frontend deployed on Render
+* CORS configured
+* Frontend successfully connected to Backend
+* Chat responses working
+
+## AI Model
+
+Current model:
+
+deepseek/deepseek-chat-v3-0324
+
+Provider:
+
+OpenRouter
+
+## Verified
+
+User message:
+
+Привет
+
+AI response:
+
+Привет! 😊 Как я могу помочь тебе сегодня?
+
+## Next Development Steps
+
+1. Improve UI/UX design
+2. Add conversation history
+3. Add memory/context between messages
+4. Add typing indicator
+5. Add model selection
+6. Add custom domain
+7. Add user accounts
+8. Add database storage
+
+## Last Verified
+
+2026-06-05
+
+System fully operational.
+
