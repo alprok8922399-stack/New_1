@@ -5,7 +5,7 @@ from typing import Optional
 import aiohttp
 
 # Модель DeepSeek через OpenRouter
-MODEL_NAME = "deepseek/deepseek-chat-v3-0324:free"
+MODEL_NAME = "deepseek/deepseek-chat-v3-0324"
 
 # Ключ берём из Render
 OPENAI_API_KEY: Optional[str] = os.environ.get("OPENAI_API_KEY")
