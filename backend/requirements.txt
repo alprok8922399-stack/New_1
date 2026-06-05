@@ -2,3 +2,5 @@ fastapi
 uvicorn
 pydantic
 aiohttp
+psycopg2-binary
+sqlalchemy
