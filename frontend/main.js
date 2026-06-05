@@ -2,25 +2,74 @@ const form = document.getElementById('form');
 const input = document.getElementById('input');
 const messages = document.getElementById('messages');
 
+const privateBtn = document.getElementById('privateBtn');
+const clearBtn = document.getElementById('clearBtn');
+
 const BACKEND = "https://new-1-5155.onrender.com/api/chat";
 
-function appendMessage(text, cls = "bot") {
+/*
+  📦 Состояние чата
+*/
+let chatHistory = [];
+let isPrivate = false;
+
+/*
+  💾 загрузка истории (если НЕ приватный режим)
+*/
+function loadHistory() {
+  const saved = localStorage.getItem('chat_history');
+  if (saved && !isPrivate) {
+    chatHistory = JSON.parse(saved);
+    chatHistory.forEach(m => {
+      appendMessage(m.text, m.role);
+    });
+  }
+}
+
+/*
+  💾 сохранение истории
+*/
+function saveHistory() {
+  if (!isPrivate) {
+    localStorage.setItem('chat_history', JSON.stringify(chatHistory));
+  }
+}
+
+/*
+  💬 вывод сообщения
+*/
+function appendMessage(text, role = "bot") {
   const el = document.createElement('div');
-  el.className = `msg ${cls}`;
+  el.className = `msg ${role}`;
   el.textContent = text;
   messages.appendChild(el);
   messages.scrollTop = messages.scrollHeight;
 }
 
+/*
+  🧠 добавить в историю
+*/
+function addToHistory(role, text) {
+  chatHistory.push({ role, text });
+  saveHistory();
+}
+
+/*
+  🚀 отправка сообщения
+*/
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const text = input.value.trim();
   if (!text) return;
 
+  // user message
   appendMessage(text, 'user');
+  addToHistory('user', text);
+
   input.value = '';
 
+  // placeholder bot
   appendMessage('...', 'bot');
 
   try {
@@ -29,25 +78,60 @@ form.addEventListener('submit', async (e) => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        message: text
-      })
+      body: JSON.stringify({ message: text })
     });
 
-    const last = messages.querySelectorAll('.msg.bot');
+    const lastBots = messages.querySelectorAll('.msg.bot');
 
     if (res.ok) {
       const data = await res.json();
-      last[last.length - 1].textContent =
-        data.reply || '(пустой ответ)';
+      const reply = data.reply || '(пустой ответ)';
+
+      lastBots[lastBots.length - 1].textContent = reply;
+      addToHistory('bot', reply);
+
     } else {
-      const err = await res.text();
-      last[last.length - 1].textContent =
-        `Ошибка: ${res.status} ${err}`;
+      const errText = await res.text();
+      const errorMsg = `Ошибка: ${res.status} ${errText}`;
+
+      lastBots[lastBots.length - 1].textContent = errorMsg;
+      addToHistory('bot', errorMsg);
     }
+
   } catch (err) {
-    const last = messages.querySelectorAll('.msg.bot');
-    last[last.length - 1].textContent =
-      `Сеть: ${err.message || err}`;
+    const lastBots = messages.querySelectorAll('.msg.bot');
+    const errorMsg = `Сеть: ${err.message || err}`;
+
+    lastBots[lastBots.length - 1].textContent = errorMsg;
+    addToHistory('bot', errorMsg);
   }
 });
+
+/*
+  🗑 очистка истории
+*/
+clearBtn.addEventListener('click', () => {
+  chatHistory = [];
+  localStorage.removeItem('chat_history');
+  messages.innerHTML = '';
+});
+
+/*
+  🔒 приватный режим
+*/
+privateBtn.addEventListener('click', () => {
+  isPrivate = !isPrivate;
+
+  if (isPrivate) {
+    privateBtn.textContent = "🔓 Приватный (ВКЛ)";
+    messages.innerHTML = '';
+  } else {
+    privateBtn.textContent = "🔒 Приватный";
+    loadHistory();
+  }
+});
+
+/*
+  🔄 старт
+*/
+loadHistory();
