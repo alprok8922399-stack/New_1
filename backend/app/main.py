@@ -1,64 +1,40 @@
-import os
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Any, Dict
-import uvicorn
+from typing import List, Dict
 
-from . import openai_client
+from app.openai_client import create_completion
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://chat-ai-frontend-y1bt.onrender.com"
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# 🧠 простая память (в RAM)
+chat_sessions: Dict[str, List[dict]] = {}
 
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: str = "default"
 
 
 class ChatResponse(BaseModel):
     reply: str
-    meta: Dict[str, Any] = {}
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat_endpoint(req: ChatRequest):
-    prompt = req.message
+async def chat(req: ChatRequest):
 
-    try:
-        reply = await openai_client.create_completion(prompt)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"OpenAI error: {e}"
-        )
+    # создаём сессию если нет
+    if req.session_id not in chat_sessions:
+        chat_sessions[req.session_id] = []
 
-    return ChatResponse(
-        reply=reply,
-        meta={
-            "model": getattr(
-                openai_client,
-                "MODEL_NAME",
-                "unknown"
-            )
-        }
-    )
+    history = chat_sessions[req.session_id]
 
+    # добавляем сообщение пользователя
+    history.append({"role": "user", "content": req.message})
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8000"))
+    # отправляем всю историю в ИИ
+    reply = await create_completion(history)
 
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=port,
-        log_level="info"
-    )
+    # добавляем ответ ИИ в память
+    history.append({"role": "assistant", "content": reply})
+
+    return ChatResponse(reply=reply)
