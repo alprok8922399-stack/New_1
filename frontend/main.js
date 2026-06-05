@@ -7,17 +7,21 @@ const clearBtn = document.getElementById('clearBtn');
 
 const BACKEND = "https://new-1-5155.onrender.com/api/chat";
 
+// 🧠 ID сессии (пока фиксированный пользователь)
+const SESSION_ID = "user-1";
+
 /*
-  📦 Состояние чата
+  📦 состояние
 */
 let chatHistory = [];
 let isPrivate = false;
 
 /*
-  💾 загрузка истории (если НЕ приватный режим)
+  💾 загрузка истории
 */
 function loadHistory() {
   const saved = localStorage.getItem('chat_history');
+
   if (saved && !isPrivate) {
     chatHistory = JSON.parse(saved);
     chatHistory.forEach(m => {
@@ -63,13 +67,13 @@ form.addEventListener('submit', async (e) => {
   const text = input.value.trim();
   if (!text) return;
 
-  // user message
+  // user
   appendMessage(text, 'user');
   addToHistory('user', text);
 
   input.value = '';
 
-  // placeholder bot
+  // placeholder
   appendMessage('...', 'bot');
 
   try {
@@ -78,7 +82,10 @@ form.addEventListener('submit', async (e) => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ message: text })
+      body: JSON.stringify({
+        message: text,
+        session_id: SESSION_ID
+      })
     });
 
     const lastBots = messages.querySelectorAll('.msg.bot');
@@ -108,7 +115,7 @@ form.addEventListener('submit', async (e) => {
 });
 
 /*
-  🗑 очистка истории
+  🗑 очистка
 */
 clearBtn.addEventListener('click', () => {
   chatHistory = [];
