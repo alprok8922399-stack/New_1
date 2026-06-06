@@ -13,7 +13,8 @@ margin:0;
 padding:0;
 }
 
-html,body{
+html,
+body{
 width:100%;
 height:100%;
 font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
@@ -28,8 +29,8 @@ overflow:hidden;
 .app{
 display:flex;
 flex-direction:column;
-height:100vh;
 width:100%;
+height:100vh;
 }
 
 .topbar{
@@ -87,7 +88,7 @@ animation:fadeIn .2s ease;
 .msg.user{
 align-self:flex-end;
 background:#2f2f2f;
-color:white;
+color:#ffffff;
 }
 
 .msg.bot{
@@ -121,13 +122,13 @@ height:52px;
 border:none;
 border-radius:50%;
 background:#ffffff;
-color:black;
+color:#000000;
 font-size:18px;
 cursor:pointer;
 }
 
 .input-area button:hover{
-opacity:.9;
+opacity:0.9;
 }
 
 @keyframes fadeIn{
