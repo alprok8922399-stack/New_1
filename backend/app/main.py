@@ -36,21 +36,17 @@ allow_headers=["*"],
 
 # =====================
 
-# PATHS (FRONTEND)
+# FRONTEND PATH
 
 # =====================
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(**file**)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
-# подключаем статику
-
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
-# главная страница
-
 @app.get("/")
-def read_index():
+def home():
 return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 # =====================
@@ -155,3 +151,4 @@ try:
 finally:
     db.close()
 ```
+                
