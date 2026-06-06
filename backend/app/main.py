@@ -53,6 +53,16 @@ Base.metadata.create_all(bind=engine)
 # =====================
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
+print("===================================")
+print("OPENROUTER_API_KEY EXISTS:", OPENROUTER_API_KEY is not None)
+
+if OPENROUTER_API_KEY:
+    print("OPENROUTER_API_KEY LENGTH:", len(OPENROUTER_API_KEY))
+else:
+    print("OPENROUTER_API_KEY LENGTH: 0")
+
+print("===================================")
+
 MODEL = "deepseek/deepseek-chat-v3-0324:free"
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
