@@ -6,63 +6,47 @@ const privateBtn = document.getElementById('privateBtn');
 const clearBtn = document.getElementById('clearBtn');
 
 const BACKEND = "https://new-1-5155.onrender.com/api/chat";
-
-// 🧠 ID сессии (пока фиксированный пользователь)
 const SESSION_ID = "user-1";
 
-/*
-📦 состояние
-*/
 let chatHistory = [];
 let isPrivate = false;
 
-/*
-💾 загрузка истории
-*/
-function loadHistory() {
-const saved = localStorage.getItem('chat_history');
-
-if (saved && !isPrivate) {
-chatHistory = JSON.parse(saved);
-chatHistory.forEach(m => {
-appendMessage(m.text, m.role);
-});
-}
-}
-
-/*
-💾 сохранение истории
-*/
-function saveHistory() {
-if (!isPrivate) {
-localStorage.setItem('chat_history', JSON.stringify(chatHistory));
-}
-}
-
-/*
-💬 вывод сообщения
-*/
 function appendMessage(text, role = "bot") {
 const el = document.createElement('div');
 el.className = `msg ${role}`;
 el.textContent = text;
 messages.appendChild(el);
 messages.scrollTop = messages.scrollHeight;
+return el;
 }
 
-/*
-🧠 добавить в историю
-*/
+function saveHistory() {
+if (!isPrivate) {
+localStorage.setItem('chat_history', JSON.stringify(chatHistory));
+}
+}
+
+function loadHistory() {
+messages.innerHTML = "";
+const saved = localStorage.getItem('chat_history');
+
+if (saved && !isPrivate) {
+chatHistory = JSON.parse(saved);
+chatHistory.forEach(m => appendMessage(m.text, m.role));
+}
+}
+
 function addToHistory(role, text) {
 chatHistory.push({ role, text });
 saveHistory();
 }
 
 /*
-🚀 отправка сообщения
+🚀 ВАЖНО: submit полностью блокируем
 */
 form.addEventListener('submit', async (e) => {
 e.preventDefault();
+e.stopPropagation();
 
 const text = input.value.trim();
 if (!text) return;
@@ -70,16 +54,14 @@ if (!text) return;
 appendMessage(text, 'user');
 addToHistory('user', text);
 
-input.value = '';
+input.value = "";
 
-appendMessage('...', 'bot');
+const thinking = appendMessage('✦ Думаю...', 'bot');
 
 try {
 const res = await fetch(BACKEND, {
 method: 'POST',
-headers: {
-'Content-Type': 'application/json'
-},
+headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({
 message: text,
 session_id: SESSION_ID
@@ -87,33 +69,18 @@ session_id: SESSION_ID
 });
 
 ```
-const lastBots = messages.querySelectorAll('.msg.bot');
-
 if (res.ok) {
   const data = await res.json();
-  const reply = data.reply || '(пустой ответ)';
-
-  lastBots[lastBots.length - 1].textContent = reply;
-  addToHistory('bot', reply);
-
+  thinking.textContent = data.reply || '(пустой ответ)';
+  addToHistory('bot', thinking.textContent);
 } else {
-  const errText = await res.text();
-  const errorMsg = `Ошибка: ${res.status} ${errText}`;
-
-  lastBots[lastBots.length - 1].textContent = errorMsg;
-  addToHistory('bot', errorMsg);
+  const err = await res.text();
+  thinking.textContent = `Ошибка: ${res.status} ${err}`;
 }
 ```
 
 } catch (err) {
-const lastBots = messages.querySelectorAll('.msg.bot');
-const errorMsg = `Сеть: ${err.message || err}`;
-
-```
-lastBots[lastBots.length - 1].textContent = errorMsg;
-addToHistory('bot', errorMsg);
-```
-
+thinking.textContent = `Сеть: ${err.message}`;
 }
 });
 
