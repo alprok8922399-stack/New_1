@@ -85,41 +85,71 @@ class ChatResponse(BaseModel):
 async def chat(req: ChatRequest):
     user_text = req.message
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            OPENROUTER_URL,
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": MODEL,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": user_text
-                    }
-                ],
-            },
-        ) as resp:
-
-            data = await resp.json()
-
-            print("===================================")
-            print("OPENROUTER STATUS:", resp.status)
-            print("OPENROUTER RESPONSE:")
-            print(data)
-            print("===================================")
-
-    reply = (
-        data.get("choices", [{}])[0]
-        .get("message", {})
-        .get("content", "Ошибка ответа")
-    )
-
     db = SessionLocal()
 
     try:
+        # Берём последние сообщения из БД
+        history_rows = (
+            db.query(Message)
+            .order_by(Message.id.desc())
+            .limit(10)
+            .all()
+        )
+
+        history_rows.reverse()
+
+        messages_payload = []
+
+        for row in history_rows:
+            messages_payload.append(
+                {
+                    "role": "user",
+                    "content": row.user_message
+                }
+            )
+
+            messages_payload.append(
+                {
+                    "role": "assistant",
+                    "content": row.bot_reply
+                }
+            )
+
+        # Добавляем текущее сообщение
+        messages_payload.append(
+            {
+                "role": "user",
+                "content": user_text
+            }
+        )
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                OPENROUTER_URL,
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": MODEL,
+                    "messages": messages_payload,
+                },
+            ) as resp:
+
+                data = await resp.json()
+
+                print("===================================")
+                print("OPENROUTER STATUS:", resp.status)
+                print("OPENROUTER RESPONSE:")
+                print(data)
+                print("===================================")
+
+        reply = (
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "Ошибка ответа")
+        )
+
         msg = Message(
             user_message=user_text,
             bot_reply=reply
@@ -128,7 +158,7 @@ async def chat(req: ChatRequest):
         db.add(msg)
         db.commit()
 
+        return ChatResponse(reply=reply)
+
     finally:
         db.close()
-
-    return ChatResponse(reply=reply)
