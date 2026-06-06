@@ -45,10 +45,12 @@ FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
+from fastapi.responses import FileResponse
+import os
+
 @app.get("/")
 def home():
-return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
-
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 # =====================
 
 # DB
