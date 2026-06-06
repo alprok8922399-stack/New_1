@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from datetime import datetime
 
 from fastapi import FastAPI
@@ -29,26 +30,16 @@ app.add_middleware(
 )
 
 # =====================
-# FRONTEND PATH (SAFE VERSION)
+# FRONTEND PATH
 # =====================
+BASE_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = BASE_DIR / "frontend"
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-
-FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
-
-# Проверка (ВАЖНО для Render)
-if os.path.exists(FRONTEND_DIR):
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
-
+app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
 @app.get("/")
 def home():
-    index_file = os.path.join(FRONTEND_DIR, "index.html")
-
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-
-    return {"status": "ok", "message": "frontend not found"}
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 # =====================
 # DB
@@ -60,7 +51,6 @@ SessionLocal = sessionmaker(bind=engine)
 
 Base = declarative_base()
 
-
 class Message(Base):
     __tablename__ = "messages"
 
@@ -68,7 +58,6 @@ class Message(Base):
     user_message = Column(Text)
     bot_reply = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
-
 
 Base.metadata.create_all(bind=engine)
 
@@ -80,18 +69,17 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 MODEL = "deepseek/deepseek-chat-v3-0324"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-
 class ChatRequest(BaseModel):
     message: str
-
+    session_id: str | None = None
 
 class ChatResponse(BaseModel):
     reply: str
 
-
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     user_text = req.message
+
     db = SessionLocal()
 
     try:
@@ -107,19 +95,10 @@ async def chat(req: ChatRequest):
         messages_payload = []
 
         for row in history_rows:
-            messages_payload.append({
-                "role": "user",
-                "content": row.user_message
-            })
-            messages_payload.append({
-                "role": "assistant",
-                "content": row.bot_reply
-            })
+            messages_payload.append({"role": "user", "content": row.user_message})
+            messages_payload.append({"role": "assistant", "content": row.bot_reply})
 
-        messages_payload.append({
-            "role": "user",
-            "content": user_text
-        })
+        messages_payload.append({"role": "user", "content": user_text})
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -133,7 +112,6 @@ async def chat(req: ChatRequest):
                     "messages": messages_payload,
                 },
             ) as resp:
-
                 data = await resp.json()
 
         reply = (
