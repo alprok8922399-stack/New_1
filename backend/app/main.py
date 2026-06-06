@@ -32,7 +32,7 @@ app.add_middleware(
 # FRONTEND PATH (SAFE VERSION)
 # =====================
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
