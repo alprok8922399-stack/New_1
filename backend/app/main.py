@@ -63,7 +63,7 @@ else:
 
 print("===================================")
 
-MODEL = "deepseek/deepseek-chat-v3-0324:free"
+MODEL = "deepseek/deepseek-chat-v3-0324"
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
