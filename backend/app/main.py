@@ -29,17 +29,26 @@ app.add_middleware(
 )
 
 # =====================
-# FRONTEND PATH
+# FRONTEND PATH (SAFE VERSION)
 # =====================
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
-app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+# Проверка (ВАЖНО для Render)
+if os.path.exists(FRONTEND_DIR):
+    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 
 @app.get("/")
 def home():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+    index_file = os.path.join(FRONTEND_DIR, "index.html")
+
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+
+    return {"status": "ok", "message": "frontend not found"}
 
 # =====================
 # DB
@@ -74,7 +83,6 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 class ChatRequest(BaseModel):
     message: str
-    session_id: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -84,7 +92,6 @@ class ChatResponse(BaseModel):
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     user_text = req.message
-
     db = SessionLocal()
 
     try:
@@ -100,10 +107,19 @@ async def chat(req: ChatRequest):
         messages_payload = []
 
         for row in history_rows:
-            messages_payload.append({"role": "user", "content": row.user_message})
-            messages_payload.append({"role": "assistant", "content": row.bot_reply})
+            messages_payload.append({
+                "role": "user",
+                "content": row.user_message
+            })
+            messages_payload.append({
+                "role": "assistant",
+                "content": row.bot_reply
+            })
 
-        messages_payload.append({"role": "user", "content": user_text})
+        messages_payload.append({
+            "role": "user",
+            "content": user_text
+        })
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
