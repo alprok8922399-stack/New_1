@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 from datetime import datetime
 
 from fastapi import FastAPI
@@ -16,11 +15,13 @@ import aiohttp
 # =====================
 # APP
 # =====================
+
 app = FastAPI()
 
 # =====================
 # CORS
 # =====================
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,29 +31,37 @@ app.add_middleware(
 )
 
 # =====================
-# FRONTEND
+# FRONTEND PATH
 # =====================
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
-app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+
+# static подключаем только если папка реально существует
+if os.path.exists(FRONTEND_DIR):
+    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 
 @app.get("/")
 def home():
-    index_file = FRONTEND_DIR / "index.html"
-    if not index_file.exists():
-        return {"status": "error", "message": "index.html not found"}
-    return FileResponse(index_file)
+    index_path = os.path.join(FRONTEND_DIR, "index.html")
+
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+
+    return {"status": "ok", "message": "frontend not found"}
 
 # =====================
 # DB
 # =====================
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
 Base = declarative_base()
+
 
 class Message(Base):
     __tablename__ = "messages"
@@ -62,11 +71,13 @@ class Message(Base):
     bot_reply = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+
 Base.metadata.create_all(bind=engine)
 
 # =====================
 # OPENROUTER
 # =====================
+
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 MODEL = "deepseek/deepseek-chat-v3-0324"
@@ -118,6 +129,7 @@ async def chat(req: ChatRequest):
                     "messages": messages_payload,
                 },
             ) as resp:
+
                 data = await resp.json()
 
         reply = (
