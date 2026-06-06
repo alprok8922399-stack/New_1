@@ -7,7 +7,7 @@ const clearBtn = document.getElementById('clearBtn');
 
 const BACKEND = "https://new-1-5155.onrender.com/api/chat";
 
-// 🧠 ID сессии
+// 🧠 ID сессии (пока фиксированный пользователь)
 const SESSION_ID = "user-1";
 
 /*
@@ -20,19 +20,13 @@ let isPrivate = false;
 💾 загрузка истории
 */
 function loadHistory() {
-messages.innerHTML = "";
-
 const saved = localStorage.getItem('chat_history');
 
 if (saved && !isPrivate) {
 chatHistory = JSON.parse(saved);
-
-```
 chatHistory.forEach(m => {
-  appendMessage(m.text, m.role);
+appendMessage(m.text, m.role);
 });
-```
-
 }
 }
 
@@ -50,14 +44,10 @@ localStorage.setItem('chat_history', JSON.stringify(chatHistory));
 */
 function appendMessage(text, role = "bot") {
 const el = document.createElement('div');
-
 el.className = `msg ${role}`;
 el.textContent = text;
-
 messages.appendChild(el);
 messages.scrollTop = messages.scrollHeight;
-
-return el;
 }
 
 /*
@@ -75,7 +65,6 @@ form.addEventListener('submit', async (e) => {
 e.preventDefault();
 
 const text = input.value.trim();
-
 if (!text) return;
 
 appendMessage(text, 'user');
@@ -83,7 +72,7 @@ addToHistory('user', text);
 
 input.value = '';
 
-const thinkingMessage = appendMessage('✦ Думаю...', 'bot');
+appendMessage('...', 'bot');
 
 try {
 const res = await fetch(BACKEND, {
@@ -98,45 +87,42 @@ session_id: SESSION_ID
 });
 
 ```
+const lastBots = messages.querySelectorAll('.msg.bot');
+
 if (res.ok) {
   const data = await res.json();
   const reply = data.reply || '(пустой ответ)';
 
-  thinkingMessage.textContent = reply;
+  lastBots[lastBots.length - 1].textContent = reply;
   addToHistory('bot', reply);
 
 } else {
   const errText = await res.text();
   const errorMsg = `Ошибка: ${res.status} ${errText}`;
 
-  thinkingMessage.textContent = errorMsg;
+  lastBots[lastBots.length - 1].textContent = errorMsg;
   addToHistory('bot', errorMsg);
 }
 ```
 
 } catch (err) {
+const lastBots = messages.querySelectorAll('.msg.bot');
 const errorMsg = `Сеть: ${err.message || err}`;
 
 ```
-thinkingMessage.textContent = errorMsg;
+lastBots[lastBots.length - 1].textContent = errorMsg;
 addToHistory('bot', errorMsg);
 ```
 
 }
 });
 
-/*
-🗑 очистка
-*/
 clearBtn.addEventListener('click', () => {
 chatHistory = [];
 localStorage.removeItem('chat_history');
 messages.innerHTML = '';
 });
 
-/*
-🔒 приватный режим
-*/
 privateBtn.addEventListener('click', () => {
 isPrivate = !isPrivate;
 
@@ -149,7 +135,4 @@ loadHistory();
 }
 });
 
-/*
-🔄 старт
-*/
 loadHistory();
