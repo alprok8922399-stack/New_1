@@ -30,16 +30,19 @@ app.add_middleware(
 )
 
 # =====================
-# FRONTEND PATH
+# FRONTEND
 # =====================
-BASE_DIR = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = BASE_DIR / "frontend"
+FRONTEND_DIR = Path("frontend")
 
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
+
 @app.get("/")
 def home():
-    return FileResponse(FRONTEND_DIR / "index.html")
+    index_file = FRONTEND_DIR / "index.html"
+    if not index_file.exists():
+        return {"status": "error", "message": "index.html not found"}
+    return FileResponse(index_file)
 
 # =====================
 # DB
@@ -69,12 +72,15 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 MODEL = "deepseek/deepseek-chat-v3-0324"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
+
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
 
+
 class ChatResponse(BaseModel):
     reply: str
+
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
