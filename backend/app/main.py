@@ -2,9 +2,10 @@ import os
 from datetime import datetime
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
+from sqlalchemy import create_engine, Column, Integer, Text, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 import aiohttp
@@ -13,6 +14,17 @@ import aiohttp
 # APP
 # =====================
 app = FastAPI()
+
+# =====================
+# CORS
+# =====================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # =====================
 # DB
@@ -42,8 +54,8 @@ Base.metadata.create_all(bind=engine)
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 MODEL = "deepseek/deepseek-chat-v3-0324:free"
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # =====================
 # REQUEST MODEL
@@ -63,7 +75,6 @@ class ChatResponse(BaseModel):
 async def chat(req: ChatRequest):
     user_text = req.message
 
-    # --- call AI ---
     async with aiohttp.ClientSession() as session:
         async with session.post(
             OPENROUTER_URL,
@@ -74,11 +85,21 @@ async def chat(req: ChatRequest):
             json={
                 "model": MODEL,
                 "messages": [
-                    {"role": "user", "content": user_text}
+                    {
+                        "role": "user",
+                        "content": user_text
+                    }
                 ],
             },
         ) as resp:
+
             data = await resp.json()
+
+            print("===================================")
+            print("OPENROUTER STATUS:", resp.status)
+            print("OPENROUTER RESPONSE:")
+            print(data)
+            print("===================================")
 
     reply = (
         data.get("choices", [{}])[0]
@@ -86,15 +107,17 @@ async def chat(req: ChatRequest):
         .get("content", "Ошибка ответа")
     )
 
-    # --- save to DB ---
     db = SessionLocal()
+
     try:
         msg = Message(
             user_message=user_text,
             bot_reply=reply
         )
+
         db.add(msg)
         db.commit()
+
     finally:
         db.close()
 
