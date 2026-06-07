@@ -20,6 +20,7 @@ function appendMessage(text, role = "bot") {
   const el = document.createElement('div');
   el.className = `msg ${role}`;
   el.textContent = text;
+
   messages.appendChild(el);
 
   setTimeout(scrollToBottom, 50);
@@ -40,10 +41,13 @@ function loadHistory() {
 
   if (saved && !isPrivate) {
     chatHistory = JSON.parse(saved);
-    chatHistory.forEach(m => appendMessage(m.text, m.role));
+
+    chatHistory.forEach(m => {
+      appendMessage(m.text, m.role);
+    });
   }
 
-  setTimeout(scrollToBottom, 100);
+  setTimeout(scrollToBottom, 50);
 }
 
 function addToHistory(role, text) {
@@ -53,7 +57,6 @@ function addToHistory(role, text) {
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  e.stopPropagation();
 
   const text = input.value.trim();
 
@@ -85,7 +88,7 @@ form.addEventListener('submit', async (e) => {
 
       addToHistory('bot', thinking.textContent);
 
-      setTimeout(scrollToBottom, 100);
+      setTimeout(scrollToBottom, 50);
     } else {
       const err = await res.text();
       thinking.textContent = `Ошибка: ${res.status} ${err}`;
@@ -95,7 +98,7 @@ form.addEventListener('submit', async (e) => {
     thinking.textContent = `Сеть: ${err.message}`;
   }
 
-  setTimeout(scrollToBottom, 100);
+  setTimeout(scrollToBottom, 50);
 });
 
 clearBtn.addEventListener('click', () => {
@@ -114,8 +117,6 @@ privateBtn.addEventListener('click', () => {
     privateBtn.textContent = "🔒 Приватный";
     loadHistory();
   }
-
-  setTimeout(scrollToBottom, 100);
 });
 
 loadHistory();
