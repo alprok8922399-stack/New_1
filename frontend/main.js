@@ -1,261 +1,75 @@
-const form = document.getElementById('form');
-const input = document.getElementById('input');
-const messages = document.getElementById('messages');
+const form = document.getElementById("form");
+const input = document.getElementById("input");
+const messages = document.getElementById("messages");
 
-const privateBtn = document.getElementById('privateBtn');
-const autoClearSelect = document.getElementById('autoClearSelect');
-
-const BACKEND = "https://new-1-5155.onrender.com/api/chat";
-const SESSION_ID = "user-1";
-
-let chatHistory = [];
-let isPrivate = false;
-
-let autoClearTimer = null;
-
-function scrollToBottom() {
+// прокрутка вниз
+function scrollDown() {
   messages.scrollTop = messages.scrollHeight;
 }
 
-function clearChat() {
-  chatHistory = [];
-  localStorage.removeItem('chat_history');
-  messages.innerHTML = '';
-}
+// добавление сообщения
+function addMessage(text, type) {
+  const div = document.createElement("div");
+  div.className = "msg " + type;
 
-function resetAutoClearTimer() {
+  div.innerHTML = marked.parse(text);
 
-  if (!autoClearSelect) return;
+  messages.appendChild(div);
+  scrollDown();
 
-  if (autoClearTimer) {
-    clearTimeout(autoClearTimer);
-  }
-
-  const minutes = Number(autoClearSelect.value);
-
-  if (minutes <= 0) return;
-
-  autoClearTimer = setTimeout(() => {
-
-    clearChat();
-
-  }, minutes * 60 * 1000);
-}
-
-function enhanceCodeBlocks(container) {
-
-  container.querySelectorAll("pre").forEach((pre) => {
-
-    const code = pre.querySelector("code");
-
-    if (code && window.hljs) {
-      hljs.highlightElement(code);
-    }
-
-    if (pre.querySelector(".copy-btn")) return;
-
-    pre.style.position = "relative";
-
-    if (!code) return;
-
-    const btn = document.createElement("button");
-
-    btn.className = "copy-btn";
-    btn.textContent = "Копировать";
-
-    btn.style.position = "absolute";
-    btn.style.top = "8px";
-    btn.style.right = "8px";
-    btn.style.background = "#444";
-    btn.style.color = "#fff";
-    btn.style.border = "none";
-    btn.style.padding = "4px 8px";
-    btn.style.borderRadius = "6px";
-    btn.style.cursor = "pointer";
-    btn.style.fontSize = "12px";
-
-    btn.onclick = () => {
-
-      navigator.clipboard.writeText(code.innerText);
-
-      btn.textContent = "Скопировано";
-
-      setTimeout(() => {
-        btn.textContent = "Копировать";
-      }, 1500);
-    };
-
-    pre.appendChild(btn);
+  // подсветка кода
+  div.querySelectorAll("pre code").forEach((block) => {
+    hljs.highlightElement(block);
   });
 }
 
-function renderMarkdown(text) {
-
-  if (window.marked) {
-    return marked.parse(text || "");
-  }
-
-  return text || "";
-}
-
-function appendMessage(text, role = "bot") {
-
-  const el = document.createElement('div');
-
-  el.className = `msg ${role}`;
-
-  if (role === "bot") {
-
-    el.innerHTML = renderMarkdown(text);
-
-    enhanceCodeBlocks(el);
-
-  } else {
-
-    el.textContent = text;
-  }
-
-  messages.appendChild(el);
-
-  setTimeout(scrollToBottom, 50);
-
-  return el;
-}
-
-function saveHistory() {
-
-  if (!isPrivate) {
-    localStorage.setItem(
-      'chat_history',
-      JSON.stringify(chatHistory)
-    );
-  }
-}
-
-function loadHistory() {
-
-  messages.innerHTML = "";
-
-  const saved = localStorage.getItem('chat_history');
-
-  if (saved && !isPrivate) {
-
-    chatHistory = JSON.parse(saved);
-
-    chatHistory.forEach(m => {
-      appendMessage(m.text, m.role);
-    });
-  }
-
-  setTimeout(scrollToBottom, 50);
-}
-
-function addToHistory(role, text) {
-
-  chatHistory.push({
-    role,
-    text
-  });
-
-  saveHistory();
-}
-
-form.addEventListener('submit', async (e) => {
-
-  e.preventDefault();
-
-  resetAutoClearTimer();
-
+// отправка сообщения
+async function sendMessage() {
   const text = input.value.trim();
-
   if (!text) return;
 
-  appendMessage(text, 'user');
-
-  addToHistory('user', text);
-
+  addMessage(text, "user");
   input.value = "";
 
-  const thinking = appendMessage(
-    '✦ Думаю...',
-    'bot'
-  );
+  const botDiv = document.createElement("div");
+  botDiv.className = "msg bot";
+  botDiv.innerHTML = "⏳...";
+  messages.appendChild(botDiv);
+  scrollDown();
 
   try {
-
-    const res = await fetch(BACKEND, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message: text,
-        session_id: SESSION_ID
-      })
+    const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text })
     });
 
-    if (res.ok) {
+    const data = await res.json();
+    const answer = data.answer || "Ошибка ответа";
 
-      const data = await res.json();
+    botDiv.innerHTML = marked.parse(answer);
 
-      thinking.innerHTML = renderMarkdown(
-        data.reply || '(пустой ответ)'
-      );
+    botDiv.querySelectorAll("pre code").forEach((block) => {
+      hljs.highlightElement(block);
+    });
 
-      enhanceCodeBlocks(thinking);
+    scrollDown();
 
-      addToHistory(
-        'bot',
-        data.reply || '(пустой ответ)'
-      );
-
-      setTimeout(scrollToBottom, 50);
-
-    } else {
-
-      const err = await res.text();
-
-      thinking.textContent =
-        `Ошибка: ${res.status} ${err}`;
-    }
-
-  } catch (err) {
-
-    thinking.textContent =
-      `Сеть: ${err.message}`;
+  } catch (e) {
+    botDiv.innerHTML = "Ошибка соединения";
   }
-
-  setTimeout(scrollToBottom, 50);
-});
-
-privateBtn.addEventListener('click', () => {
-
-  isPrivate = !isPrivate;
-
-  if (isPrivate) {
-
-    privateBtn.textContent =
-      "🔓 Приватный (ВКЛ)";
-
-    messages.innerHTML = '';
-
-  } else {
-
-    privateBtn.textContent =
-      "🔒 Приватный";
-
-    loadHistory();
-  }
-});
-
-if (autoClearSelect) {
-
-  autoClearSelect.addEventListener(
-    'change',
-    resetAutoClearTimer
-  );
 }
 
-loadHistory();
+// кнопка отправки формы
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  sendMessage();
+});
 
-resetAutoClearTimer();
+// 🔥 Enter / Shift+Enter (как в ChatGPT)
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault(); // не перенос строки
+    sendMessage();      // отправка
+  }
+});
