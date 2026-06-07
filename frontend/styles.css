@@ -26,13 +26,13 @@ overflow:hidden;
 .app{
 display:flex;
 flex-direction:column;
-height:100vh;
 width:100%;
+height:100vh;
 }
 
 .topbar{
-flex-shrink:0;
 height:60px;
+min-height:60px;
 background:var(--panel);
 border-bottom:1px solid var(--border);
 display:flex;
@@ -60,10 +60,6 @@ padding:8px 12px;
 cursor:pointer;
 }
 
-.btn:hover{
-opacity:0.9;
-}
-
 .messages{
 flex:1;
 overflow-y:auto;
@@ -74,32 +70,36 @@ gap:14px;
 width:100%;
 max-width:900px;
 margin:0 auto;
-min-height:0;
 }
 
 .msg{
 padding:12px 16px;
 border-radius:18px;
-line-height:1.5;
-max-width:80%;
-word-wrap:break-word;
+line-height:1.7;
+word-break:break-word;
+overflow-wrap:break-word;
 animation:fadeIn .2s ease;
 }
 
 .msg.user{
 align-self:flex-end;
+max-width:80%;
 background:#2f2f2f;
 color:#ffffff;
 }
 
 .msg.bot{
 align-self:flex-start;
+width:100%;
+max-width:100%;
 background:transparent;
 color:#ececec;
+white-space:pre-wrap;
+word-break:break-word;
+overflow-wrap:break-word;
 }
 
 .input-area{
-flex-shrink:0;
 display:flex;
 gap:10px;
 padding:16px;
