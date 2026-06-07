@@ -3,7 +3,10 @@ const input = document.getElementById("input");
 const messages = document.getElementById("messages");
 
 const btnPrivate = document.getElementById("btnPrivate");
-const btnClear = document.getElementById("btnClear");
+const clearTimer = document.getElementById("clearTimer");
+
+let inactivityTimer = null;
+let inactivityMinutes = 0;
 
 function getSessionKey() {
   return localStorage.getItem("session_key") || "guest";
@@ -18,20 +21,48 @@ function autoResize() {
   input.style.height = input.scrollHeight + "px";
 }
 
+function clearChat() {
+  messages.innerHTML = "";
+}
+
+function startTimer() {
+  clearTimeout(inactivityTimer);
+
+  if (!inactivityMinutes) return;
+
+  inactivityTimer = setTimeout(() => {
+    clearChat();
+  }, inactivityMinutes * 60 * 1000);
+}
+
+function resetTimer() {
+  if (inactivityMinutes > 0) {
+    startTimer();
+  }
+}
+
 function addMessage(text, type) {
   const div = document.createElement("div");
+
   div.className = "msg " + type;
   div.innerHTML = marked.parse(text);
+
   messages.appendChild(div);
+
   scrollDown();
+  resetTimer();
 }
 
 function createBotMessage() {
   const div = document.createElement("div");
+
   div.className = "msg bot";
   div.innerHTML = "⏳...";
+
   messages.appendChild(div);
+
   scrollDown();
+
   return div;
 }
 
@@ -66,6 +97,7 @@ async function sendMessage() {
     );
 
     scrollDown();
+    resetTimer();
 
   } catch (e) {
     botDiv.innerHTML = "Ошибка соединения";
@@ -79,16 +111,35 @@ form.addEventListener("submit", (e) => {
 
 input.addEventListener("input", () => {
   autoResize();
+  resetTimer();
 });
 
 btnPrivate.addEventListener("click", () => {
   localStorage.setItem("mode", "private");
-  messages.innerHTML = "";
-  addMessage("🔒 Приватный режим активирован", "bot");
+
+  clearChat();
+
+  addMessage(
+    "🔒 Приватный режим активирован",
+    "bot"
+  );
 });
 
-btnClear.addEventListener("click", () => {
-  messages.innerHTML = "";
+clearTimer.addEventListener("change", () => {
+
+  if (clearTimer.value === "now") {
+    clearChat();
+    clearTimer.selectedIndex = 0;
+    return;
+  }
+
+  inactivityMinutes = Number(clearTimer.value);
+
+  clearTimeout(inactivityTimer);
+
+  if (inactivityMinutes > 0) {
+    startTimer();
+  }
 });
 
 autoResize();
