@@ -1,43 +1,60 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="ru">
 <head>
-  <title>Чат с отправкой скринов</title>
-  <style>
-    /* Стили кнопки */
-    #screenshotBtn {
-      background: #4CAF50;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      margin: 10px;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    
-    #screenshotBtn:hover {
-      background: #45a049;
-    }
-    
-    /* Стили для превью скрина */
-    #screenshotPreview {
-      max-width: 100%;
-      margin-top: 10px;
-      display: none;
-    }
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Chat</title>
+
+  <link rel="stylesheet" href="./styles.css" />
+
+  <!-- Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- Highlight.js -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
+  />
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
+
 <body>
-  <button id="screenshotBtn">📷 Отправить скриншот</button>
-  <img id="screenshotPreview" alt="Ваш скриншот">
-  
-  <script>
-    document.getElementById('screenshotBtn').addEventListener('click', function() {
-      alert("Функция отправки скриншота активирована!\n(В реальном приложении здесь будет загрузка файла)");
-      // Реальный код для мобильного устройства:
-      // 1. Вызов API камеры/галереи
-      // 2. Загрузка файла на сервер
-      // 3. Отправка URL скрина боту
-    });
-  </script>
+  <div class="app">
+
+    <header class="topbar">
+      <div class="title">💬 AI Chat</div>
+
+      <div class="actions">
+        <select id="autoClearSelect" class="btn" style="width:80px;font-size:12px;">
+          <option value="0">🕒 Таймер</option>
+          <option value="1">1 минута</option>
+          <option value="5">5 минут</option>
+          <option value="10">10 минут</option>
+          <option value="30">30 минут</option>
+          <option value="60">1 час</option>
+        </select>
+
+        <button id="privateBtn" class="btn" type="button">
+          🔒 Приватный
+        </button>
+      </div>
+    </header>
+
+    <main id="messages" class="messages"></main>
+
+    <form id="form" class="input-area">
+      <input
+        id="input"
+        type="text"
+        autocomplete="off"
+        placeholder="Напишите сообщение..."
+      />
+      <button type="submit">➤</button>
+    </form>
+
+  </div>
+
+  <script src="./main.js"></script>
 </body>
 </html>
