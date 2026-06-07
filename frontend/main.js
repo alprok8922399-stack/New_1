@@ -45,6 +45,9 @@ function addMessage(text, type) {
   const div = document.createElement("div");
 
   div.className = "msg " + type;
+
+  div.style.border = "3px solid red";
+
   div.innerHTML = marked.parse(text);
 
   messages.appendChild(div);
