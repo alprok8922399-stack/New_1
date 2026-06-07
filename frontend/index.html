@@ -15,31 +15,17 @@
 
 <div class="app">
 
-  <!-- TOPBAR -->
   <header class="topbar">
-
     <div class="title">💬 AI Chat</div>
 
     <div class="actions">
-
-      <!-- ПРИВАТНЫЙ (КНОПКА) -->
-      <button type="button" class="btn" id="btnPrivate">
-        🔒 Приватный
-      </button>
-
-      <!-- ОЧИСТИТЬ -->
-      <button type="button" class="btn" id="btnClear">
-        🧹 Очистить
-      </button>
-
+      <button class="btn" id="btnPrivate" type="button">🔒 Приватный</button>
+      <button class="btn" id="btnClear" type="button">🧹 Очистить</button>
     </div>
-
   </header>
 
-  <!-- CHAT -->
   <main id="messages" class="messages"></main>
 
-  <!-- INPUT -->
   <form id="form" class="input-area">
     <input id="input" type="text" placeholder="Напишите сообщение..." />
     <button type="submit">➤</button>
@@ -47,7 +33,23 @@
 
 </div>
 
-<script src="./main.js"></script>
+<!-- 🔥 ВРЕМЕННЫЙ ТЕСТ JS -->
+<script>
+  alert("JS ЗАГРУЗИЛСЯ");
+
+  console.log("INDEX LOADED");
+
+  const btnPrivate = document.getElementById("btnPrivate");
+  const btnClear = document.getElementById("btnClear");
+
+  btnPrivate.onclick = () => {
+    alert("ПРИВАТНЫЙ НАЖАТ");
+  };
+
+  btnClear.onclick = () => {
+    alert("ОЧИСТИТЬ НАЖАТ");
+  };
+</script>
 
 </body>
 </html>
