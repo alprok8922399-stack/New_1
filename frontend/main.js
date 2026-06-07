@@ -2,25 +2,41 @@ const form = document.getElementById("form");
 const input = document.getElementById("input");
 const messages = document.getElementById("messages");
 
+/* =========================
+   КЛЮЧ ПОЛЬЗОВАТЕЛЯ
+========================= */
+
 function getUserKey() {
-  return localStorage.getItem("user_key") || "guest";
+  return localStorage.getItem("user_key") || null;
 }
 
 function setUserKey(key) {
   localStorage.setItem("user_key", key);
 }
 
-function ensureUserKey() {
-  let key = localStorage.getItem("user_key");
+/* =========================
+   ПЕРВЫЙ ВХОД — ВОПРОС
+========================= */
+
+function askForKey() {
+  let key = getUserKey();
 
   if (!key) {
     key = prompt("Как твоё имя?");
-    if (!key) key = "guest";
+    
+    if (!key) {
+      key = "guest";
+    }
+
     setUserKey(key);
   }
 }
 
-ensureUserKey();
+askForKey();
+
+/* =========================
+   UI
+========================= */
 
 function scrollDown(smooth = true) {
   messages.scrollTo({
@@ -51,6 +67,10 @@ function createBotMessage() {
   return div;
 }
 
+/* =========================
+   КНОПКА COPY
+========================= */
+
 function addCopyButtons(container) {
   container.querySelectorAll("pre").forEach((pre) => {
     if (pre.querySelector(".copy-btn")) return;
@@ -74,6 +94,10 @@ function addCopyButtons(container) {
   });
 }
 
+/* =========================
+   РЕНДЕР БОТА
+========================= */
+
 function renderBotMessage(div, text) {
   div.innerHTML = marked.parse(text);
 
@@ -84,6 +108,10 @@ function renderBotMessage(div, text) {
   addCopyButtons(div);
   scrollDown(true);
 }
+
+/* =========================
+   ОТПРАВКА
+========================= */
 
 async function sendMessage() {
   const text = input.value.trim();
@@ -98,7 +126,9 @@ async function sendMessage() {
   try {
     const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({
         message: text,
         session_id: getUserKey()
@@ -114,6 +144,10 @@ async function sendMessage() {
     botDiv.innerHTML = "Ошибка соединения";
   }
 }
+
+/* =========================
+   EVENTS
+========================= */
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
