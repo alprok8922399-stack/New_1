@@ -2,6 +2,9 @@ const form = document.getElementById("form");
 const input = document.getElementById("input");
 const messages = document.getElementById("messages");
 
+const btnPrivate = document.getElementById("btnPrivate");
+const btnClear = document.getElementById("btnClear");
+
 function getSessionKey() {
   return localStorage.getItem("session_key") || "guest";
 }
@@ -21,7 +24,7 @@ function addMessage(text, type) {
 function createBotMessage() {
   const div = document.createElement("div");
   div.className = "msg bot";
-  div.innerHTML = "⏳ отправка...";
+  div.innerHTML = "⏳...";
   messages.appendChild(div);
   scrollDown();
   return div;
@@ -48,35 +51,38 @@ async function sendMessage() {
       })
     });
 
-    console.log("STATUS:", res.status);
+    const data = await res.json();
 
-    const raw = await res.text();
-    console.log("RAW RESPONSE:", raw);
-
-    let data;
-    try {
-      data = JSON.parse(raw);
-    } catch (e) {
-      botDiv.innerHTML = "Ошибка: сервер вернул не JSON";
-      return;
-    }
-
-    if (!data.reply) {
-      botDiv.innerHTML = "Ошибка: нет reply в ответе";
-      console.log(data);
-      return;
-    }
-
-    botDiv.innerHTML = marked.parse(data.reply);
+    botDiv.innerHTML = marked.parse(data.reply || "Ошибка ответа");
     scrollDown();
 
   } catch (e) {
-    console.log("FETCH ERROR:", e);
-    botDiv.innerHTML = "Ошибка соединения с сервером";
+    botDiv.innerHTML = "Ошибка соединения";
   }
 }
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
   sendMessage();
+});
+
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") sendMessage();
+});
+
+
+// =======================
+// 🔥 КНОПКИ
+// =======================
+
+// ПРИВАТНЫЙ (пока просто очищает local UI + ставит режим)
+btnPrivate.addEventListener("click", () => {
+  localStorage.setItem("mode", "private");
+  messages.innerHTML = "";
+  addMessage("🔒 Приватный режим активирован", "bot");
+});
+
+// ОЧИСТИТЬ ЧАТ
+btnClear.addEventListener("click", () => {
+  messages.innerHTML = "";
 });
