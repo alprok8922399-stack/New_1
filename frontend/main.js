@@ -11,12 +11,19 @@ const SESSION_ID = "user-1";
 let chatHistory = [];
 let isPrivate = false;
 
+function scrollToBottom() {
+  window.scrollTo(0, document.body.scrollHeight);
+  messages.scrollTop = messages.scrollHeight;
+}
+
 function appendMessage(text, role = "bot") {
   const el = document.createElement('div');
   el.className = `msg ${role}`;
   el.textContent = text;
   messages.appendChild(el);
-  messages.scrollTop = messages.scrollHeight;
+
+  setTimeout(scrollToBottom, 50);
+
   return el;
 }
 
@@ -35,6 +42,8 @@ function loadHistory() {
     chatHistory = JSON.parse(saved);
     chatHistory.forEach(m => appendMessage(m.text, m.role));
   }
+
+  setTimeout(scrollToBottom, 100);
 }
 
 function addToHistory(role, text) {
@@ -44,6 +53,7 @@ function addToHistory(role, text) {
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
+  e.stopPropagation();
 
   const text = input.value.trim();
 
@@ -68,31 +78,24 @@ form.addEventListener('submit', async (e) => {
       })
     });
 
-    const raw = await res.text();
+    if (res.ok) {
+      const data = await res.json();
 
-    console.log("STATUS:", res.status);
-    console.log("RAW:", raw);
+      thinking.textContent = data.reply || '(пустой ответ)';
 
-    if (!res.ok) {
-      thinking.textContent = `Ошибка ${res.status}: ${raw}`;
-      return;
+      addToHistory('bot', thinking.textContent);
+
+      setTimeout(scrollToBottom, 100);
+    } else {
+      const err = await res.text();
+      thinking.textContent = `Ошибка: ${res.status} ${err}`;
     }
-
-    let data;
-
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      thinking.textContent = `Некорректный JSON: ${raw}`;
-      return;
-    }
-
-    thinking.textContent = data.reply || "(пустой ответ)";
-    addToHistory('bot', thinking.textContent);
 
   } catch (err) {
     thinking.textContent = `Сеть: ${err.message}`;
   }
+
+  setTimeout(scrollToBottom, 100);
 });
 
 clearBtn.addEventListener('click', () => {
@@ -111,6 +114,8 @@ privateBtn.addEventListener('click', () => {
     privateBtn.textContent = "🔒 Приватный";
     loadHistory();
   }
+
+  setTimeout(scrollToBottom, 100);
 });
 
 loadHistory();
