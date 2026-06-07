@@ -22,27 +22,27 @@ function addUserMessage(text) {
   scrollDown(false);
 }
 
-function addBotMessage(text) {
+function createBotMessage() {
   const div = document.createElement("div");
   div.className = "msg bot";
-
-  div.innerHTML = marked.parse(text);
-
+  div.innerHTML = "⏳...";
   messages.appendChild(div);
   scrollDown(false);
-
-  addCopyButtons(div);
-  highlightCode(div);
+  return div;
 }
 
 function addCopyButtons(container) {
   container.querySelectorAll("pre").forEach((pre) => {
+    if (pre.querySelector(".copy-btn")) return;
+
     const btn = document.createElement("button");
     btn.innerText = "Copy";
     btn.className = "copy-btn";
 
     btn.onclick = () => {
       const code = pre.querySelector("code");
+      if (!code) return;
+
       navigator.clipboard.writeText(code.innerText);
 
       btn.innerText = "Copied!";
@@ -54,10 +54,15 @@ function addCopyButtons(container) {
   });
 }
 
-function highlightCode(container) {
-  container.querySelectorAll("pre code").forEach((block) => {
+function renderBotMessage(div, text) {
+  div.innerHTML = marked.parse(text);
+
+  div.querySelectorAll("pre code").forEach((block) => {
     hljs.highlightElement(block);
   });
+
+  addCopyButtons(div);
+  scrollDown(true);
 }
 
 async function sendMessage() {
@@ -68,11 +73,7 @@ async function sendMessage() {
   input.value = "";
   autoResize();
 
-  const botDiv = document.createElement("div");
-  botDiv.className = "msg bot";
-  botDiv.innerHTML = "⏳...";
-  messages.appendChild(botDiv);
-  scrollDown(false);
+  const botDiv = createBotMessage();
 
   try {
     const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
@@ -84,12 +85,7 @@ async function sendMessage() {
     const data = await res.json();
     const answer = data.reply || "Ошибка ответа";
 
-    botDiv.innerHTML = marked.parse(answer);
-
-    addCopyButtons(botDiv);
-    highlightCode(botDiv);
-
-    scrollDown(true);
+    renderBotMessage(botDiv, answer);
 
   } catch (e) {
     botDiv.innerHTML = "Ошибка соединения";
