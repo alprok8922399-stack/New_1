@@ -1,61 +1,13 @@
-<!doctype html>
-<html lang="ru">
+<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI Chat</title>
-
-  <link rel="stylesheet" href="./styles.css" />
-
-  <!-- Markdown -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-  <!-- Highlight.js -->
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
-  />
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-</head>
-
-<body>
-  <div class="app">
-
-    <header class="topbar">
-      <div class="title">💬 AI Chat</div>
-
-      <div class="actions">
-        <select id="autoClearSelect" class="btn" style="width:80px;font-size:12px;">
-          <option value="0">🕒 Таймер</option>
-          <option value="1">1 минута</option>
-          <option value="5">5 минут</option>
-          <option value="10">10 минут</option>
-          <option value="30">30 минут</option>
-          <option value="60">1 час</option>
-        </select>
-
-        <button id="privateBtn" class="btn" type="button">
-          🔒 Приватный
-        </button>
-      </div>
-    </header>
-
-    <main id="messages" class="messages"></main>
-
-    <form id="form" class="input-area">
-
-      <!-- 🔥 ВАЖНО: input заменён на textarea -->
-      <textarea
-        id="input"
-        placeholder="Напишите сообщение..."
-      ></textarea>
-
-      <button type="submit">➤</button>
-    </form>
-
-  </div>
-
+  <title>Проверка доступа Алексея</title>
   <script src="./main.js"></script>
+</head>
+<body>
+  <input type="text" id="secretInput" placeholder="Введи фразу...">
+  <button onclick="checkAuth(document.getElementById('secretInput').value)">
+    Проверить
+  </button>
 </body>
 </html>
