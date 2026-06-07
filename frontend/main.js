@@ -7,6 +7,12 @@ function scrollDown() {
   messages.scrollTop = messages.scrollHeight;
 }
 
+// авто-увеличение textarea
+function autoResize() {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 120) + "px";
+}
+
 // добавление сообщения
 function addMessage(text, type) {
   const div = document.createElement("div");
@@ -17,7 +23,6 @@ function addMessage(text, type) {
   messages.appendChild(div);
   scrollDown();
 
-  // подсветка кода
   div.querySelectorAll("pre code").forEach((block) => {
     hljs.highlightElement(block);
   });
@@ -30,6 +35,8 @@ async function sendMessage() {
 
   addMessage(text, "user");
   input.value = "";
+
+  autoResize();
 
   const botDiv = document.createElement("div");
   botDiv.className = "msg bot";
@@ -60,16 +67,19 @@ async function sendMessage() {
   }
 }
 
-// кнопка отправки формы
+// отправка формы
 form.addEventListener("submit", (e) => {
   e.preventDefault();
   sendMessage();
 });
 
-// 🔥 Enter / Shift+Enter (как в ChatGPT)
+// Enter / Shift+Enter
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault(); // не перенос строки
-    sendMessage();      // отправка
+    e.preventDefault();
+    sendMessage();
   }
 });
+
+// 🔥 рост поля при вводе
+input.addEventListener("input", autoResize);
