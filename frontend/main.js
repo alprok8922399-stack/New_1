@@ -2,6 +2,26 @@ const form = document.getElementById("form");
 const input = document.getElementById("input");
 const messages = document.getElementById("messages");
 
+function getUserKey() {
+  return localStorage.getItem("user_key") || "guest";
+}
+
+function setUserKey(key) {
+  localStorage.setItem("user_key", key);
+}
+
+function ensureUserKey() {
+  let key = localStorage.getItem("user_key");
+
+  if (!key) {
+    key = prompt("Как твоё имя?");
+    if (!key) key = "guest";
+    setUserKey(key);
+  }
+}
+
+ensureUserKey();
+
 function scrollDown(smooth = true) {
   messages.scrollTo({
     top: messages.scrollHeight,
@@ -79,7 +99,10 @@ async function sendMessage() {
     const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text })
+      body: JSON.stringify({
+        message: text,
+        session_id: getUserKey()
+      })
     });
 
     const data = await res.json();
