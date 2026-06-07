@@ -3,50 +3,22 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI Chat</title>
-
-  <link rel="stylesheet" href="./styles.css" />
-
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <title>DEBUG PAGE</title>
 </head>
 
-<body>
+<body style="background:black;color:white;font-size:20px;">
 
-<div class="app">
+<h1>DEBUG MODE</h1>
 
-  <header class="topbar">
-    <div class="title">💬 AI Chat</div>
+<p>Если ты видишь это — обновился index.html</p>
 
-    <div class="actions">
-      <button class="btn" id="btnPrivate" type="button">🔒 Приватный</button>
-      <button class="btn" id="btnClear" type="button">🧹 Очистить</button>
-    </div>
-  </header>
-
-  <main id="messages" class="messages"></main>
-
-  <form id="form" class="input-area">
-    <input id="input" type="text" placeholder="Напишите сообщение..." />
-    <button type="submit">➤</button>
-  </form>
-
-</div>
+<p id="time"></p>
 
 <script>
-  // только проверка кнопок (без alert)
-  console.log("JS LOADED OK");
+  document.getElementById("time").innerText =
+    "TIME: " + new Date().toISOString();
 
-  const btnPrivate = document.getElementById("btnPrivate");
-  const btnClear = document.getElementById("btnClear");
-
-  btnPrivate.onclick = () => {
-    console.log("PRIVATE CLICK");
-  };
-
-  btnClear.onclick = () => {
-    console.log("CLEAR CLICK");
-  };
+  console.log("DEBUG INDEX LOADED");
 </script>
 
 </body>
