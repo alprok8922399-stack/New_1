@@ -9,72 +9,39 @@
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-
-  <style>
-    #loginScreen {
-      position: fixed;
-      inset: 0;
-      background: #0f0f0f;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-      color: white;
-    }
-
-    #loginBox {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      width: 260px;
-    }
-
-    #loginInput {
-      padding: 12px;
-      border-radius: 8px;
-      border: none;
-      font-size: 16px;
-      outline: none;
-    }
-
-    #loginBtn {
-      padding: 10px;
-      border: none;
-      border-radius: 8px;
-      background: #333;
-      color: white;
-      cursor: pointer;
-    }
-
-    #hint {
-      display: none;
-    }
-  </style>
 </head>
 
 <body>
 
-<!-- LOGIN -->
-<div id="loginScreen">
-  <h2>💬 AI Chat</h2>
+<div class="app">
 
-  <div id="loginBox">
-    <input id="loginInput" type="text" placeholder="Как твоё имя?" />
-    <button id="loginBtn" onclick="login()">Войти</button>
-    <div id="hint"></div>
-  </div>
-</div>
-
-<!-- CHAT -->
-<div class="app" id="app" style="display:none;">
-
+  <!-- TOPBAR -->
   <header class="topbar">
+
     <div class="title">💬 AI Chat</div>
+
+    <!-- 🔥 ВОТ ЭТО ТЕПЕРЬ ОБЯЗАТЕЛЬНО -->
+    <div class="actions">
+
+      <select class="btn" id="autoClearSelect">
+        <option value="0">🕒 Таймер</option>
+        <option value="1">1 мин</option>
+        <option value="5">5 мин</option>
+        <option value="10">10 мин</option>
+      </select>
+
+      <button class="btn" type="button">
+        🔒 Приватный
+      </button>
+
+    </div>
+
   </header>
 
+  <!-- CHAT -->
   <main id="messages" class="messages"></main>
 
+  <!-- INPUT -->
   <form id="form" class="input-area">
     <input id="input" type="text" placeholder="Напишите сообщение..." />
     <button type="submit">➤</button>
@@ -83,33 +50,6 @@
 </div>
 
 <script src="./main.js"></script>
-
-<script>
-  function login() {
-    const val = document.getElementById("loginInput").value.trim();
-    if (!val) return;
-
-    let sessionKey = val === "Ошибка 123"
-      ? "admin"
-      : "user_" + val;
-
-    localStorage.setItem("session_key", sessionKey);
-
-    document.getElementById("loginScreen").style.display = "none";
-    document.getElementById("app").style.display = "flex";
-  }
-
-  function autoLogin() {
-    const saved = localStorage.getItem("session_key");
-
-    if (saved) {
-      document.getElementById("loginScreen").style.display = "none";
-      document.getElementById("app").style.display = "flex";
-    }
-  }
-
-  autoLogin();
-</script>
 
 </body>
 </html>
