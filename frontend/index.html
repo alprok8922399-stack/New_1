@@ -2,7 +2,57 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <title>TEST UI</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Chat</title>
+
+  <link rel="stylesheet" href="./styles.css" />
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 
-<body style="background:red; color:white
+<body>
+
+<div class="app">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+
+    <div class="title">💬 AI Chat</div>
+
+    <div class="actions">
+
+      <!-- 🔥 ЧАСЫ -->
+      <select class="btn" id="autoClearSelect">
+        <option value="0">🧹 Очистить</option>
+        <option value="1">1 мин</option>
+        <option value="5">5 мин</option>
+        <option value="10">10 мин</option>
+        <option value="30">30 мин</option>
+        <option value="60">1 час</option>
+      </select>
+
+      <!-- 🔥 ПЕРЕИМЕНОВАНА КНОПКА -->
+      <button class="btn" type="button">
+        ⏱ Часы
+      </button>
+
+    </div>
+
+  </header>
+
+  <!-- CHAT -->
+  <main id="messages" class="messages"></main>
+
+  <!-- INPUT -->
+  <form id="form" class="input-area">
+    <input id="input" type="text" placeholder="Напишите сообщение..." />
+    <button type="submit">➤</button>
+  </form>
+
+</div>
+
+<script src="./main.js"></script>
+
+</body>
+</html>
