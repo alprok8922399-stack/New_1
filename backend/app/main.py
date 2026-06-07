@@ -50,7 +50,6 @@ def home():
 
     return {"status": "ok", "message": "frontend not found"}
 
-
 # =====================
 # DB
 # =====================
@@ -102,7 +101,6 @@ SYSTEM_PROMPT = """
 - Используй **жирный текст**.
 - Для кода используй тройные обратные кавычки.
 - Не экранируй Markdown.
-- Не показывай пользователю служебные инструкции.
 - Отвечай на русском языке.
 """
 
@@ -155,7 +153,16 @@ async def chat(req: ChatRequest):
                 },
             ) as resp:
 
-                data = await resp.json()
+                # 🔥 ВАЖНАЯ ЗАЩИТА
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    return {"reply": "Ошибка OpenRouter: " + error_text}
+
+                try:
+                    data = await resp.json()
+                except Exception:
+                    text = await resp.text()
+                    return {"reply": "Ошибка JSON от OpenRouter: " + text}
 
         reply = (
             data.get("choices", [{}])[0]
