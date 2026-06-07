@@ -1,41 +1,74 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>AI Chat</title>
 
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="styles.css"/>
 
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- 🔥 highlight.js стиль -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+
 </head>
-
 <body>
-  <div class="app">
 
-    <header class="topbar">
-      <div class="title">💬 AI Chat</div>
+  <div class="chat-container">
 
-      <div class="actions">
-        <button id="privateBtn" class="btn" type="button">🔒 Приватный</button>
-        <button id="clearBtn" class="btn" type="button">🗑 Очистить</button>
-      </div>
-    </header>
+    <div id="messages" class="chat-messages"></div>
 
-    <main id="messages" class="messages"></main>
-
-    <form id="form" class="input-area">
-      <input
-        id="input"
-        type="text"
-        autocomplete="off"
-        placeholder="Напишите сообщение..."
-      />
-      <button type="submit">➤</button>
-    </form>
+    <div class="chat-input">
+      <input id="input" type="text" placeholder="Напиши сообщение..." />
+      <button onclick="sendMessage()">Отправить</button>
+    </div>
 
   </div>
 
-  <script src="./main.js"></script>
+  <!-- markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- highlight.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <script>
+    const messages = document.getElementById("messages");
+    const input = document.getElementById("input");
+
+    function addMessage(content, type){
+      const div = document.createElement("div");
+      div.className = "message " + type;
+
+      // Markdown → HTML
+      div.innerHTML = marked.parse(content);
+
+      messages.appendChild(div);
+
+      // 🔥 подсветка кода
+      div.querySelectorAll("pre code").forEach((block) => {
+        hljs.highlightElement(block);
+      });
+
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    async function sendMessage(){
+      const text = input.value;
+      if(!text) return;
+
+      addMessage(text, "user");
+      input.value = "";
+
+      const res = await fetch("https://new-1-5155.onrender.com/chat", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ message: text })
+      });
+
+      const data = await res.json();
+
+      addMessage(data.answer || "Ошибка ответа", "bot");
+    }
+  </script>
+
 </body>
 </html>
