@@ -33,21 +33,19 @@
 
 </div>
 
-<!-- 🔥 ВРЕМЕННЫЙ ТЕСТ JS -->
 <script>
-  alert("JS ЗАГРУЗИЛСЯ");
-
-  console.log("INDEX LOADED");
+  // только проверка кнопок (без alert)
+  console.log("JS LOADED OK");
 
   const btnPrivate = document.getElementById("btnPrivate");
   const btnClear = document.getElementById("btnClear");
 
   btnPrivate.onclick = () => {
-    alert("ПРИВАТНЫЙ НАЖАТ");
+    console.log("PRIVATE CLICK");
   };
 
   btnClear.onclick = () => {
-    alert("ОЧИСТИТЬ НАЖАТ");
+    console.log("CLEAR CLICK");
   };
 </script>
 
