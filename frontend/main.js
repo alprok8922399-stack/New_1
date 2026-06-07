@@ -15,12 +15,20 @@ function scrollToBottom() {
   messages.scrollTop = messages.scrollHeight;
 }
 
+function renderMarkdown(text) {
+  if (window.marked) {
+    return marked.parse(text || "");
+  }
+
+  return text || "";
+}
+
 function appendMessage(text, role = "bot") {
   const el = document.createElement('div');
   el.className = `msg ${role}`;
 
   if (role === "bot") {
-    el.innerHTML = marked.parse(text || "");
+    el.innerHTML = renderMarkdown(text);
   } else {
     el.textContent = text;
   }
@@ -88,11 +96,17 @@ form.addEventListener('submit', async (e) => {
     if (res.ok) {
       const data = await res.json();
 
-      thinking.innerHTML = marked.parse(data.reply || '(пустой ответ)');
+      thinking.innerHTML = renderMarkdown(
+        data.reply || '(пустой ответ)'
+      );
 
-      addToHistory('bot', data.reply || '(пустой ответ)');
+      addToHistory(
+        'bot',
+        data.reply || '(пустой ответ)'
+      );
 
       setTimeout(scrollToBottom, 50);
+
     } else {
       const err = await res.text();
       thinking.textContent = `Ошибка: ${res.status} ${err}`;
