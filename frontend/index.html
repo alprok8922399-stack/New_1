@@ -27,18 +27,22 @@
 
       <div class="actions">
 
+        <select id="autoClearSelect" class="btn">
+          <option value="0">🕒 Очистить по времени</option>
+          <option value="1">Через 1 минуту</option>
+          <option value="5">Через 5 минут</option>
+          <option value="10">Через 10 минут</option>
+          <option value="30">Через 30 минут</option>
+          <option value="60">Через 1 час</option>
+        </select>
+
         <button id="privateBtn" class="btn" type="button">
           🔒 Приватный
         </button>
 
-        <select id="autoClearSelect" class="btn">
-          <option value="0">🗑 Очистка: Никогда</option>
-          <option value="1">🗑 Через 1 минуту</option>
-          <option value="5">🗑 Через 5 минут</option>
-          <option value="10">🗑 Через 10 минут</option>
-          <option value="30">🗑 Через 30 минут</option>
-          <option value="60">🗑 Через 1 час</option>
-        </select>
+        <button id="clearBtn" class="btn" type="button">
+          🗑 Очистить
+        </button>
 
       </div>
     </header>
