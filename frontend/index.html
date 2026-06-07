@@ -11,7 +11,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 
   <style>
-    /* кнопка копирования */
     .code-block {
       position: relative;
     }
@@ -97,12 +96,40 @@
       });
     }
 
+    // 🔥 новая функция: печатание текста
+    function typeText(element, text, speed = 15){
+      let i = 0;
+
+      function step(){
+        if(i < text.length){
+          element.innerHTML += text.charAt(i);
+          i++;
+          messages.scrollTop = messages.scrollHeight;
+          setTimeout(step, speed);
+        } else {
+          // после завершения можно обработать markdown
+          const finalHTML = marked.parse(text);
+          element.innerHTML = finalHTML;
+          enhanceCodeBlocks(element);
+        }
+      }
+
+      step();
+    }
+
     async function sendMessage(){
       const text = input.value;
       if(!text) return;
 
       addMessage(text, "user");
       input.value = "";
+
+      // создаём пустое сообщение бота
+      const botDiv = document.createElement("div");
+      botDiv.className = "message bot";
+      messages.appendChild(botDiv);
+
+      messages.scrollTop = messages.scrollHeight;
 
       const res = await fetch("https://new-1-5155.onrender.com/chat", {
         method:"POST",
@@ -112,8 +139,12 @@
 
       const data = await res.json();
 
-      addMessage(data.answer || "Ошибка ответа", "bot");
+      const answer = data.answer || "Ошибка ответа";
+
+      // 🔥 эффект печати
+      typeText(botDiv, answer);
     }
+
   </script>
 
 </body>
