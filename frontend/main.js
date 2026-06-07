@@ -18,11 +18,15 @@ function scrollToBottom() {
 function enhanceCodeBlocks(container) {
   container.querySelectorAll("pre").forEach((pre) => {
 
+    const code = pre.querySelector("code");
+
+    if (code && window.hljs) {
+      hljs.highlightElement(code);
+    }
+
     if (pre.querySelector(".copy-btn")) return;
 
     pre.style.position = "relative";
-
-    const code = pre.querySelector("code");
 
     if (!code) return;
 
