@@ -12,14 +12,18 @@ let chatHistory = [];
 let isPrivate = false;
 
 function scrollToBottom() {
-  window.scrollTo(0, document.body.scrollHeight);
   messages.scrollTop = messages.scrollHeight;
 }
 
 function appendMessage(text, role = "bot") {
   const el = document.createElement('div');
   el.className = `msg ${role}`;
-  el.textContent = text;
+
+  if (role === "bot") {
+    el.innerHTML = marked.parse(text || "");
+  } else {
+    el.textContent = text;
+  }
 
   messages.appendChild(el);
 
@@ -84,9 +88,9 @@ form.addEventListener('submit', async (e) => {
     if (res.ok) {
       const data = await res.json();
 
-      thinking.textContent = data.reply || '(пустой ответ)';
+      thinking.innerHTML = marked.parse(data.reply || '(пустой ответ)');
 
-      addToHistory('bot', thinking.textContent);
+      addToHistory('bot', data.reply || '(пустой ответ)');
 
       setTimeout(scrollToBottom, 50);
     } else {
