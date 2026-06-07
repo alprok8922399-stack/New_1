@@ -4,29 +4,27 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>AI Chat</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 
 <body>
   <div class="app">
 
-    <!-- TOP BAR -->
     <header class="topbar">
       <div class="title">💬 AI Chat</div>
 
       <div class="actions">
-        <button id="privateBtn" class="btn">🔒 Приватный</button>
-        <button id="clearBtn" class="btn">🗑 Очистить</button>
+        <button id="privateBtn" class="btn" type="button">🔒 Приватный</button>
+        <button id="clearBtn" class="btn" type="button">🗑 Очистить</button>
       </div>
     </header>
 
-    <!-- CHAT AREA -->
     <main id="messages" class="messages"></main>
 
-    <!-- INPUT -->
     <form id="form" class="input-area">
       <input
         id="input"
+        type="text"
         autocomplete="off"
         placeholder="Напишите сообщение..."
       />
@@ -35,6 +33,6 @@
 
   </div>
 
-  <script src="main.js"></script>
+  <script src="./main.js"></script>
 </body>
 </html>
