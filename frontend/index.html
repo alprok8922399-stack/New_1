@@ -7,8 +7,33 @@
 
   <link rel="stylesheet" href="styles.css"/>
 
-  <!-- 🔥 highlight.js стиль -->
+  <!-- highlight.js -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+
+  <style>
+    /* кнопка копирования */
+    .code-block {
+      position: relative;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: #444;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      font-size: 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      opacity: 0.7;
+    }
+
+    .copy-btn:hover {
+      opacity: 1;
+    }
+  </style>
 
 </head>
 <body>
@@ -38,17 +63,38 @@
       const div = document.createElement("div");
       div.className = "message " + type;
 
-      // Markdown → HTML
       div.innerHTML = marked.parse(content);
 
       messages.appendChild(div);
 
-      // 🔥 подсветка кода
-      div.querySelectorAll("pre code").forEach((block) => {
-        hljs.highlightElement(block);
-      });
+      enhanceCodeBlocks(div);
 
       messages.scrollTop = messages.scrollHeight;
+    }
+
+    function enhanceCodeBlocks(container){
+      container.querySelectorAll("pre").forEach((pre) => {
+
+        pre.classList.add("code-block");
+
+        const code = pre.querySelector("code");
+
+        if(code){
+          hljs.highlightElement(code);
+        }
+
+        const btn = document.createElement("button");
+        btn.innerText = "Copy";
+        btn.className = "copy-btn";
+
+        btn.onclick = () => {
+          navigator.clipboard.writeText(code.innerText);
+          btn.innerText = "Copied!";
+          setTimeout(() => btn.innerText = "Copy", 1500);
+        };
+
+        pre.appendChild(btn);
+      });
     }
 
     async function sendMessage(){
