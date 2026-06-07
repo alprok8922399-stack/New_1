@@ -2,37 +2,47 @@ const form = document.getElementById("form");
 const input = document.getElementById("input");
 const messages = document.getElementById("messages");
 
-/* =========================
-   КЛЮЧ ПОЛЬЗОВАТЕЛЯ
-========================= */
+const ADMIN_KEY = "Ошибка 123";
 
-function getUserKey() {
-  return localStorage.getItem("user_key") || null;
-}
-
-function setUserKey(key) {
-  localStorage.setItem("user_key", key);
-}
+let sessionMode = "guest"; // guest | admin
+let sessionKey = null;
 
 /* =========================
-   ПЕРВЫЙ ВХОД — ВОПРОС
+   ВХОД
 ========================= */
 
-function askForKey() {
-  let key = getUserKey();
+function askForName() {
+  const name = prompt("Как твоё имя?");
 
-  if (!key) {
-    key = prompt("Как твоё имя?");
-    
-    if (!key) {
-      key = "guest";
-    }
+  if (!name) {
+    sessionMode = "guest";
+    sessionKey = "guest_" + Date.now();
+    return;
+  }
 
-    setUserKey(key);
+  if (name === ADMIN_KEY) {
+    sessionMode = "admin";
+    sessionKey = "admin";
+  } else {
+    sessionMode = "guest";
+    sessionKey = "user_" + name;
+  }
+
+  localStorage.setItem("session_key", sessionKey);
+}
+
+function initSession() {
+  const saved = localStorage.getItem("session_key");
+
+  if (saved) {
+    sessionKey = saved;
+    sessionMode = saved === "admin" ? "admin" : "guest";
+  } else {
+    askForName();
   }
 }
 
-askForKey();
+initSession();
 
 /* =========================
    UI
@@ -68,7 +78,7 @@ function createBotMessage() {
 }
 
 /* =========================
-   КНОПКА COPY
+   COPY
 ========================= */
 
 function addCopyButtons(container) {
@@ -95,7 +105,7 @@ function addCopyButtons(container) {
 }
 
 /* =========================
-   РЕНДЕР БОТА
+   RENDER
 ========================= */
 
 function renderBotMessage(div, text) {
@@ -110,7 +120,7 @@ function renderBotMessage(div, text) {
 }
 
 /* =========================
-   ОТПРАВКА
+   SEND
 ========================= */
 
 async function sendMessage() {
@@ -131,7 +141,7 @@ async function sendMessage() {
       },
       body: JSON.stringify({
         message: text,
-        session_id: getUserKey()
+        session_id: sessionKey
       })
     });
 
