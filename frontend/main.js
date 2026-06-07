@@ -2,9 +2,12 @@ const form = document.getElementById("form");
 const input = document.getElementById("input");
 const messages = document.getElementById("messages");
 
-// прокрутка вниз
-function scrollDown() {
-  messages.scrollTop = messages.scrollHeight;
+// 🔥 плавный скролл вниз
+function scrollDown(smooth = true) {
+  messages.scrollTo({
+    top: messages.scrollHeight,
+    behavior: smooth ? "smooth" : "auto"
+  });
 }
 
 // авто-увеличение textarea
@@ -21,7 +24,7 @@ function addMessage(text, type) {
   div.innerHTML = marked.parse(text);
 
   messages.appendChild(div);
-  scrollDown();
+  scrollDown(false);
 
   div.querySelectorAll("pre code").forEach((block) => {
     hljs.highlightElement(block);
@@ -35,14 +38,14 @@ async function sendMessage() {
 
   addMessage(text, "user");
   input.value = "";
-
   autoResize();
 
   const botDiv = document.createElement("div");
   botDiv.className = "msg bot";
   botDiv.innerHTML = "⏳...";
   messages.appendChild(botDiv);
-  scrollDown();
+
+  scrollDown(false);
 
   try {
     const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
@@ -60,7 +63,7 @@ async function sendMessage() {
       hljs.highlightElement(block);
     });
 
-    scrollDown();
+    scrollDown(true);
 
   } catch (e) {
     botDiv.innerHTML = "Ошибка соединения";
@@ -81,5 +84,5 @@ input.addEventListener("keydown", (e) => {
   }
 });
 
-// 🔥 рост поля при вводе
+// авто-рост поля
 input.addEventListener("input", autoResize);
