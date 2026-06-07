@@ -22,13 +22,42 @@ function addUserMessage(text) {
   scrollDown(false);
 }
 
-function createBotMessage() {
+function addBotMessage(text) {
   const div = document.createElement("div");
   div.className = "msg bot";
-  div.innerHTML = "⏳...";
+
+  div.innerHTML = marked.parse(text);
+
   messages.appendChild(div);
   scrollDown(false);
-  return div;
+
+  addCopyButtons(div);
+  highlightCode(div);
+}
+
+function addCopyButtons(container) {
+  container.querySelectorAll("pre").forEach((pre) => {
+    const btn = document.createElement("button");
+    btn.innerText = "Copy";
+    btn.className = "copy-btn";
+
+    btn.onclick = () => {
+      const code = pre.querySelector("code");
+      navigator.clipboard.writeText(code.innerText);
+
+      btn.innerText = "Copied!";
+      setTimeout(() => (btn.innerText = "Copy"), 1500);
+    };
+
+    pre.style.position = "relative";
+    pre.appendChild(btn);
+  });
+}
+
+function highlightCode(container) {
+  container.querySelectorAll("pre code").forEach((block) => {
+    hljs.highlightElement(block);
+  });
 }
 
 async function sendMessage() {
@@ -39,7 +68,11 @@ async function sendMessage() {
   input.value = "";
   autoResize();
 
-  const botDiv = createBotMessage();
+  const botDiv = document.createElement("div");
+  botDiv.className = "msg bot";
+  botDiv.innerHTML = "⏳...";
+  messages.appendChild(botDiv);
+  scrollDown(false);
 
   try {
     const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
@@ -49,15 +82,12 @@ async function sendMessage() {
     });
 
     const data = await res.json();
-
-    // 🔥 ВАЖНОЕ ИСПРАВЛЕНИЕ
     const answer = data.reply || "Ошибка ответа";
 
     botDiv.innerHTML = marked.parse(answer);
 
-    botDiv.querySelectorAll("pre code").forEach((block) => {
-      hljs.highlightElement(block);
-    });
+    addCopyButtons(botDiv);
+    highlightCode(botDiv);
 
     scrollDown(true);
 
