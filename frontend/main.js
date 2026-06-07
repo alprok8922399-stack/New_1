@@ -12,94 +12,105 @@ let chatHistory = [];
 let isPrivate = false;
 
 function appendMessage(text, role = "bot") {
-const el = document.createElement('div');
-el.className = `msg ${role}`;
-el.textContent = text;
-messages.appendChild(el);
-messages.scrollTop = messages.scrollHeight;
-return el;
+  const el = document.createElement('div');
+  el.className = `msg ${role}`;
+  el.textContent = text;
+  messages.appendChild(el);
+  messages.scrollTop = messages.scrollHeight;
+  return el;
 }
 
 function saveHistory() {
-if (!isPrivate) {
-localStorage.setItem('chat_history', JSON.stringify(chatHistory));
-}
+  if (!isPrivate) {
+    localStorage.setItem('chat_history', JSON.stringify(chatHistory));
+  }
 }
 
 function loadHistory() {
-messages.innerHTML = "";
-const saved = localStorage.getItem('chat_history');
+  messages.innerHTML = "";
 
-if (saved && !isPrivate) {
-chatHistory = JSON.parse(saved);
-chatHistory.forEach(m => appendMessage(m.text, m.role));
-}
+  const saved = localStorage.getItem('chat_history');
+
+  if (saved && !isPrivate) {
+    chatHistory = JSON.parse(saved);
+    chatHistory.forEach(m => appendMessage(m.text, m.role));
+  }
 }
 
 function addToHistory(role, text) {
-chatHistory.push({ role, text });
-saveHistory();
+  chatHistory.push({ role, text });
+  saveHistory();
 }
 
-/*
-🚀 ВАЖНО: submit полностью блокируем
-*/
 form.addEventListener('submit', async (e) => {
-e.preventDefault();
-e.stopPropagation();
+  e.preventDefault();
 
-const text = input.value.trim();
-if (!text) return;
+  const text = input.value.trim();
 
-appendMessage(text, 'user');
-addToHistory('user', text);
+  if (!text) return;
 
-input.value = "";
+  appendMessage(text, 'user');
+  addToHistory('user', text);
 
-const thinking = appendMessage('✦ Думаю...', 'bot');
+  input.value = "";
 
-try {
-const res = await fetch(BACKEND, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({
-message: text,
-session_id: SESSION_ID
-})
-});
+  const thinking = appendMessage('✦ Думаю...', 'bot');
 
-```
-if (res.ok) {
-  const data = await res.json();
-  thinking.textContent = data.reply || '(пустой ответ)';
-  addToHistory('bot', thinking.textContent);
-} else {
-  const err = await res.text();
-  thinking.textContent = `Ошибка: ${res.status} ${err}`;
-}
-```
+  try {
+    const res = await fetch(BACKEND, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: text,
+        session_id: SESSION_ID
+      })
+    });
 
-} catch (err) {
-thinking.textContent = `Сеть: ${err.message}`;
-}
+    const raw = await res.text();
+
+    console.log("STATUS:", res.status);
+    console.log("RAW:", raw);
+
+    if (!res.ok) {
+      thinking.textContent = `Ошибка ${res.status}: ${raw}`;
+      return;
+    }
+
+    let data;
+
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      thinking.textContent = `Некорректный JSON: ${raw}`;
+      return;
+    }
+
+    thinking.textContent = data.reply || "(пустой ответ)";
+    addToHistory('bot', thinking.textContent);
+
+  } catch (err) {
+    thinking.textContent = `Сеть: ${err.message}`;
+  }
 });
 
 clearBtn.addEventListener('click', () => {
-chatHistory = [];
-localStorage.removeItem('chat_history');
-messages.innerHTML = '';
+  chatHistory = [];
+  localStorage.removeItem('chat_history');
+  messages.innerHTML = '';
 });
 
 privateBtn.addEventListener('click', () => {
-isPrivate = !isPrivate;
+  isPrivate = !isPrivate;
 
-if (isPrivate) {
-privateBtn.textContent = "🔓 Приватный (ВКЛ)";
-messages.innerHTML = '';
-} else {
-privateBtn.textContent = "🔒 Приватный";
-loadHistory();
-}
+  if (isPrivate) {
+    privateBtn.textContent = "🔓 Приватный (ВКЛ)";
+    messages.innerHTML = '';
+  } else {
+    privateBtn.textContent = "🔒 Приватный";
+    loadHistory();
+  }
 });
 
 loadHistory();
