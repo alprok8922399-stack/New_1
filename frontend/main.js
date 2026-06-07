@@ -15,6 +15,47 @@ function scrollToBottom() {
   messages.scrollTop = messages.scrollHeight;
 }
 
+function enhanceCodeBlocks(container) {
+  container.querySelectorAll("pre").forEach((pre) => {
+
+    if (pre.querySelector(".copy-btn")) return;
+
+    pre.style.position = "relative";
+
+    const code = pre.querySelector("code");
+
+    if (!code) return;
+
+    const btn = document.createElement("button");
+
+    btn.className = "copy-btn";
+    btn.textContent = "Копировать";
+
+    btn.style.position = "absolute";
+    btn.style.top = "8px";
+    btn.style.right = "8px";
+    btn.style.background = "#444";
+    btn.style.color = "#fff";
+    btn.style.border = "none";
+    btn.style.padding = "4px 8px";
+    btn.style.borderRadius = "6px";
+    btn.style.cursor = "pointer";
+    btn.style.fontSize = "12px";
+
+    btn.onclick = () => {
+      navigator.clipboard.writeText(code.innerText);
+
+      btn.textContent = "Скопировано";
+
+      setTimeout(() => {
+        btn.textContent = "Копировать";
+      }, 1500);
+    };
+
+    pre.appendChild(btn);
+  });
+}
+
 function renderMarkdown(text) {
   if (window.marked) {
     return marked.parse(text || "");
@@ -29,6 +70,9 @@ function appendMessage(text, role = "bot") {
 
   if (role === "bot") {
     el.innerHTML = renderMarkdown(text);
+
+    enhanceCodeBlocks(el);
+
   } else {
     el.textContent = text;
   }
@@ -99,6 +143,8 @@ form.addEventListener('submit', async (e) => {
       thinking.innerHTML = renderMarkdown(
         data.reply || '(пустой ответ)'
       );
+
+      enhanceCodeBlocks(thinking);
 
       addToHistory(
         'bot',
