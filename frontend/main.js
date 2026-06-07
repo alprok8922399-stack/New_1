@@ -1,174 +1,164 @@
-const form = document.getElementById("form");
-const input = document.getElementById("input");
-const messages = document.getElementById("messages");
+import os
+from datetime import datetime
 
-const ADMIN_KEY = "Ошибка 123";
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-let sessionMode = "guest"; // guest | admin
-let sessionKey = null;
+from sqlalchemy import create_engine, Column, Integer, Text, DateTime
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-/* =========================
-   ВХОД
-========================= */
+import aiohttp
 
-function askForName() {
-  const name = prompt("Как твоё имя?");
+# =====================
+# APP
+# =====================
 
-  if (!name) {
-    sessionMode = "guest";
-    sessionKey = "guest_" + Date.now();
-    return;
-  }
+app = FastAPI()
 
-  if (name === ADMIN_KEY) {
-    sessionMode = "admin";
-    sessionKey = "admin";
-  } else {
-    sessionMode = "guest";
-    sessionKey = "user_" + name;
-  }
+# =====================
+# CORS
+# =====================
 
-  localStorage.setItem("session_key", sessionKey);
-}
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-function initSession() {
-  const saved = localStorage.getItem("session_key");
+# =====================
+# FRONTEND
+# =====================
 
-  if (saved) {
-    sessionKey = saved;
-    sessionMode = saved === "admin" ? "admin" : "guest";
-  } else {
-    askForName();
-  }
-}
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
-initSession();
+if os.path.exists(FRONTEND_DIR):
+    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
-/* =========================
-   UI
-========================= */
 
-function scrollDown(smooth = true) {
-  messages.scrollTo({
-    top: messages.scrollHeight,
-    behavior: smooth ? "smooth" : "auto"
-  });
-}
+@app.get("/")
+def home():
+    index_path = os.path.join(FRONTEND_DIR, "index.html")
 
-function autoResize() {
-  input.style.height = "auto";
-  input.style.height = Math.min(input.scrollHeight, 120) + "px";
-}
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
 
-function addUserMessage(text) {
-  const div = document.createElement("div");
-  div.className = "msg user";
-  div.innerHTML = marked.parse(text);
-  messages.appendChild(div);
-  scrollDown(false);
-}
+    return {"status": "ok"}
 
-function createBotMessage() {
-  const div = document.createElement("div");
-  div.className = "msg bot";
-  div.innerHTML = "⏳...";
-  messages.appendChild(div);
-  scrollDown(false);
-  return div;
-}
+# =====================
+# DB
+# =====================
 
-/* =========================
-   COPY
-========================= */
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-function addCopyButtons(container) {
-  container.querySelectorAll("pre").forEach((pre) => {
-    if (pre.querySelector(".copy-btn")) return;
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine)
 
-    const btn = document.createElement("button");
-    btn.innerText = "Copy";
-    btn.className = "copy-btn";
+Base = declarative_base()
 
-    btn.onclick = () => {
-      const code = pre.querySelector("code");
-      if (!code) return;
+class Message(Base):
+    __tablename__ = "messages"
 
-      navigator.clipboard.writeText(code.innerText);
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Text)   # 🔥 ДОБАВИЛИ
+    user_message = Column(Text)
+    bot_reply = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-      btn.innerText = "Copied!";
-      setTimeout(() => (btn.innerText = "Copy"), 1500);
-    };
+Base.metadata.create_all(bind=engine)
 
-    pre.style.position = "relative";
-    pre.appendChild(btn);
-  });
-}
+# =====================
+# OPENROUTER
+# =====================
 
-/* =========================
-   RENDER
-========================= */
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-function renderBotMessage(div, text) {
-  div.innerHTML = marked.parse(text);
+MODEL = "deepseek/deepseek-chat-v3-0324"
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-  div.querySelectorAll("pre code").forEach((block) => {
-    hljs.highlightElement(block);
-  });
 
-  addCopyButtons(div);
-  scrollDown(true);
-}
+class ChatRequest(BaseModel):
+    message: str
+    session_id: str | None = "guest"
 
-/* =========================
-   SEND
-========================= */
 
-async function sendMessage() {
-  const text = input.value.trim();
-  if (!text) return;
+class ChatResponse(BaseModel):
+    reply: str
 
-  addUserMessage(text);
-  input.value = "";
-  autoResize();
 
-  const botDiv = createBotMessage();
+SYSTEM_PROMPT = """
+Отвечай в Markdown. Кратко и понятно.
+"""
 
-  try {
-    const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: text,
-        session_id: sessionKey
-      })
-    });
 
-    const data = await res.json();
-    const answer = data.reply || "Ошибка ответа";
+# =====================
+# CHAT
+# =====================
 
-    renderBotMessage(botDiv, answer);
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat(req: ChatRequest):
 
-  } catch (e) {
-    botDiv.innerHTML = "Ошибка соединения";
-  }
-}
+    user_text = req.message
+    session_id = req.session_id or "guest"
 
-/* =========================
-   EVENTS
-========================= */
+    db = SessionLocal()
 
-form.addEventListener("submit", (e) => {
-  e.preventDefault();
-  sendMessage();
-});
+    try:
+        # 🔥 ИСТОРИЯ ТОЛЬКО ДЛЯ ЭТОГО ПОЛЬЗОВАТЕЛЯ
+        history = (
+            db.query(Message)
+            .filter(Message.session_id == session_id)
+            .order_by(Message.id.desc())
+            .limit(10)
+            .all()
+        )
 
-input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-});
+        history.reverse()
 
-input.addEventListener("input", autoResize);
+        messages_payload = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+        for row in history:
+            messages_payload.append({"role": "user", "content": row.user_message})
+            messages_payload.append({"role": "assistant", "content": row.bot_reply})
+
+        messages_payload.append({"role": "user", "content": user_text})
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                OPENROUTER_URL,
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": MODEL,
+                    "messages": messages_payload,
+                },
+            ) as resp:
+
+                data = await resp.json()
+
+        reply = (
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "Ошибка ответа")
+        )
+
+        msg = Message(
+            session_id=session_id,
+            user_message=user_text,
+            bot_reply=reply
+        )
+
+        db.add(msg)
+        db.commit()
+
+        return ChatResponse(reply=reply)
+
+    finally:
+        db.close()
