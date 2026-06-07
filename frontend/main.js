@@ -1,164 +1,77 @@
-import os
-from datetime import datetime
+const form = document.getElementById("form");
+const input = document.getElementById("input");
+const messages = document.getElementById("messages");
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+function getSessionKey() {
+  return localStorage.getItem("session_key") || "guest";
+}
 
-from sqlalchemy import create_engine, Column, Integer, Text, DateTime
-from sqlalchemy.orm import declarative_base, sessionmaker
+function scrollDown() {
+  messages.scrollTop = messages.scrollHeight;
+}
 
-import aiohttp
+function addMessage(text, type) {
+  const div = document.createElement("div");
+  div.className = "msg " + type;
+  div.innerHTML = marked.parse(text);
+  messages.appendChild(div);
+  scrollDown();
+}
 
-# =====================
-# APP
-# =====================
+function createBotMessage() {
+  const div = document.createElement("div");
+  div.className = "msg bot";
+  div.innerHTML = "⏳";
+  messages.appendChild(div);
+  scrollDown();
+  return div;
+}
 
-app = FastAPI()
+async function sendMessage() {
+  const text = input.value.trim();
+  if (!text) return;
 
-# =====================
-# CORS
-# =====================
+  addMessage(text, "user");
+  input.value = "";
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+  const botDiv = createBotMessage();
 
-# =====================
-# FRONTEND
-# =====================
+  try {
+    const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: text,
+        session_id: getSessionKey()
+      })
+    });
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+    const data = await res.json();
 
-if os.path.exists(FRONTEND_DIR):
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+    const reply = data.reply;
 
+    if (!reply) {
+      botDiv.innerHTML = "Ошибка ответа (пустой ответ)";
+      return;
+    }
 
-@app.get("/")
-def home():
-    index_path = os.path.join(FRONTEND_DIR, "index.html")
+    botDiv.innerHTML = marked.parse(reply);
+    scrollDown();
 
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
+  } catch (e) {
+    botDiv.innerHTML = "Ошибка соединения с сервером";
+  }
+}
 
-    return {"status": "ok"}
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  sendMessage();
+});
 
-# =====================
-# DB
-# =====================
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(bind=engine)
-
-Base = declarative_base()
-
-class Message(Base):
-    __tablename__ = "messages"
-
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Text)   # 🔥 ДОБАВИЛИ
-    user_message = Column(Text)
-    bot_reply = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-Base.metadata.create_all(bind=engine)
-
-# =====================
-# OPENROUTER
-# =====================
-
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-MODEL = "deepseek/deepseek-chat-v3-0324"
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-
-class ChatRequest(BaseModel):
-    message: str
-    session_id: str | None = "guest"
-
-
-class ChatResponse(BaseModel):
-    reply: str
-
-
-SYSTEM_PROMPT = """
-Отвечай в Markdown. Кратко и понятно.
-"""
-
-
-# =====================
-# CHAT
-# =====================
-
-@app.post("/api/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest):
-
-    user_text = req.message
-    session_id = req.session_id or "guest"
-
-    db = SessionLocal()
-
-    try:
-        # 🔥 ИСТОРИЯ ТОЛЬКО ДЛЯ ЭТОГО ПОЛЬЗОВАТЕЛЯ
-        history = (
-            db.query(Message)
-            .filter(Message.session_id == session_id)
-            .order_by(Message.id.desc())
-            .limit(10)
-            .all()
-        )
-
-        history.reverse()
-
-        messages_payload = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-        for row in history:
-            messages_payload.append({"role": "user", "content": row.user_message})
-            messages_payload.append({"role": "assistant", "content": row.bot_reply})
-
-        messages_payload.append({"role": "user", "content": user_text})
-
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                OPENROUTER_URL,
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": MODEL,
-                    "messages": messages_payload,
-                },
-            ) as resp:
-
-                data = await resp.json()
-
-        reply = (
-            data.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "Ошибка ответа")
-        )
-
-        msg = Message(
-            session_id=session_id,
-            user_message=user_text,
-            bot_reply=reply
-        )
-
-        db.add(msg)
-        db.commit()
-
-        return ChatResponse(reply=reply)
-
-    finally:
-        db.close()
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    sendMessage();
+  }
+});
