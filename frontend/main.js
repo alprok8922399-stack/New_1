@@ -13,6 +13,11 @@ function scrollDown() {
   messages.scrollTop = messages.scrollHeight;
 }
 
+function autoResize() {
+  input.style.height = "auto";
+  input.style.height = input.scrollHeight + "px";
+}
+
 function addMessage(text, type) {
   const div = document.createElement("div");
   div.className = "msg " + type;
@@ -32,10 +37,13 @@ function createBotMessage() {
 
 async function sendMessage() {
   const text = input.value.trim();
+
   if (!text) return;
 
   addMessage(text, "user");
+
   input.value = "";
+  input.style.height = "44px";
 
   const botDiv = createBotMessage();
 
@@ -53,7 +61,10 @@ async function sendMessage() {
 
     const data = await res.json();
 
-    botDiv.innerHTML = marked.parse(data.reply || "Ошибка ответа");
+    botDiv.innerHTML = marked.parse(
+      data.reply || "Ошибка ответа"
+    );
+
     scrollDown();
 
   } catch (e) {
@@ -66,23 +77,18 @@ form.addEventListener("submit", (e) => {
   sendMessage();
 });
 
-input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") sendMessage();
+input.addEventListener("input", () => {
+  autoResize();
 });
 
-
-// =======================
-// 🔥 КНОПКИ
-// =======================
-
-// ПРИВАТНЫЙ (пока просто очищает local UI + ставит режим)
 btnPrivate.addEventListener("click", () => {
   localStorage.setItem("mode", "private");
   messages.innerHTML = "";
   addMessage("🔒 Приватный режим активирован", "bot");
 });
 
-// ОЧИСТИТЬ ЧАТ
 btnClear.addEventListener("click", () => {
   messages.innerHTML = "";
 });
+
+autoResize();
