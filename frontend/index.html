@@ -3,23 +3,47 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>DEBUG PAGE</title>
+  <title>AI Chat</title>
+
+  <link rel="stylesheet" href="./styles.css" />
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
-<body style="background:black;color:white;font-size:20px;">
+<body>
 
-<h1>DEBUG MODE</h1>
+<div class="app">
 
-<p>Если ты видишь это — обновился index.html</p>
+  <header class="topbar">
+    <div class="title">💬 AI Chat</div>
 
-<p id="time"></p>
+    <div class="actions">
+      <button id="btnPrivate" class="btn" type="button">
+        🔒 Приватный
+      </button>
 
-<script>
-  document.getElementById("time").innerText =
-    "TIME: " + new Date().toISOString();
+      <button id="btnClear" class="btn" type="button">
+        🧹 Очистить
+      </button>
+    </div>
+  </header>
 
-  console.log("DEBUG INDEX LOADED");
-</script>
+  <main id="messages" class="messages"></main>
+
+  <form id="form" class="input-area">
+    <input
+      id="input"
+      type="text"
+      autocomplete="off"
+      placeholder="Напишите сообщение..."
+    />
+
+    <button type="submit">➤</button>
+  </form>
+
+</div>
+
+<script src="./main.js"></script>
 
 </body>
 </html>
