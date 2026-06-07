@@ -1,13 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Проверка доступа Алексея</title>
-  <script src="./main.js"></script>
+  <title>Чат с отправкой скринов</title>
+  <style>
+    /* Стили кнопки */
+    #screenshotBtn {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      margin: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    
+    #screenshotBtn:hover {
+      background: #45a049;
+    }
+    
+    /* Стили для превью скрина */
+    #screenshotPreview {
+      max-width: 100%;
+      margin-top: 10px;
+      display: none;
+    }
+  </style>
 </head>
 <body>
-  <input type="text" id="secretInput" placeholder="Введи фразу...">
-  <button onclick="checkAuth(document.getElementById('secretInput').value)">
-    Проверить
-  </button>
+  <button id="screenshotBtn">📷 Отправить скриншот</button>
+  <img id="screenshotPreview" alt="Ваш скриншот">
+  
+  <script>
+    document.getElementById('screenshotBtn').addEventListener('click', function() {
+      alert("Функция отправки скриншота активирована!\n(В реальном приложении здесь будет загрузка файла)");
+      // Реальный код для мобильного устройства:
+      // 1. Вызов API камеры/галереи
+      // 2. Загрузка файла на сервер
+      // 3. Отправка URL скрина боту
+    });
+  </script>
 </body>
 </html>
