@@ -26,12 +26,7 @@
       <div class="title">💬 AI Chat</div>
 
       <div class="actions">
-
-        <select
-          id="autoClearSelect"
-          class="btn"
-          style="width:80px;font-size:12px;"
-        >
+        <select id="autoClearSelect" class="btn" style="width:80px;font-size:12px;">
           <option value="0">🕒 Таймер</option>
           <option value="1">1 минута</option>
           <option value="5">5 минут</option>
@@ -43,19 +38,18 @@
         <button id="privateBtn" class="btn" type="button">
           🔒 Приватный
         </button>
-
       </div>
     </header>
 
     <main id="messages" class="messages"></main>
 
     <form id="form" class="input-area">
-      <input
+
+      <!-- 🔥 ВАЖНО: input заменён на textarea -->
+      <textarea
         id="input"
-        type="text"
-        autocomplete="off"
         placeholder="Напишите сообщение..."
-      />
+      ></textarea>
 
       <button type="submit">➤</button>
     </form>
