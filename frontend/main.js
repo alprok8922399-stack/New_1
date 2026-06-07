@@ -21,7 +21,7 @@ function addMessage(text, type) {
 function createBotMessage() {
   const div = document.createElement("div");
   div.className = "msg bot";
-  div.innerHTML = "⏳";
+  div.innerHTML = "⏳ отправка...";
   messages.appendChild(div);
   scrollDown();
   return div;
@@ -48,19 +48,30 @@ async function sendMessage() {
       })
     });
 
-    const data = await res.json();
+    console.log("STATUS:", res.status);
 
-    const reply = data.reply;
+    const raw = await res.text();
+    console.log("RAW RESPONSE:", raw);
 
-    if (!reply) {
-      botDiv.innerHTML = "Ошибка ответа (пустой ответ)";
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      botDiv.innerHTML = "Ошибка: сервер вернул не JSON";
       return;
     }
 
-    botDiv.innerHTML = marked.parse(reply);
+    if (!data.reply) {
+      botDiv.innerHTML = "Ошибка: нет reply в ответе";
+      console.log(data);
+      return;
+    }
+
+    botDiv.innerHTML = marked.parse(data.reply);
     scrollDown();
 
   } catch (e) {
+    console.log("FETCH ERROR:", e);
     botDiv.innerHTML = "Ошибка соединения с сервером";
   }
 }
@@ -68,10 +79,4 @@ async function sendMessage() {
 form.addEventListener("submit", (e) => {
   e.preventDefault();
   sendMessage();
-});
-
-input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    sendMessage();
-  }
 });
