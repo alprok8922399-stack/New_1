@@ -58,17 +58,19 @@
     const messages = document.getElementById("messages");
     const input = document.getElementById("input");
 
-    function addMessage(content, type){
+    function addUserMessage(text){
       const div = document.createElement("div");
-      div.className = "message " + type;
-
-      div.innerHTML = marked.parse(content);
-
+      div.className = "message user";
+      div.textContent = text;
       messages.appendChild(div);
+    }
 
-      enhanceCodeBlocks(div);
-
-      messages.scrollTop = messages.scrollHeight;
+    function addBotMessage(){
+      const div = document.createElement("div");
+      div.className = "message bot";
+      div.textContent = "";
+      messages.appendChild(div);
+      return div;
     }
 
     function enhanceCodeBlocks(container){
@@ -81,6 +83,8 @@
         if(code){
           hljs.highlightElement(code);
         }
+
+        if(pre.querySelector(".copy-btn")) return;
 
         const btn = document.createElement("button");
         btn.innerText = "Copy";
@@ -96,20 +100,18 @@
       });
     }
 
-    // 🔥 новая функция: печатание текста
-    function typeText(element, text, speed = 15){
+    function typeText(element, text, speed = 10){
       let i = 0;
 
       function step(){
         if(i < text.length){
-          element.innerHTML += text.charAt(i);
+          element.textContent += text[i];
           i++;
           messages.scrollTop = messages.scrollHeight;
           setTimeout(step, speed);
         } else {
-          // после завершения можно обработать markdown
-          const finalHTML = marked.parse(text);
-          element.innerHTML = finalHTML;
+          // финальная обработка Markdown
+          element.innerHTML = marked.parse(text);
           enhanceCodeBlocks(element);
         }
       }
@@ -121,15 +123,10 @@
       const text = input.value;
       if(!text) return;
 
-      addMessage(text, "user");
+      addUserMessage(text);
       input.value = "";
 
-      // создаём пустое сообщение бота
-      const botDiv = document.createElement("div");
-      botDiv.className = "message bot";
-      messages.appendChild(botDiv);
-
-      messages.scrollTop = messages.scrollHeight;
+      const botDiv = addBotMessage();
 
       const res = await fetch("https://new-1-5155.onrender.com/chat", {
         method:"POST",
@@ -141,7 +138,6 @@
 
       const answer = data.answer || "Ошибка ответа";
 
-      // 🔥 эффект печати
       typeText(botDiv, answer);
     }
 
