@@ -65,6 +65,32 @@ html, body {
   background: #1b1b1b;
 }
 
+/* MARKDOWN */
+
+.msg.bot p {
+  margin: 4px 0;
+}
+
+.msg.bot ul,
+.msg.bot ol {
+  margin: 6px 0 6px 20px;
+}
+
+.msg.bot li {
+  margin: 2px 0;
+}
+
+.msg.bot h1,
+.msg.bot h2,
+.msg.bot h3,
+.msg.bot h4 {
+  margin: 8px 0;
+}
+
+.msg.bot pre {
+  margin: 8px 0;
+}
+
 /* INPUT */
 .input-area {
   display: flex;
