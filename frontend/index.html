@@ -7,54 +7,127 @@
 
   <link rel="stylesheet" href="./styles.css" />
 
-  <!-- Markdown -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-  <!-- Highlight.js -->
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
-  />
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <style>
+    /* ===== LOGIN SCREEN ===== */
+    #loginScreen {
+      position: fixed;
+      inset: 0;
+      background: #0f0f0f;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      color: white;
+    }
+
+    #loginBox {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 260px;
+    }
+
+    #loginInput {
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+      outline: none;
+    }
+
+    #loginBtn {
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      background: #333;
+      color: white;
+      cursor: pointer;
+    }
+
+    #hint {
+      font-size: 12px;
+      opacity: 0.6;
+      text-align: center;
+    }
+  </style>
 </head>
 
 <body>
-  <div class="app">
 
-    <header class="topbar">
-      <div class="title">💬 AI Chat</div>
+<!-- ===== LOGIN ===== -->
+<div id="loginScreen">
+  <h2>💬 AI Chat</h2>
 
-      <div class="actions">
-        <select id="autoClearSelect" class="btn" style="width:80px;font-size:12px;">
-          <option value="0">🕒 Таймер</option>
-          <option value="1">1 минута</option>
-          <option value="5">5 минут</option>
-          <option value="10">10 минут</option>
-          <option value="30">30 минут</option>
-          <option value="60">1 час</option>
-        </select>
-
-        <button id="privateBtn" class="btn" type="button">
-          🔒 Приватный
-        </button>
-      </div>
-    </header>
-
-    <main id="messages" class="messages"></main>
-
-    <form id="form" class="input-area">
-      <input
-        id="input"
-        type="text"
-        autocomplete="off"
-        placeholder="Напишите сообщение..."
-      />
-      <button type="submit">➤</button>
-    </form>
-
+  <div id="loginBox">
+    <input id="loginInput" type="text" placeholder="Как твоё имя?" />
+    <button id="loginBtn" onclick="login()">Войти</button>
+    <div id="hint">Если вводишь “Ошибка 123” → личный чат</div>
   </div>
+</div>
 
-  <script src="./main.js"></script>
+<!-- ===== CHAT ===== -->
+<div class="app" id="app" style="display:none;">
+
+  <header class="topbar">
+    <div class="title">💬 AI Chat</div>
+
+    <div class="actions">
+      <button class="btn">🔒 Приватный</button>
+    </div>
+  </header>
+
+  <main id="messages" class="messages"></main>
+
+  <form id="form" class="input-area">
+    <input id="input" type="text" placeholder="Напишите сообщение..." />
+    <button type="submit">➤</button>
+  </form>
+
+</div>
+
+<script src="./main.js"></script>
+
+<script>
+  const ADMIN_KEY = "Ошибка 123";
+
+  function login() {
+    const val = document.getElementById("loginInput").value.trim();
+
+    if (!val) return;
+
+    let sessionKey;
+    let mode;
+
+    if (val === ADMIN_KEY) {
+      sessionKey = "admin";
+      mode = "admin";
+    } else {
+      sessionKey = "user_" + val;
+      mode = "guest";
+    }
+
+    localStorage.setItem("session_key", sessionKey);
+    localStorage.setItem("mode", mode);
+
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("app").style.display = "flex";
+  }
+
+  function autoLogin() {
+    const saved = localStorage.getItem("session_key");
+
+    if (saved) {
+      document.getElementById("loginScreen").style.display = "none";
+      document.getElementById("app").style.display = "flex";
+    }
+  }
+
+  autoLogin();
+</script>
+
 </body>
 </html>
