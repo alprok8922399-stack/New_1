@@ -88,11 +88,6 @@ class ChatRequest(BaseModel):
     message: str
     image: str | None = None
     user: str | None = None
-    mode: str | None = "public"
-
-
-class ChatResponse(BaseModel):
-    reply: str
 
 
 SYSTEM_PROMPT = """
@@ -100,40 +95,39 @@ SYSTEM_PROMPT = """
 
 Отвечай только на русском языке.
 
-Не добавляй скобки, комментарии и мета-текст.
+Не добавляй скобки, комментарии и лишний текст.
 
-Отвечай кратко или подробно по ситуации.
+Отвечай по делу.
 """
 
 
-@app.post("/api/chat", response_model=ChatResponse)
+@app.post("/api/chat")
 async def chat(req: ChatRequest):
-    user_text = req.message
-    mode = req.mode or "public"
+    user_text = req.message.strip()
 
     db = SessionLocal()
 
     try:
         # =====================
-        # ЛОГИКА РЕЖИМОВ
+        # ОПРЕДЕЛЕНИЕ РЕЖИМА ПО ПАРОЛЮ
         # =====================
-
-        if mode == "private":
-            history_rows = (
-                db.query(Message)
-                .filter(Message.mode == "private")
-                .order_by(Message.id.desc())
-                .limit(10)
-                .all()
-            )
+        if user_text == "Первое детище":
+            mode = "private"
+            display_name = "Алексей"
         else:
-            history_rows = (
-                db.query(Message)
-                .filter(Message.mode == "public")
-                .order_by(Message.id.desc())
-                .limit(10)
-                .all()
-            )
+            mode = "public"
+            display_name = req.user or "Гость"
+
+        # =====================
+        # ИСТОРИЯ ПО РЕЖИМУ
+        # =====================
+        history_rows = (
+            db.query(Message)
+            .filter(Message.mode == mode)
+            .order_by(Message.id.desc())
+            .limit(10)
+            .all()
+        )
 
         history_rows.reverse()
 
@@ -166,7 +160,6 @@ async def chat(req: ChatRequest):
                     "max_tokens": 512,
                 },
             ) as resp:
-
                 data = await resp.json()
 
         reply = (
@@ -184,7 +177,7 @@ async def chat(req: ChatRequest):
         db.add(msg)
         db.commit()
 
-        return ChatResponse(reply=reply)
+        return {"reply": reply, "mode": mode}
 
     finally:
         db.close()
