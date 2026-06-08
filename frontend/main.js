@@ -29,6 +29,13 @@ function createSession() {
       "alexey_private_chat"
     );
 
+    loginScreen.style.display = "none";
+
+    addMessage(
+      "👋 Привет, Алексей! Ты у себя дома. Что пожелаешь?",
+      "bot"
+    );
+
   } else {
 
     localStorage.setItem(
@@ -36,9 +43,13 @@ function createSession() {
       "guest_" + value.toLowerCase()
     );
 
-  }
+    loginScreen.style.display = "none";
 
-  loginScreen.style.display = "none";
+    addMessage(
+      "👋 Добро пожаловать!",
+      "bot"
+    );
+  }
 }
 
 loginBtn.addEventListener("click", createSession);
