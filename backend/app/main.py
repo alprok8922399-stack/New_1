@@ -31,24 +31,17 @@ app.add_middleware(
 )
 
 # =====================
-# FRONTEND FIX (ВАЖНОЕ ИЗМЕНЕНИЕ)
+# FRONTEND FIX (ГЛАВНОЕ ИСПРАВЛЕНИЕ)
 # =====================
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-# 👉 фикс: теперь явно поднимаем папку frontend рядом с backend
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
-# если frontend лежит внутри backend/app/../frontend
-ALT_FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
+STATIC_DIR = None
 
 if os.path.exists(FRONTEND_DIR):
     STATIC_DIR = FRONTEND_DIR
-elif os.path.exists(ALT_FRONTEND_DIR):
-    STATIC_DIR = ALT_FRONTEND_DIR
-else:
-    STATIC_DIR = None
-
 
 if STATIC_DIR:
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -144,21 +137,25 @@ async def chat(req: ChatRequest):
             {"role": "user", "content": user_text}
         )
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                OPENROUTER_URL,
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": MODEL,
-                    "messages": messages_payload,
-                    "max_tokens": 512,
-                },
-            ) as resp:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    OPENROUTER_URL,
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": MODEL,
+                        "messages": messages_payload,
+                        "max_tokens": 512,
+                    },
+                ) as resp:
 
-                data = await resp.json()
+                    data = await resp.json()
+
+        except Exception as e:
+            return {"reply": f"Ошибка API: {str(e)}"}
 
         reply = (
             data.get("choices", [{}])[0]
