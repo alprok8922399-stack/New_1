@@ -12,6 +12,9 @@ const loginBtn = document.getElementById("loginBtn");
 let selectedImageBase64 = null;
 let userName = null;
 
+// 🔥 ВАЖНО: полный адрес backend
+const API_URL = "https://new-1-5155.onrender.com/api/chat";
+
 // =====================
 // LOGIN
 // =====================
@@ -51,13 +54,12 @@ form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const text = input.value.trim();
-
     if (!text && !selectedImageBase64) return;
 
     addMessage(text || "📷 изображение", "user", selectedImageBase64);
 
     try {
-        const res = await fetch("/api/chat", {
+        const res = await fetch(API_URL, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -71,12 +73,10 @@ form.addEventListener("submit", async (e) => {
 
         const data = await res.json();
 
-        const reply = data?.reply ?? "Ошибка: пустой ответ";
-
-        addMessage(reply, "bot");
+        addMessage(data.reply || "⚠️ пустой ответ", "bot");
 
     } catch (err) {
-        addMessage("Ошибка соединения с сервером", "bot");
+        addMessage("❌ Сервер недоступен", "bot");
     }
 
     input.value = "";
@@ -85,7 +85,7 @@ form.addEventListener("submit", async (e) => {
 });
 
 // =====================
-// UI SAFE RENDER
+// UI
 // =====================
 function addMessage(text, type, image = null) {
     const div = document.createElement("div");
@@ -101,9 +101,7 @@ function addMessage(text, type, image = null) {
 
     const p = document.createElement("div");
 
-    // 🔥 защита от падения
     const safeText = (text === undefined || text === null) ? "" : String(text);
-
     p.innerHTML = marked.parse(safeText);
 
     div.appendChild(p);
