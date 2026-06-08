@@ -12,9 +12,6 @@ const loginBtn = document.getElementById("loginBtn");
 let selectedImageBase64 = null;
 let userName = null;
 
-// 🔥 ВАЖНО: полный адрес backend
-const API_URL = "https://new-1-5155.onrender.com/api/chat";
-
 // =====================
 // LOGIN
 // =====================
@@ -59,7 +56,8 @@ form.addEventListener("submit", async (e) => {
     addMessage(text || "📷 изображение", "user", selectedImageBase64);
 
     try {
-        const res = await fetch(API_URL, {
+        // 🔥 ВАЖНО: только относительный путь
+        const res = await fetch("/api/chat", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -76,7 +74,7 @@ form.addEventListener("submit", async (e) => {
         addMessage(data.reply || "⚠️ пустой ответ", "bot");
 
     } catch (err) {
-        addMessage("❌ Сервер недоступен", "bot");
+        addMessage("❌ Нет соединения с сервером", "bot");
     }
 
     input.value = "";
