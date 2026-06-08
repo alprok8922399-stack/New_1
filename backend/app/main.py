@@ -102,10 +102,7 @@ SYSTEM_PROMPT = """
 
 Не добавляй скобки, комментарии и мета-текст.
 
-Если вопрос простой — отвечай коротко.
-Если сложный — подробно.
-
-Не пиши вступления и завершения.
+Отвечай кратко или подробно по ситуации.
 """
 
 
@@ -118,15 +115,25 @@ async def chat(req: ChatRequest):
 
     try:
         # =====================
-        # ИСТОРИЯ ПО РЕЖИМУ
+        # ЛОГИКА РЕЖИМОВ
         # =====================
-        history_rows = (
-            db.query(Message)
-            .filter(Message.mode == mode)
-            .order_by(Message.id.desc())
-            .limit(6)
-            .all()
-        )
+
+        if mode == "private":
+            history_rows = (
+                db.query(Message)
+                .filter(Message.mode == "private")
+                .order_by(Message.id.desc())
+                .limit(10)
+                .all()
+            )
+        else:
+            history_rows = (
+                db.query(Message)
+                .filter(Message.mode == "public")
+                .order_by(Message.id.desc())
+                .limit(10)
+                .all()
+            )
 
         history_rows.reverse()
 
