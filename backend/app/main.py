@@ -153,7 +153,6 @@ async def chat(req: ChatRequest):
                 },
             ) as resp:
 
-                # 🔥 ВАЖНАЯ ЗАЩИТА
                 if resp.status != 200:
                     error_text = await resp.text()
                     return {"reply": "Ошибка OpenRouter: " + error_text}
@@ -162,10 +161,9 @@ async def chat(req: ChatRequest):
                     data = await resp.json()
                 except Exception:
                     text = await resp.text()
-                    ка JSON от OpenRouter: " + text}
+                    return {"reply": "Ошибка JSON от OpenRouter: " + text}
 
         reply = str(data)
-        
 
         msg = Message(
             user_message=user_text,
