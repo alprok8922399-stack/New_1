@@ -69,6 +69,7 @@ class Message(Base):
     user_message = Column(Text)
     bot_reply = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+    mode = Column(Text, default="public")
 
 
 Base.metadata.create_all(bind=engine)
@@ -85,7 +86,9 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 class ChatRequest(BaseModel):
     message: str
-    session_id: str | None = None
+    image: str | None = None
+    user: str | None = None
+    mode: str | None = "public"
 
 
 class ChatResponse(BaseModel):
@@ -95,39 +98,31 @@ class ChatResponse(BaseModel):
 SYSTEM_PROMPT = """
 Ты — ассистент чата.
 
-ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА:
-- Отвечай только на русском языке
-- Не добавляй комментарии в скобках
-- Не объясняй свои действия
-- Не разговаривай сам с собой
-- Не добавляй мета-текст
-- Не добавляй вступления и завершения
-- Не задавай вопросов пользователю
-- Не используй фразы вроде:
-  "чем помочь", "что пожелаешь", "если хочешь", "я запомнил"
+Отвечай только на русском языке.
 
-ФОРМАТ ОТВЕТА:
-- только прямой ответ
-- без эмоций и рассуждений
+Не добавляй скобки, комментарии и мета-текст.
 
-ПОВЕДЕНИЕ:
-- если вопрос простой → короткий ответ
-- если сложный → развернутый ответ
+Если вопрос простой — отвечай коротко.
+Если сложный — подробно.
 
-ИСТОРИЯ:
-используй предыдущие сообщения только для контекста, не повторяй их
+Не пиши вступления и завершения.
 """
 
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     user_text = req.message
+    mode = req.mode or "public"
 
     db = SessionLocal()
 
     try:
+        # =====================
+        # ИСТОРИЯ ПО РЕЖИМУ
+        # =====================
         history_rows = (
             db.query(Message)
+            .filter(Message.mode == mode)
             .order_by(Message.id.desc())
             .limit(6)
             .all()
@@ -140,13 +135,12 @@ async def chat(req: ChatRequest):
         ]
 
         for row in history_rows:
-            if row.user_message and row.bot_reply:
-                messages_payload.append(
-                    {"role": "user", "content": row.user_message}
-                )
-                messages_payload.append(
-                    {"role": "assistant", "content": row.bot_reply}
-                )
+            messages_payload.append(
+                {"role": "user", "content": row.user_message}
+            )
+            messages_payload.append(
+                {"role": "assistant", "content": row.bot_reply}
+            )
 
         messages_payload.append(
             {"role": "user", "content": user_text}
@@ -166,24 +160,18 @@ async def chat(req: ChatRequest):
                 },
             ) as resp:
 
-                if resp.status != 200:
-                    error_text = await resp.text()
-                    return ChatResponse(reply=f"Ошибка OpenRouter: {error_text}")
-
                 data = await resp.json()
 
         reply = (
             data.get("choices", [{}])[0]
             .get("message", {})
-            .get("content")
+            .get("content", "Ошибка ответа")
         )
-
-        if not reply:
-            reply = "Ошибка: пустой ответ модели"
 
         msg = Message(
             user_message=user_text,
-            bot_reply=reply
+            bot_reply=reply,
+            mode=mode
         )
 
         db.add(msg)
