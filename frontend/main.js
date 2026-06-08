@@ -11,24 +11,15 @@ const loginBtn = document.getElementById("loginBtn");
 
 let selectedImageBase64 = null;
 let userName = null;
-let chatMode = "public";
 
 // =====================
 // LOGIN
 // =====================
 loginBtn.addEventListener("click", () => {
     const value = loginInput.value.trim();
-
     if (!value) return;
 
-    if (value === "Первое детище") {
-        userName = "Алексей";
-        chatMode = "private";
-    } else {
-        userName = value;
-        chatMode = "public";
-    }
-
+    userName = value;
     loginScreen.style.display = "none";
 });
 
@@ -60,36 +51,41 @@ form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const text = input.value.trim();
+
     if (!text && !selectedImageBase64) return;
 
     addMessage(text || "📷 изображение", "user", selectedImageBase64);
 
-    const payload = {
-        message: text || "[image]",
-        image: selectedImageBase64,
-        user: userName,
-        mode: chatMode
-    };
+    try {
+        const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                message: text || "[image]",
+                image: selectedImageBase64,
+                user: userName
+            })
+        });
+
+        const data = await res.json();
+
+        const reply = data?.reply ?? "Ошибка: пустой ответ";
+
+        addMessage(reply, "bot");
+
+    } catch (err) {
+        addMessage("Ошибка соединения с сервером", "bot");
+    }
 
     input.value = "";
     selectedImageBase64 = null;
     imageInput.value = "";
-
-    const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-    });
-
-    const data = await res.json();
-
-    addMessage(data.reply, "bot");
 });
 
 // =====================
-// UI
+// UI SAFE RENDER
 // =====================
 function addMessage(text, type, image = null) {
     const div = document.createElement("div");
@@ -104,7 +100,11 @@ function addMessage(text, type, image = null) {
     }
 
     const p = document.createElement("div");
-    p.innerHTML = marked.parse(text);
+
+    // 🔥 защита от падения
+    const safeText = (text === undefined || text === null) ? "" : String(text);
+
+    p.innerHTML = marked.parse(safeText);
 
     div.appendChild(p);
 
