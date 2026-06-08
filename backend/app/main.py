@@ -109,7 +109,7 @@ async def chat(req: ChatRequest):
 
     try:
         # =====================
-        # ОПРЕДЕЛЕНИЕ РЕЖИМА ПО ПАРОЛЮ
+        # РЕЖИМ ОПРЕДЕЛЯЕТСЯ ТОЛЬКО ЗДЕСЬ
         # =====================
         if user_text == "Первое детище":
             mode = "private"
@@ -119,7 +119,7 @@ async def chat(req: ChatRequest):
             display_name = req.user or "Гость"
 
         # =====================
-        # ИСТОРИЯ ПО РЕЖИМУ
+        # ИСТОРИЯ
         # =====================
         history_rows = (
             db.query(Message)
@@ -177,7 +177,7 @@ async def chat(req: ChatRequest):
         db.add(msg)
         db.commit()
 
-        return {"reply": reply, "mode": mode}
+        return {"reply": reply}
 
     finally:
         db.close()
