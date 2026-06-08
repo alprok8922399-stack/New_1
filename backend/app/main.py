@@ -31,7 +31,7 @@ app.add_middleware(
 )
 
 # =====================
-# FRONTEND PATH
+# FRONTEND
 # =====================
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -56,7 +56,7 @@ def home():
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine)
 
 Base = declarative_base()
@@ -93,34 +93,29 @@ class ChatResponse(BaseModel):
 
 
 SYSTEM_PROMPT = """
-Ты — Гений.
+Ты — ассистент чата.
 
-Отвечай только на русском языке.
+ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА:
+- Отвечай только на русском языке
+- Не добавляй комментарии в скобках
+- Не объясняй свои действия
+- Не разговаривай сам с собой
+- Не добавляй мета-текст
+- Не добавляй вступления и завершения
+- Не задавай вопросов пользователю
+- Не используй фразы вроде:
+  "чем помочь", "что пожелаешь", "если хочешь", "я запомнил"
 
-Если пользователь представился как Алексей, обращайся к нему по имени Алексей.
+ФОРМАТ ОТВЕТА:
+- только прямой ответ
+- без эмоций и рассуждений
 
-Не используй фразы:
-- Чем помочь?
-- Чем могу помочь?
-- Что пожелаешь?
-- Что на повестке дня?
-- Какой следующий шаг?
-- Чем займёмся?
-- Что ещё?
+ПОВЕДЕНИЕ:
+- если вопрос простой → короткий ответ
+- если сложный → развернутый ответ
 
-Не навязывай продолжение разговора.
-
-Не предлагай помощь в конце каждого ответа.
-
-Отвечай естественно, коротко и по существу.
-
-Если пользователь задаёт простой вопрос —
-дай простой ответ.
-
-Если вопрос требует подробностей —
-дай подробный ответ.
-
-Помни предыдущие сообщения из истории диалога.
+ИСТОРИЯ:
+используй предыдущие сообщения только для контекста, не повторяй их
 """
 
 
@@ -134,26 +129,24 @@ async def chat(req: ChatRequest):
         history_rows = (
             db.query(Message)
             .order_by(Message.id.desc())
-            .limit(3)
+            .limit(6)
             .all()
         )
 
         history_rows.reverse()
 
         messages_payload = [
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT
-            }
+            {"role": "system", "content": SYSTEM_PROMPT}
         ]
 
         for row in history_rows:
-            messages_payload.append(
-                {"role": "user", "content": row.user_message}
-            )
-            messages_payload.append(
-                {"role": "assistant", "content": row.bot_reply}
-            )
+            if row.user_message and row.bot_reply:
+                messages_payload.append(
+                    {"role": "user", "content": row.user_message}
+                )
+                messages_payload.append(
+                    {"role": "assistant", "content": row.bot_reply}
+                )
 
         messages_payload.append(
             {"role": "user", "content": user_text}
@@ -175,19 +168,18 @@ async def chat(req: ChatRequest):
 
                 if resp.status != 200:
                     error_text = await resp.text()
-                    return {"reply": "Ошибка OpenRouter: " + error_text}
+                    return ChatResponse(reply=f"Ошибка OpenRouter: {error_text}")
 
-                try:
-                    data = await resp.json()
-                except Exception:
-                    text = await resp.text()
-                    return {"reply": "Ошибка JSON от OpenRouter: " + text}
+                data = await resp.json()
 
         reply = (
             data.get("choices", [{}])[0]
             .get("message", {})
-            .get("content", "Ошибка ответа")
+            .get("content")
         )
+
+        if not reply:
+            reply = "Ошибка: пустой ответ модели"
 
         msg = Message(
             user_message=user_text,
