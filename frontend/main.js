@@ -2,247 +2,92 @@ const form = document.getElementById("form");
 const input = document.getElementById("input");
 const messages = document.getElementById("messages");
 
-const btnPrivate = document.getElementById("btnPrivate");
-const clearTimer = document.getElementById("clearTimer");
-
-const loginScreen = document.getElementById("loginScreen");
-const loginInput = document.getElementById("loginInput");
-const loginBtn = document.getElementById("loginBtn");
-
 const imageBtn = document.getElementById("imageBtn");
 const imageInput = document.getElementById("imageInput");
 
-let inactivityTimer = null;
-let inactivityMinutes = 0;
+let selectedImageBase64 = null;
 
-// =======================
-// ВХОД В ЧАТ
-// =======================
-
-function createSession() {
-
-  const value = loginInput.value.trim();
-
-  if (!value) return;
-
-  if (value === "Ошибка 123") {
-
-    sessionStorage.setItem(
-      "session_key",
-      "alexey_private_chat"
-    );
-
-    loginScreen.style.display = "none";
-
-    addMessage(
-      "👋 Привет, Алексей! Ты у себя дома. Что пожелаешь?",
-      "bot"
-    );
-
-  } else {
-
-    sessionStorage.setItem(
-      "session_key",
-      "guest_" + value.toLowerCase()
-    );
-
-    loginScreen.style.display = "none";
-
-    addMessage(
-      "👋 Добро пожаловать!",
-      "bot"
-    );
-  }
-}
-
-loginBtn.addEventListener("click", createSession);
-
-loginInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    createSession();
-  }
+// =====================
+// ОТКРЫТЬ ФАЙЛЫ
+// =====================
+imageBtn.addEventListener("click", () => {
+    imageInput.click();
 });
 
-function getSessionKey() {
-  return sessionStorage.getItem("session_key") || "guest";
-}
+// =====================
+// ЧТЕНИЕ ФАЙЛА
+// =====================
+imageInput.addEventListener("change", () => {
+    const file = imageInput.files[0];
 
-// =======================
-// ЧАТ
-// =======================
+    if (!file) return;
 
-function scrollDown() {
-  messages.scrollTop = messages.scrollHeight;
-}
+    const reader = new FileReader();
 
-function autoResize() {
-  input.style.height = "auto";
-  input.style.height = input.scrollHeight + "px";
-}
+    reader.onload = () => {
+        selectedImageBase64 = reader.result;
 
-function clearChat() {
-  messages.innerHTML = "";
-}
+        addMessage("Вы выбрали изображение 📷", "user", selectedImageBase64);
+    };
 
-function startTimer() {
+    reader.readAsDataURL(file);
+});
 
-  clearTimeout(inactivityTimer);
+// =====================
+// ОТПРАВКА СООБЩЕНИЯ
+// =====================
+form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-  if (!inactivityMinutes) return;
+    const text = input.value.trim();
 
-  inactivityTimer = setTimeout(() => {
-    clearChat();
-  }, inactivityMinutes * 60 * 1000);
-}
+    if (!text && !selectedImageBase64) return;
 
-function resetTimer() {
+    addMessage(text || "📷 изображение", "user", selectedImageBase64);
 
-  if (inactivityMinutes > 0) {
-    startTimer();
-  }
-}
+    const payload = {
+        message: text || "[image]",
+        image: selectedImageBase64
+    };
 
-function addMessage(text, type) {
+    input.value = "";
+    selectedImageBase64 = null;
+    imageInput.value = "";
 
-  const div = document.createElement("div");
-
-  div.className = "msg " + type;
-
-  div.style.border = "3px solid black";
-
-  div.innerHTML = marked.parse(text);
-
-  messages.appendChild(div);
-
-  scrollDown();
-  resetTimer();
-}
-
-function createBotMessage() {
-
-  const div = document.createElement("div");
-
-  div.className = "msg bot";
-  div.innerHTML = "⏳...";
-
-  messages.appendChild(div);
-
-  scrollDown();
-
-  return div;
-}
-
-async function sendMessage() {
-
-  const text = input.value.trim();
-
-  if (!text) return;
-
-  addMessage(text, "user");
-
-  input.value = "";
-  input.style.height = "44px";
-
-  const botDiv = createBotMessage();
-
-  try {
-
-    const res = await fetch(
-      "https://new-1-5155.onrender.com/api/chat",
-      {
+    const res = await fetch("/api/chat", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+            "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          message: text,
-          session_id: getSessionKey()
-        })
-      }
-    );
+        body: JSON.stringify(payload)
+    });
 
     const data = await res.json();
 
-    botDiv.innerHTML = marked.parse(
-      data.reply || "Ошибка ответа"
-    );
+    addMessage(data.reply, "bot");
+});
 
-    scrollDown();
-    resetTimer();
+// =====================
+// UI ФУНКЦИЯ
+// =====================
+function addMessage(text, type, image = null) {
+    const div = document.createElement("div");
 
-  } catch (e) {
+    div.className = type === "user" ? "msg user" : "msg bot";
 
-    botDiv.innerHTML =
-      "Ошибка соединения: " + e.message;
+    if (image) {
+        const img = document.createElement("img");
+        img.src = image;
+        img.style.maxWidth = "200px";
+        img.style.borderRadius = "10px";
+        div.appendChild(img);
+    }
 
-    console.log(e);
-  }
+    const p = document.createElement("div");
+    p.innerHTML = marked.parse(text);
+
+    div.appendChild(p);
+
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
 }
-
-form.addEventListener("submit", (e) => {
-  e.preventDefault();
-  sendMessage();
-});
-
-input.addEventListener("input", () => {
-  autoResize();
-  resetTimer();
-});
-
-// =======================
-// ФОТО
-// =======================
-
-imageBtn.addEventListener("click", () => {
-  imageInput.click();
-});
-
-imageInput.addEventListener("change", () => {
-
-  const file = imageInput.files[0];
-
-  if (!file) return;
-
-  addMessage(
-    "📷 Выбрано фото: " + file.name,
-    "user"
-  );
-});
-
-// =======================
-// КНОПКИ
-// =======================
-
-btnPrivate.addEventListener("click", () => {
-
-  sessionStorage.setItem("mode", "private");
-
-  clearChat();
-
-  addMessage(
-    "🔒 Приватный режим активирован",
-    "bot"
-  );
-});
-
-clearTimer.addEventListener("change", () => {
-
-  if (clearTimer.value === "now") {
-
-    clearChat();
-
-    clearTimer.selectedIndex = 0;
-
-    return;
-  }
-
-  inactivityMinutes = Number(clearTimer.value);
-
-  clearTimeout(inactivityTimer);
-
-  if (inactivityMinutes > 0) {
-    startTimer();
-  }
-});
-
-autoResize();
