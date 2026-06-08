@@ -92,10 +92,7 @@ class ChatRequest(BaseModel):
 
 SYSTEM_PROMPT = """
 Ты — ассистент чата.
-
-Отвечай только на русском языке.
-Отвечай по делу.
-Без лишних вступлений и комментариев.
+Отвечай кратко и по делу на русском языке.
 """
 
 
@@ -137,50 +134,45 @@ async def chat(req: ChatRequest):
             {"role": "user", "content": user_text}
         )
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                OPENROUTER_URL,
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": MODEL,
-                    "messages": messages_payload,
-                    "max_tokens": 512,
-                },
-            ) as resp:
+        reply_text = "Ошибка: нет ответа"
 
-                try:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    OPENROUTER_URL,
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": MODEL,
+                        "messages": messages_payload,
+                        "max_tokens": 512,
+                    },
+                ) as resp:
+
                     data = await resp.json()
-                except Exception:
-                    text = await resp.text()
-                    return {"reply": f"Ошибка OpenRouter: {text}"}
 
-        choices = data.get("choices")
+                    reply_text = (
+                        data.get("choices", [{}])[0]
+                        .get("message", {})
+                        .get("content")
+                        or "Пустой ответ модели"
+                    )
 
-        if not choices:
-            return {"reply": f"Ошибка OpenRouter: {data}"}
-
-        reply = (
-            choices[0]
-            .get("message", {})
-            .get("content")
-        )
-
-        if not reply:
-            reply = "Ошибка: пустой ответ модели"
+        except Exception as e:
+            reply_text = f"Ошибка API: {str(e)}"
 
         msg = Message(
             user_message=user_text,
-            bot_reply=reply,
+            bot_reply=reply_text,
             mode="public"
         )
 
         db.add(msg)
         db.commit()
 
-        return {"reply": reply}
+        return {"reply": reply_text}
 
     finally:
         db.close()
