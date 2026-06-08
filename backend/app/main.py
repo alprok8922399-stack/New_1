@@ -163,7 +163,11 @@ async def chat(req: ChatRequest):
                     text = await resp.text()
                     return {"reply": "Ошибка JSON от OpenRouter: " + text}
 
-        reply = str(data)
+        reply = (
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "Ошибка ответа")
+        )
 
         msg = Message(
             user_message=user_text,
