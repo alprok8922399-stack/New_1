@@ -24,7 +24,7 @@ function createSession() {
 
   if (value === "Ошибка 123") {
 
-    localStorage.setItem(
+    sessionStorage.setItem(
       "session_key",
       "alexey_private_chat"
     );
@@ -38,7 +38,7 @@ function createSession() {
 
   } else {
 
-    localStorage.setItem(
+    sessionStorage.setItem(
       "session_key",
       "guest_" + value.toLowerCase()
     );
@@ -61,11 +61,7 @@ loginInput.addEventListener("keydown", (e) => {
 });
 
 function getSessionKey() {
-  return localStorage.getItem("session_key") || "guest";
-}
-
-if (getSessionKey() !== "guest") {
-  loginScreen.style.display = "none";
+  return sessionStorage.getItem("session_key") || "guest";
 }
 
 // =======================
@@ -193,7 +189,7 @@ input.addEventListener("input", () => {
 
 btnPrivate.addEventListener("click", () => {
 
-  localStorage.setItem("mode", "private");
+  sessionStorage.setItem("mode", "private");
 
   clearChat();
 
