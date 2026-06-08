@@ -40,12 +40,12 @@ html, body {
 .messages {
   flex: 1;
   overflow-y: auto;
-  padding: 10px 25px;
+  padding: 4px;
 }
 
 /* СООБЩЕНИЯ */
 .msg {
-  max-width: 80%;
+  max-width: 96%;
   margin: 8px 0;
   padding: 10px;
   border-radius: 10px;
