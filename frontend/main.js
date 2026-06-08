@@ -12,17 +12,11 @@ const loginBtn = document.getElementById("loginBtn");
 let inactivityTimer = null;
 let inactivityMinutes = 0;
 
-/* ==========================
-   ВХОД В ЧАТ
-========================== */
+// =======================
+// ВХОД В ЧАТ
+// =======================
 
-sessionStorage.removeItem("session_key");
-
-function createGuestId() {
-  return "guest_" + Date.now();
-}
-
-function login() {
+function createSession() {
 
   const value = loginInput.value.trim();
 
@@ -30,38 +24,38 @@ function login() {
 
   if (value === "Ошибка 123") {
 
-    sessionStorage.setItem(
+    localStorage.setItem(
       "session_key",
-      "alexey"
+      "alexey_private_chat"
     );
 
   } else {
 
-    sessionStorage.setItem(
+    localStorage.setItem(
       "session_key",
-      createGuestId()
+      "guest_" + value.toLowerCase()
     );
+
   }
 
   loginScreen.style.display = "none";
 }
 
-loginBtn.addEventListener("click", login);
+loginBtn.addEventListener("click", createSession);
 
 loginInput.addEventListener("keydown", (e) => {
-
   if (e.key === "Enter") {
-    login();
+    createSession();
   }
 });
 
-/* ==========================
-   ЧАТ
-========================== */
-
 function getSessionKey() {
-  return sessionStorage.getItem("session_key") || "guest";
+  return localStorage.getItem("session_key") || "guest";
 }
+
+// =======================
+// ЧАТ
+// =======================
 
 function scrollDown() {
   messages.scrollTop = messages.scrollHeight;
@@ -169,23 +163,22 @@ async function sendMessage() {
 }
 
 form.addEventListener("submit", (e) => {
-
   e.preventDefault();
   sendMessage();
 });
 
 input.addEventListener("input", () => {
-
   autoResize();
   resetTimer();
 });
 
+// =======================
+// КНОПКИ
+// =======================
+
 btnPrivate.addEventListener("click", () => {
 
-  localStorage.setItem(
-    "mode",
-    "private"
-  );
+  localStorage.setItem("mode", "private");
 
   clearChat();
 
@@ -206,8 +199,7 @@ clearTimer.addEventListener("change", () => {
     return;
   }
 
-  inactivityMinutes =
-    Number(clearTimer.value);
+  inactivityMinutes = Number(clearTimer.value);
 
   clearTimeout(inactivityTimer);
 
