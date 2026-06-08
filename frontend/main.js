@@ -167,9 +167,13 @@ async function sendMessage() {
     scrollDown();
     resetTimer();
 
-  } catch (e) {
+  
+    } catch (e) {
 
-    botDiv.innerHTML = "Ошибка соединения";
+    botDiv.innerHTML =
+      "Ошибка соединения: " + e.message;
+
+    console.log(e);
   }
 }
 
