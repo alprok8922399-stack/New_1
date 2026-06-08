@@ -162,13 +162,10 @@ async def chat(req: ChatRequest):
                     data = await resp.json()
                 except Exception:
                     text = await resp.text()
-                    return {"reply": "Ошибка JSON от OpenRouter: " + text}
+                    ка JSON от OpenRouter: " + text}
 
-        reply = (
-            data.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "Ошибка ответа")
-        )
+        reply = str(data)
+        
 
         msg = Message(
             user_message=user_text,
