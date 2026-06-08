@@ -21,12 +21,11 @@ loginBtn.addEventListener("click", () => {
 
     if (!value) return;
 
-    userName = value;
-
     if (value === "Первое детище") {
         userName = "Алексей";
         chatMode = "private";
     } else {
+        userName = value;
         chatMode = "public";
     }
 
@@ -34,15 +33,12 @@ loginBtn.addEventListener("click", () => {
 });
 
 // =====================
-// ОТКРЫТЬ ФАЙЛЫ
+// IMAGE
 // =====================
 imageBtn.addEventListener("click", () => {
     imageInput.click();
 });
 
-// =====================
-// ЧТЕНИЕ ФАЙЛА
-// =====================
 imageInput.addEventListener("change", () => {
     const file = imageInput.files[0];
     if (!file) return;
@@ -58,7 +54,7 @@ imageInput.addEventListener("change", () => {
 });
 
 // =====================
-// ОТПРАВКА СООБЩЕНИЯ
+// SEND
 // =====================
 form.addEventListener("submit", async (e) => {
     e.preventDefault();
