@@ -94,36 +94,26 @@ SYSTEM_PROMPT = """
 Ты — ассистент чата.
 
 Отвечай только на русском языке.
-
-Не добавляй скобки, комментарии и лишний текст.
-
 Отвечай по делу.
+Без лишних вступлений и комментариев.
 """
 
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest):
-    user_text = req.message.strip()
+    user_text = (req.message or "").strip()
+
+    if not user_text:
+        return {"reply": "Пустое сообщение"}
 
     db = SessionLocal()
 
     try:
         # =====================
-        # РЕЖИМ ОПРЕДЕЛЯЕТСЯ ТОЛЬКО ЗДЕСЬ
-        # =====================
-        if user_text == "Первое детище":
-            mode = "private"
-            display_name = "Алексей"
-        else:
-            mode = "public"
-            display_name = req.user or "Гость"
-
-        # =====================
         # ИСТОРИЯ
         # =====================
         history_rows = (
             db.query(Message)
-            .filter(Message.mode == mode)
             .order_by(Message.id.desc())
             .limit(10)
             .all()
@@ -160,18 +150,31 @@ async def chat(req: ChatRequest):
                     "max_tokens": 512,
                 },
             ) as resp:
-                data = await resp.json()
+
+                try:
+                    data = await resp.json()
+                except Exception:
+                    text = await resp.text()
+                    return {"reply": f"Ошибка OpenRouter: {text}"}
+
+        choices = data.get("choices")
+
+        if not choices:
+            return {"reply": f"Ошибка OpenRouter: {data}"}
 
         reply = (
-            data.get("choices", [{}])[0]
+            choices[0]
             .get("message", {})
-            .get("content", "Ошибка ответа")
+            .get("content")
         )
+
+        if not reply:
+            reply = "Ошибка: пустой ответ модели"
 
         msg = Message(
             user_message=user_text,
             bot_reply=reply,
-            mode=mode
+            mode="public"
         )
 
         db.add(msg)
