@@ -31,22 +31,35 @@ app.add_middleware(
 )
 
 # =====================
-# FRONTEND
+# FRONTEND FIX (ВАЖНОЕ ИЗМЕНЕНИЕ)
 # =====================
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# 👉 фикс: теперь явно поднимаем папку frontend рядом с backend
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
+# если frontend лежит внутри backend/app/../frontend
+ALT_FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
+
 if os.path.exists(FRONTEND_DIR):
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+    STATIC_DIR = FRONTEND_DIR
+elif os.path.exists(ALT_FRONTEND_DIR):
+    STATIC_DIR = ALT_FRONTEND_DIR
+else:
+    STATIC_DIR = None
+
+
+if STATIC_DIR:
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
 def home():
-    index_path = os.path.join(FRONTEND_DIR, "index.html")
-
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
+    if STATIC_DIR:
+        index_path = os.path.join(STATIC_DIR, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
 
     return {"status": "ok", "message": "frontend not found"}
 
@@ -106,9 +119,6 @@ async def chat(req: ChatRequest):
     db = SessionLocal()
 
     try:
-        # =====================
-        # ИСТОРИЯ
-        # =====================
         history_rows = (
             db.query(Message)
             .order_by(Message.id.desc())
@@ -134,45 +144,38 @@ async def chat(req: ChatRequest):
             {"role": "user", "content": user_text}
         )
 
-        reply_text = "Ошибка: нет ответа"
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                OPENROUTER_URL,
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": MODEL,
+                    "messages": messages_payload,
+                    "max_tokens": 512,
+                },
+            ) as resp:
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    OPENROUTER_URL,
-                    headers={
-                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": MODEL,
-                        "messages": messages_payload,
-                        "max_tokens": 512,
-                    },
-                ) as resp:
+                data = await resp.json()
 
-                    data = await resp.json()
-
-                    reply_text = (
-                        data.get("choices", [{}])[0]
-                        .get("message", {})
-                        .get("content")
-                        or "Пустой ответ модели"
-                    )
-
-        except Exception as e:
-            reply_text = f"Ошибка API: {str(e)}"
+        reply = (
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "Ошибка ответа")
+        )
 
         msg = Message(
             user_message=user_text,
-            bot_reply=reply_text,
+            bot_reply=reply,
             mode="public"
         )
 
         db.add(msg)
         db.commit()
 
-        return {"reply": reply_text}
+        return {"reply": reply}
 
     finally:
         db.close()
