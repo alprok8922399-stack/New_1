@@ -24,14 +24,14 @@ function createSession() {
 
   if (value === "Ошибка 123") {
 
-    localStorage.setItem(
+    sessionStorage.setItem(
       "session_key",
       "alexey_private_chat"
     );
 
   } else {
 
-    localStorage.setItem(
+    sessionStorage.setItem(
       "session_key",
       "guest_" + value.toLowerCase()
     );
@@ -50,7 +50,7 @@ loginInput.addEventListener("keydown", (e) => {
 });
 
 function getSessionKey() {
-  return localStorage.getItem("session_key") || "guest";
+  return sessionStorage.getItem("session_key") || "guest";
 }
 
 // =======================
