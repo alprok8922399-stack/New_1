@@ -9,6 +9,9 @@ const loginScreen = document.getElementById("loginScreen");
 const loginInput = document.getElementById("loginInput");
 const loginBtn = document.getElementById("loginBtn");
 
+const imageBtn = document.getElementById("imageBtn");
+const imageInput = document.getElementById("imageInput");
+
 let inactivityTimer = null;
 let inactivityMinutes = 0;
 
@@ -167,8 +170,7 @@ async function sendMessage() {
     scrollDown();
     resetTimer();
 
-  
-    } catch (e) {
+  } catch (e) {
 
     botDiv.innerHTML =
       "Ошибка соединения: " + e.message;
@@ -185,6 +187,26 @@ form.addEventListener("submit", (e) => {
 input.addEventListener("input", () => {
   autoResize();
   resetTimer();
+});
+
+// =======================
+// ФОТО
+// =======================
+
+imageBtn.addEventListener("click", () => {
+  imageInput.click();
+});
+
+imageInput.addEventListener("change", () => {
+
+  const file = imageInput.files[0];
+
+  if (!file) return;
+
+  addMessage(
+    "📷 Выбрано фото: " + file.name,
+    "user"
+  );
 });
 
 // =======================
