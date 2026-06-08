@@ -5,11 +5,62 @@ const messages = document.getElementById("messages");
 const btnPrivate = document.getElementById("btnPrivate");
 const clearTimer = document.getElementById("clearTimer");
 
+const loginScreen = document.getElementById("loginScreen");
+const loginInput = document.getElementById("loginInput");
+const loginBtn = document.getElementById("loginBtn");
+
 let inactivityTimer = null;
 let inactivityMinutes = 0;
 
+/* ==========================
+   ВХОД В ЧАТ
+========================== */
+
+sessionStorage.removeItem("session_key");
+
+function createGuestId() {
+  return "guest_" + Date.now();
+}
+
+function login() {
+
+  const value = loginInput.value.trim();
+
+  if (!value) return;
+
+  if (value === "Ошибка 123") {
+
+    sessionStorage.setItem(
+      "session_key",
+      "alexey"
+    );
+
+  } else {
+
+    sessionStorage.setItem(
+      "session_key",
+      createGuestId()
+    );
+  }
+
+  loginScreen.style.display = "none";
+}
+
+loginBtn.addEventListener("click", login);
+
+loginInput.addEventListener("keydown", (e) => {
+
+  if (e.key === "Enter") {
+    login();
+  }
+});
+
+/* ==========================
+   ЧАТ
+========================== */
+
 function getSessionKey() {
-  return localStorage.getItem("session_key") || "guest";
+  return sessionStorage.getItem("session_key") || "guest";
 }
 
 function scrollDown() {
@@ -26,6 +77,7 @@ function clearChat() {
 }
 
 function startTimer() {
+
   clearTimeout(inactivityTimer);
 
   if (!inactivityMinutes) return;
@@ -36,12 +88,14 @@ function startTimer() {
 }
 
 function resetTimer() {
+
   if (inactivityMinutes > 0) {
     startTimer();
   }
 }
 
 function addMessage(text, type) {
+
   const div = document.createElement("div");
 
   div.className = "msg " + type;
@@ -57,6 +111,7 @@ function addMessage(text, type) {
 }
 
 function createBotMessage() {
+
   const div = document.createElement("div");
 
   div.className = "msg bot";
@@ -70,6 +125,7 @@ function createBotMessage() {
 }
 
 async function sendMessage() {
+
   const text = input.value.trim();
 
   if (!text) return;
@@ -82,16 +138,20 @@ async function sendMessage() {
   const botDiv = createBotMessage();
 
   try {
-    const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: text,
-        session_id: getSessionKey()
-      })
-    });
+
+    const res = await fetch(
+      "https://new-1-5155.onrender.com/api/chat",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: text,
+          session_id: getSessionKey()
+        })
+      }
+    );
 
     const data = await res.json();
 
@@ -103,22 +163,29 @@ async function sendMessage() {
     resetTimer();
 
   } catch (e) {
+
     botDiv.innerHTML = "Ошибка соединения";
   }
 }
 
 form.addEventListener("submit", (e) => {
+
   e.preventDefault();
   sendMessage();
 });
 
 input.addEventListener("input", () => {
+
   autoResize();
   resetTimer();
 });
 
 btnPrivate.addEventListener("click", () => {
-  localStorage.setItem("mode", "private");
+
+  localStorage.setItem(
+    "mode",
+    "private"
+  );
 
   clearChat();
 
@@ -131,12 +198,16 @@ btnPrivate.addEventListener("click", () => {
 clearTimer.addEventListener("change", () => {
 
   if (clearTimer.value === "now") {
+
     clearChat();
+
     clearTimer.selectedIndex = 0;
+
     return;
   }
 
-  inactivityMinutes = Number(clearTimer.value);
+  inactivityMinutes =
+    Number(clearTimer.value);
 
   clearTimeout(inactivityTimer);
 
