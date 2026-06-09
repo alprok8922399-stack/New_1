@@ -24,23 +24,23 @@ class DBMessage(Base):
     __tablename__ = "messages"
     
     id = Column(Integer, primary_key=True, index=True)
-    sender = Column(String, index=True)  # "user" или "bot"
+    sender = Column(String, index=True)
     text = Column(Text)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
-# Создаем таблицы, если их нет
 Base.metadata.create_all(bind=engine)
 
 # Инициализация FastAPI
 app = FastAPI(title="AI Chat API")
 
-# Настройка CORS
+# Максимально разрешающий CORS (чтобы браузеры не блокировали запросы с фронтенда)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Зависимость для получения сессии БД
@@ -77,13 +77,11 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
     if not user_text.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    # 1. Сохраняем сообщение пользователя
     db_user_msg = DBMessage(sender="user", text=user_text)
     db.add(db_user_msg)
     db.commit()
     db.refresh(db_user_msg)
 
-    # 2. Получаем историю диалога
     history = db.query(DBMessage).order_by(DBMessage.timestamp.desc()).limit(10).all()
     history.reverse()
 
@@ -95,7 +93,6 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
     if not messages_for_ai:
         messages_for_ai.append({"role": "user", "content": user_text})
 
-    # 3. Синхронный запрос к OpenRouter через стандартный urllib
     if not OPENROUTER_API_KEY:
         bot_response_text = "[Ошибка конфигурации: API ключ OpenRouter не задан]: " + user_text
     else:
@@ -127,7 +124,6 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
         except Exception as e:
             bot_response_text = f"[Ошибка сети при запросе к ИИ: {str(e)}]"
 
-    # 4. Сохраняем ответ бота
     db_bot_msg = DBMessage(sender="bot", text=bot_response_text)
     db.add(db_bot_msg)
     db.commit()
@@ -150,4 +146,4 @@ if os.path.exists(frontend_path):
 else:
     @app.get("/")
     def read_root():
-        return {"status": "working", "message": "Backend is running, but frontend folder not found"}
+        return {"status": "working", "message": "Backend is running"}
