@@ -32,7 +32,7 @@ Base.metadata.create_all(bind=engine)
 # Инициализация FastAPI
 app = FastAPI(title="AI Chat API")
 
-# Настройка CORS, чтобы фронтенд мог слать запросы
+# Настройка CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -67,10 +67,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL_NAME = "deepseek/deepseek-chat"
 
-@app.get("/")
-def read_root():
-    return {"status": "working", "message": "Backend is running"}
-
+# API Эндпоинт для чата
 @app.post("/api/chat", response_model=MessageResponse)
 async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
     user_text = payload.text
@@ -78,17 +75,14 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
     if not user_text.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    # 1. Сохраняем сообщение пользователя в базу
     db_user_msg = DBMessage(sender="user", text=user_text)
     db.add(db_user_msg)
     db.commit()
     db.refresh(db_user_msg)
 
-    # 2. Получаем историю (последние 10 сообщений) для контекста
     history = db.query(DBMessage).order_by(DBMessage.timestamp.desc()).limit(10).all()
     history.reverse()
 
-    # Формируем сообщения для ИИ
     messages_for_ai = []
     for msg in history:
         role = "user" if msg.sender == "user" else "assistant"
@@ -97,7 +91,6 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
     if not messages_for_ai:
         messages_for_ai.append({"role": "user", "content": user_text})
 
-    # 3. Запрос к OpenRouter (DeepSeek)
     if not OPENROUTER_API_KEY:
         bot_response_text = "[Ошибка конфигурации: API ключ OpenRouter не задан]: " + user_text
     else:
@@ -124,10 +117,28 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
             except Exception as e:
                 bot_response_text = f"[Ошибка сети при запросе к ИИ: {str(e)}]"
 
-    # 4. Сохраняем ответ бота в базу
     db_bot_msg = DBMessage(sender="bot", text=bot_response_text)
     db.add(db_bot_msg)
     db.commit()
     db.refresh(db_bot_msg)
 
     return db_bot_msg
+
+# Подключение статических файлов фронтенда
+# Проверяем, существует ли папка с фронтендом, чтобы избежать ошибок при локальном запуске
+frontend_path = "/app/frontend" if os.path.exists("/app/frontend") else "frontend"
+
+if os.path.exists(frontend_path):
+    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
+    @app.get("/{catchall:path}")
+    async def serve_frontend(catchall: str):
+        # Если запрашивают корень или несуществующий файл, отдаем index.html
+        index_file = os.path.join(frontend_path, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return {"error": "index.html not found"}
+else:
+    @app.get("/")
+    def read_root():
+        return {"status": "working", "message": "Backend is running, but frontend folder not found"}
