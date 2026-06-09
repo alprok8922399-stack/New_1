@@ -21,7 +21,7 @@ Base = declarative_base()
 
 # Модель базы данных для сообщений
 class DBMessage(Base):
-    __tablename__ = "chat_messages"  # Изменили имя таблицы для автосоздания структуры
+    __tablename__ = "chat_messages"
     
     id = Column(Integer, primary_key=True, index=True)
     sender = Column(String, index=True)
@@ -67,7 +67,8 @@ class MessageResponse(BaseModel):
 # Настройки OpenRouter
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_NAME = "deepseek/deepseek-chat"
+# 🔥 Переключили на бесплатную и стабильную модель Google Gemini
+MODEL_NAME = "google/gemini-2.5-flash:free"
 
 # API Эндпоинт для чата
 @app.post("/api/chat", response_model=MessageResponse)
@@ -131,7 +132,7 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
 
     return db_bot_msg
 
-# Подключение статических файлов фронтенда
+# Подключение static-файлов
 frontend_path = "/app/frontend" if os.path.exists("/app/frontend") else "frontend"
 
 if os.path.exists(frontend_path):
