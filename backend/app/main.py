@@ -24,7 +24,8 @@ app.add_middleware(
 
 Base.metadata.create_all(bind=engine)
 
-# Временное хранилище истории диалога
+# Хранилище: имя пользователя и история
+user_name = "Друг"
 chat_history = []
 
 @app.get("/")
@@ -33,25 +34,22 @@ def read_root():
 
 @app.post("/api/chat")
 async def chat_endpoint(data: dict):
-    user_message = data.get("text")
-    if not user_message:
-        return {"text": "Ошибка: пустое сообщение"}
+    global user_name
+    user_message = data.get("text", "")
     
-    # Добавляем сообщение пользователя в историю
-    chat_history.append({"role": "user", "content": user_message})
+    # Если пользователь представляется
+    if "меня зовут" in user_message.lower():
+        user_name = user_message.split("зовут")[-1].strip()
+        return {"text": f"Приятно познакомиться, {user_name}! Теперь я буду знать, как к тебе обращаться."}
+
+    chat_history.append({"role": "user", "content": f"Меня зовут {user_name}. Мое сообщение: {user_message}"})
     
-    # Ограничиваем историю последними 10 сообщениями, чтобы не перегружать ИИ
     if len(chat_history) > 10:
         chat_history.pop(0)
     
     try:
-        # Отправляем всю историю в ИИ
-        # Примечание: в openai_client.py нужно будет тоже передавать список
         reply = await create_completion(str(chat_history)) 
-        
-        # Добавляем ответ бота в историю
         chat_history.append({"role": "assistant", "content": reply})
-        
         return {"text": reply}
     except Exception as e:
         return {"text": f"Ошибка ИИ: {str(e)}"}
