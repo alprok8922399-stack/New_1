@@ -15,31 +15,9 @@ let userName = null;
 // =====================
 loginBtn.addEventListener("click", () => {
     const value = loginInput.value.trim();
-    if (!value) {
-        alert("Пожалуйста, введите имя!");
-        return;
-    }
+    if (!value) { alert("Введите имя!"); return; }
     userName = value;
     loginScreen.style.display = "none";
-    console.log("Вход выполнен для:", userName);
-});
-
-// =====================
-// IMAGE
-// =====================
-imageBtn.addEventListener("click", () => {
-    imageInput.click();
-});
-
-imageInput.addEventListener("change", () => {
-    const file = imageInput.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-        selectedImageBase64 = reader.result;
-        addMessage("📷 изображение", "user", selectedImageBase64);
-    };
-    reader.readAsDataURL(file);
 });
 
 // =====================
@@ -49,22 +27,30 @@ form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text && !selectedImageBase64) return;
-    addMessage(text || "📷 изображение", "user", selectedImageBase64);
+
+    // 1. Сразу добавляем сообщение пользователя
+    addMessage(text, "user", selectedImageBase64);
+    
+    // 2. СРАЗУ очищаем поле ввода
+    input.value = "";
+    input.style.height = "auto"; // сброс высоты
+    selectedImageBase64 = null;
+
     try {
         const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ text: text || "[image]" })
         });
+        
         if (!res.ok) throw new Error("Ошибка сервера");
         const data = await res.json();
-        addMessage(data.text || "⚠️ пустой ответ", "bot");
+        
+        // 3. Добавляем ответ бота
+        addMessage(data.text, "bot");
     } catch (err) {
         addMessage("❌ Ошибка соединения", "bot");
     }
-    input.value = "";
-    selectedImageBase64 = null;
-    imageInput.value = "";
 });
 
 // =====================
@@ -73,6 +59,7 @@ form.addEventListener("submit", async (e) => {
 function addMessage(text, type, image = null) {
     const div = document.createElement("div");
     div.className = type === "user" ? "msg user" : "msg bot";
+    
     if (image) {
         const img = document.createElement("img");
         img.src = image;
@@ -80,9 +67,11 @@ function addMessage(text, type, image = null) {
         img.style.borderRadius = "10px";
         div.appendChild(img);
     }
+    
     const p = document.createElement("div");
     p.innerHTML = marked.parse(text || "");
     div.appendChild(p);
+    
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
 }
