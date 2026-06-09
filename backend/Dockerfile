@@ -20,3 +20,4 @@ COPY tools /tools
 ENV PYTHONUNBUFFERED=1
 
 CMD ["sh", "-lc", "echo STARTING; exec python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+
