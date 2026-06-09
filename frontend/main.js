@@ -56,22 +56,25 @@ form.addEventListener("submit", async (e) => {
     addMessage(text || "📷 изображение", "user", selectedImageBase64);
 
     try {
-        // 🔥 ВАЖНО: только относительный путь
-        const res = await fetch("/api/chat", {
+        // Указываем полный адрес бэкенда для связи двух сервисов на Render
+        const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                message: text || "[image]",
-                image: selectedImageBase64,
-                user: userName
+                text: text || "[image]" // Заменили message на text, чтобы бэкенд его понял
             })
         });
 
+        if (!res.ok) {
+            throw new Error("Ошибка сервера");
+        }
+
         const data = await res.json();
 
-        addMessage(data.reply || "⚠️ пустой ответ", "bot");
+        // Берем ответ из поля text, которое возвращает наш бэкенд
+        addMessage(data.text || "⚠️ пустой ответ", "bot");
 
     } catch (err) {
         addMessage("❌ Нет соединения с сервером", "bot");
