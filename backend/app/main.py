@@ -4,7 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-# Импортируем ваш клиент
 from app.openai_client import create_completion
 
 # Настройка базы данных
@@ -25,21 +24,34 @@ app.add_middleware(
 
 Base.metadata.create_all(bind=engine)
 
+# Временное хранилище истории диалога
+chat_history = []
+
 @app.get("/")
 def read_root():
     return {"message": "Бэкенд запущен!"}
 
 @app.post("/api/chat")
 async def chat_endpoint(data: dict):
-    # Теперь мы ищем поле 'text', как присылает фронтенд
     user_message = data.get("text")
-    
     if not user_message:
         return {"text": "Ошибка: пустое сообщение"}
     
+    # Добавляем сообщение пользователя в историю
+    chat_history.append({"role": "user", "content": user_message})
+    
+    # Ограничиваем историю последними 10 сообщениями, чтобы не перегружать ИИ
+    if len(chat_history) > 10:
+        chat_history.pop(0)
+    
     try:
-        # Отправляем в ваш openai_client
-        reply = await create_completion(user_message)
+        # Отправляем всю историю в ИИ
+        # Примечание: в openai_client.py нужно будет тоже передавать список
+        reply = await create_completion(str(chat_history)) 
+        
+        # Добавляем ответ бота в историю
+        chat_history.append({"role": "assistant", "content": reply})
+        
         return {"text": reply}
     except Exception as e:
         return {"text": f"Ошибка ИИ: {str(e)}"}
