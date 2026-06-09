@@ -21,7 +21,7 @@ Base = declarative_base()
 
 # Модель базы данных для сообщений
 class DBMessage(Base):
-    __tablename__ = "messages"
+    __tablename__ = "chat_messages"  # Изменили имя таблицы для автосоздания структуры
     
     id = Column(Integer, primary_key=True, index=True)
     sender = Column(String, index=True)
@@ -33,7 +33,7 @@ Base.metadata.create_all(bind=engine)
 # Инициализация FastAPI
 app = FastAPI(title="AI Chat API")
 
-# Максимально разрешающий CORS (чтобы браузеры не блокировали запросы с фронтенда)
+# Максимально разрешающий CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
