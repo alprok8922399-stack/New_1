@@ -1,56 +1,54 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.openai_client import create_completion
 
-# Настройка базы данных
+# Настройка БД
 SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL")
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Модель пользователя для БД
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
 
 Base.metadata.create_all(bind=engine)
 
-# Хранилище: имя пользователя и история
-user_name = "Друг"
-chat_history = []
-
-@app.get("/")
-def read_root():
-    return {"message": "Бэкенд запущен!"}
+app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 @app.post("/api/chat")
 async def chat_endpoint(data: dict):
-    global user_name
+    db = SessionLocal()
+    user = db.query(User).first()
     user_message = data.get("text", "")
-    
-    # Если пользователь представляется
-    if "меня зовут" in user_message.lower():
-        user_name = user_message.split("зовут")[-1].strip()
-        return {"text": f"Приятно познакомиться, {user_name}! Теперь я буду знать, как к тебе обращаться."}
 
-    chat_history.append({"role": "user", "content": f"Меня зовут {user_name}. Мое сообщение: {user_message}"})
+    # Логика запоминания имени
+    if "меня зовут" in user_message.lower():
+        name_part = user_message.lower().split("меня зовут")[-1].strip()
+        if not user:
+            user = User(name=name_part)
+            db.add(user)
+        else:
+            user.name = name_part
+        db.commit()
+        db.close()
+        return {"text": f"Запомнил! Теперь тебя зовут {name_part}."}
+
+    # Логика ответа
+    user_name = user.name if user else "Друг"
     
-    if len(chat_history) > 10:
-        chat_history.pop(0)
+    if "как меня зовут" in user_message.lower():
+        db.close()
+        return {"text": f"Тебя зовут {user_name}."}
+
+    reply = await create_completion(f"Пользователя зовут {user_name}. Его сообщение: {user_message}")
+    db.close()
+    return {"text": reply}
     
-    try:
-        reply = await create_completion(str(chat_history)) 
-        chat_history.append({"role": "assistant", "content": reply})
-        return {"text": reply}
-    except Exception as e:
-        return {"text": f"Ошибка ИИ: {str(e)}"}
-        
