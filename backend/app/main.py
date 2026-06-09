@@ -1,8 +1,6 @@
 import os
 import datetime
-import json
-import urllib.request
-import urllib.error
+import requests
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -67,8 +65,8 @@ class MessageResponse(BaseModel):
 # Настройки OpenRouter
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-# 🔥 Переключили на сверхустойчивую стандартную модель Llama 3
-MODEL_NAME = "meta-llama/llama-3-8b-instruct:free"
+# Возвращаем отличную модель DeepSeek Chat
+MODEL_NAME = "deepseek/deepseek-chat"
 
 # API Эндпоинт для чата
 @app.post("/api/chat", response_model=MessageResponse)
@@ -100,8 +98,6 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://render.com",
-            "X-Title": "AI Chat Project"
         }
         
         data = {
@@ -109,19 +105,14 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
             "messages": messages_for_ai
         }
 
-        req_body = json.dumps(data).encode("utf-8")
-        req = urllib.request.Request(OPENROUTER_URL, data=req_body, headers=headers, method="POST")
-
         try:
-            with urllib.request.urlopen(req, timeout=30) as response:
-                res_status = response.getcode()
-                if res_status == 200:
-                    res_data = json.loads(response.read().decode("utf-8"))
-                    bot_response_text = res_data['choices'][0]['message']['content']
-                else:
-                    bot_response_text = f"[Ошибка OpenRouter API: Статус {res_status}]"
-        except urllib.error.HTTPError as e:
-            bot_response_text = f"[Ошибка OpenRouter HTTP: {e.code} {e.reason}]"
+            response = requests.post(OPENROUTER_URL, json=data, headers=headers, timeout=30)
+            
+            if response.status_code == 200:
+                res_data = response.json()
+                bot_response_text = res_data['choices'][0]['message']['content']
+            else:
+                bot_response_text = f"[Ошибка OpenRouter API: Статус {response.status_code} - {response.text[:100]}]"
         except Exception as e:
             bot_response_text = f"[Ошибка сети при запросе к ИИ: {str(e)}]"
 
