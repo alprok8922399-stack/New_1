@@ -67,8 +67,8 @@ class MessageResponse(BaseModel):
 # Настройки OpenRouter
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-# 🔥 Переключили на бесплатную и стабильную модель Google Gemini
-MODEL_NAME = "google/gemini-2.5-flash:free"
+# 🔥 Переключили на актуальную бесплатную модель DeepSeek Chat
+MODEL_NAME = "deepseek/deepseek-chat:free"
 
 # API Эндпоинт для чата
 @app.post("/api/chat", response_model=MessageResponse)
