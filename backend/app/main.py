@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Теперь мы берем адрес базы данных из настроек Render
+# Настройка базы данных
 SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
@@ -19,4 +19,11 @@ Base.metadata.create_all(bind=engine)
 @app.get("/")
 def read_root():
     return {"message": "Привет! Бот успешно подключен к базе данных."}
+
+# Добавляем путь для чата
+@app.post("/api/chat")
+def chat_endpoint(data: dict):
+    user_message = data.get("message")
+    # Здесь позже будет логика работы с ИИ
+    return {"reply": f"Вы сказали: {user_message}"}
     
