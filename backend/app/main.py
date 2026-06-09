@@ -1,10 +1,11 @@
+import os
 from fastapi import FastAPI
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Настройка базы данных
-SQLALCHEMY_DATABASE_URL = "postgresql://user:password@localhost/dbname" 
+# Теперь мы берем адрес базы данных из настроек Render
+SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -17,5 +18,5 @@ Base.metadata.create_all(bind=engine)
 
 @app.get("/")
 def read_root():
-    return {"message": "Привет! Бот запущен и работает."}
+    return {"message": "Привет! Бот успешно подключен к базе данных."}
     
