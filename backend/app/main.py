@@ -1,6 +1,8 @@
 import os
 import datetime
-import httpx
+import json
+import urllib.request
+import urllib.error
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -75,11 +77,13 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
     if not user_text.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
+    # 1. Сохраняем сообщение пользователя
     db_user_msg = DBMessage(sender="user", text=user_text)
     db.add(db_user_msg)
     db.commit()
     db.refresh(db_user_msg)
 
+    # 2. Получаем историю диалога
     history = db.query(DBMessage).order_by(DBMessage.timestamp.desc()).limit(10).all()
     history.reverse()
 
@@ -91,6 +95,7 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
     if not messages_for_ai:
         messages_for_ai.append({"role": "user", "content": user_text})
 
+    # 3. Синхронный запрос к OpenRouter через стандартный urllib
     if not OPENROUTER_API_KEY:
         bot_response_text = "[Ошибка конфигурации: API ключ OpenRouter не задан]: " + user_text
     else:
@@ -106,17 +111,23 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
             "messages": messages_for_ai
         }
 
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(OPENROUTER_URL, headers=headers, json=data, timeout=30.0)
-                if response.status_code == 200:
-                    result = response.json()
-                    bot_response_text = result['choices'][0]['message']['content']
-                else:
-                    bot_response_text = f"[Ошибка OpenRouter API: Статус {response.status_code}]"
-            except Exception as e:
-                bot_response_text = f"[Ошибка сети при запросе к ИИ: {str(e)}]"
+        req_body = json.dumps(data).encode("utf-8")
+        req = urllib.request.Request(OPENROUTER_URL, data=req_body, headers=headers, method="POST")
 
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                res_status = response.getcode()
+                if res_status == 200:
+                    res_data = json.loads(response.read().decode("utf-8"))
+                    bot_response_text = res_data['choices'][0]['message']['content']
+                else:
+                    bot_response_text = f"[Ошибка OpenRouter API: Статус {res_status}]"
+        except urllib.error.HTTPError as e:
+            bot_response_text = f"[Ошибка OpenRouter HTTP: {e.code} {e.reason}]"
+        except Exception as e:
+            bot_response_text = f"[Ошибка сети при запросе к ИИ: {str(e)}]"
+
+    # 4. Сохраняем ответ бота
     db_bot_msg = DBMessage(sender="bot", text=bot_response_text)
     db.add(db_bot_msg)
     db.commit()
@@ -125,7 +136,6 @@ async def chat_endpoint(payload: MessageCreate, db: Session = Depends(get_db)):
     return db_bot_msg
 
 # Подключение статических файлов фронтенда
-# Проверяем, существует ли папка с фронтендом, чтобы избежать ошибок при локальном запуске
 frontend_path = "/app/frontend" if os.path.exists("/app/frontend") else "frontend"
 
 if os.path.exists(frontend_path):
@@ -133,7 +143,6 @@ if os.path.exists(frontend_path):
 
     @app.get("/{catchall:path}")
     async def serve_frontend(catchall: str):
-        # Если запрашивают корень или несуществующий файл, отдаем index.html
         index_file = os.path.join(frontend_path, "index.html")
         if os.path.exists(index_file):
             return FileResponse(index_file)
