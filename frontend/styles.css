@@ -56,38 +56,18 @@ html, body {
   line-height: 1.4;
 }
 
+/* Пользовательские сообщения прижаты к правому краю */
 .msg.user {
   background: #2a2a2a;
   margin-left: auto;
+  margin-right: 0; /* убираем отступ справа */
 }
 
+/* Ответ бота занимает всю ширину окна */
 .msg.bot {
   background: #1b1b1b;
-}
-
-/* MARKDOWN */
-.msg.bot p {
-  margin: 4px 0;
-}
-
-.msg.bot ul,
-.msg.bot ol {
-  margin: 6px 0 6px 20px;
-}
-
-.msg.bot li {
-  margin: 2px 0;
-}
-
-.msg.bot h1,
-.msg.bot h2,
-.msg.bot h3,
-.msg.bot h4 {
-  margin: 8px 0;
-}
-
-.msg.bot pre {
-  margin: 8px 0;
+  margin-left: 0;
+  max-width: 100%;
 }
 
 /* INPUT */
