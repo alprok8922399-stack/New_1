@@ -143,6 +143,39 @@ function addMessage(text, type, image = null) {
 
     div.appendChild(p);
 
+    // =====================
+    // EDIT BUTTON
+    // =====================
+    if (type === "user") {
+
+        const editBtn = document.createElement("button");
+
+        editBtn.innerText = "✏️";
+
+        editBtn.style.marginTop = "8px";
+        editBtn.style.marginLeft = "8px";
+        editBtn.style.border = "none";
+        editBtn.style.cursor = "pointer";
+        editBtn.style.background = "transparent";
+        editBtn.style.fontSize = "18px";
+
+        editBtn.onclick = () => {
+
+            input.value = text;
+
+            div.remove();
+
+            input.focus();
+
+            input.scrollIntoView({
+                behavior: "smooth",
+                block: "center"
+            });
+        };
+
+        div.appendChild(editBtn);
+    }
+
     messages.appendChild(div);
 
     messages.scrollTop = messages.scrollHeight;
