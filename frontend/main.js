@@ -35,13 +35,25 @@ function clearChat() {
     messages.innerHTML = "";
 }
 
-if (clearTimer) {
-    clearTimer.addEventListener("change", () => {
+function startClearTimer(minutes) {
+    if (clearTimeoutId) {
+        clearTimeout(clearTimeoutId);
+        clearTimeoutId = null;
+    }
 
-        if (clearTimeoutId) {
-            clearTimeout(clearTimeoutId);
-            clearTimeoutId = null;
-        }
+    clearTimeoutId = setTimeout(() => {
+        clearChat();
+        clearTimeoutId = null;
+    }, minutes * 60 * 1000);
+}
+
+if (clearTimer) {
+
+    // По умолчанию: через 1 час
+    clearTimer.value = "60";
+    startClearTimer(60);
+
+    clearTimer.addEventListener("change", () => {
 
         const value = clearTimer.value;
 
@@ -55,10 +67,7 @@ if (clearTimer) {
         const minutes = parseInt(value);
 
         if (!isNaN(minutes)) {
-            clearTimeoutId = setTimeout(() => {
-                clearChat();
-                clearTimeoutId = null;
-            }, minutes * 60 * 1000);
+            startClearTimer(minutes);
         }
     });
 }
