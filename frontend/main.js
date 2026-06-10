@@ -111,6 +111,7 @@ form.addEventListener("submit", async (e) => {
 function addMessage(text, type, image = null) {
     const div = document.createElement("div");
     div.className = type === "user" ? "msg user" : "msg bot";
+    div.style.position = "relative"; // для кнопки справа
 
     if (image) {
         const img = document.createElement("img");
@@ -145,9 +146,15 @@ function addMessage(text, type, image = null) {
         editBtn.style.color = "black";
         editBtn.style.fontSize = "16px";
         editBtn.style.cursor = "pointer";
-        editBtn.style.marginLeft = "10px";
         editBtn.style.verticalAlign = "middle";
-        editBtn.style.float = "right";
+        editBtn.style.position = "absolute";
+        editBtn.style.top = "5px";
+        editBtn.style.right = "5px";
+        editBtn.style.opacity = "0";
+        editBtn.style.transition = "opacity 0.3s ease";
+
+        // Анимация появления
+        setTimeout(() => { editBtn.style.opacity = "1"; }, 50);
 
         editBtn.onclick = () => {
             input.value = text;
@@ -169,4 +176,4 @@ function addMessage(text, type, image = null) {
 
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
-            }
+        }
