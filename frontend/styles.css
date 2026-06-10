@@ -45,11 +45,11 @@ html, body {
 
 /* СООБЩЕНИЯ */
 .msg {
-  display: inline-block;
-  max-width: 70%;
+  max-width: 80%;
   margin: 8px 0;
   padding: 10px;
   border-radius: 10px;
+
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -134,26 +134,6 @@ button {
   color: white;
   cursor: pointer;
   font-size: 18px;
-}
-
-/* EDIT BUTTON */
-.edit-btn {
-  display: block;
-  margin-left: auto;
-  margin-top: 6px;
-  padding: 2px;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  color: #9ca3af; /* серый контур */
-  transition: opacity 0.25s ease;
-}
-
-/* Контурная иконка под сообщением */
-.msg.user + .edit-btn,
-.msg.user .edit-btn {
-  float: right;
-  margin-top: 4px;
 }
 
 /* CODE BLOCK */
