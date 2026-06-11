@@ -1,21 +1,39 @@
 /* frontend/styles.css */
 
-/* Сохраняем твои текущие стили для сообщений */
+body {
+    font-family: sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f4f9;
+}
+
+#chat-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+#messages {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 0;
+}
+
 .msg {
     padding: 10px;
     margin-bottom: 10px;
     border-radius: 8px;
     position: relative;
+    max-width: 80%;
 }
 
-.user { background-color: #e3f2fd; margin-left: 20%; }
-.bot { background-color: #f5f5f5; margin-right: 20%; }
+.user { background-color: #e3f2fd; align-self: flex-end; }
+.bot { background-color: #f5f5f5; align-self: flex-start; }
 
-/* Добавляем стили для контейнера кнопок, чтобы они были рядом с карандашом */
+/* Контейнер для кнопок (карандаш и копирование) */
 .message-header {
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 10px;
     margin-top: 5px;
 }
 
@@ -24,15 +42,13 @@
     border: none;
     cursor: pointer;
     padding: 2px;
-    font-size: 14px;
+    font-size: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: #9ca3af;
 }
 
-/* Стили для того, чтобы всё в чате выглядело опрятно */
-#messages {
-    display: flex;
-    flex-direction: column;
-    padding: 10px;
+.action-btn:hover {
+    color: #374151;
 }
