@@ -1,52 +1,38 @@
 /* frontend/styles.css */
 
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 20px;
-    background-color: #f4f4f9;
-}
-
-#chat-container {
-    max-width: 800px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.message {
-    padding: 10px 15px;
-    border-radius: 10px;
-    background-color: #ffffff;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+/* Сохраняем твои текущие стили для сообщений */
+.msg {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 8px;
     position: relative;
-    max-width: 90%;
 }
 
+.user { background-color: #e3f2fd; margin-left: 20%; }
+.bot { background-color: #f5f5f5; margin-right: 20%; }
+
+/* Добавляем стили для контейнера кнопок, чтобы они были рядом с карандашом */
 .message-header {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
-    margin-bottom: 5px;
+    gap: 8px;
+    margin-top: 5px;
 }
 
 .action-btn {
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 16px;
-    padding: 0 5px;
-    color: #666;
-    transition: color 0.2s;
-}
-
-.action-btn:hover {
-    color: #000;
-}
-
-#chat-input-area {
-    margin-top: 20px;
+    padding: 2px;
+    font-size: 14px;
     display: flex;
-    gap: 10px;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Стили для того, чтобы всё в чате выглядело опрятно */
+#messages {
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
 }
