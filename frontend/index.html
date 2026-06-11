@@ -1,130 +1,153 @@
-<!doctype html>
+```html
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>AI Chat</title>
 
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="styles.css"/>
 
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+
+  <style>
+    .code-block {
+      position: relative;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: #444;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      font-size: 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      opacity: 0.7;
+    }
+
+    .copy-btn:hover {
+      opacity: 1;
+    }
+  </style>
+
 </head>
-
 <body>
 
-<div id="loginScreen" style="
-position:fixed;
-inset:0;
-background:#0f0f0f;
-display:flex;
-align-items:center;
-justify-content:center;
-z-index:9999;
-">
+  <div class="chat-container">
 
-  <div style="
-  width:90%;
-  max-width:400px;
-  background:#1a1a1a;
-  padding:20px;
-  border-radius:12px;
-  ">
+    <div id="messages" class="chat-messages"></div>
 
-    <h2 style="margin-top:0;">Вход в чат</h2>
-
-    <p>Введите ваше имя</p>
-
-    <input
-      id="loginInput"
-      type="text"
-      placeholder="Имя или фраза"
-      style="
-      width:100%;
-      padding:12px;
-      border:none;
-      border-radius:8px;
-      background:#2a2a2a;
-      color:white;
-      box-sizing:border-box;
-      "
-    />
-
-    <button
-      id="loginBtn"
-      style="
-      width:100%;
-      margin-top:10px;
-      padding:12px;
-      border:none;
-      border-radius:8px;
-      background:#333;
-      color:white;
-      cursor:pointer;
-      "
-    >
-      Войти
-    </button>
+    <div class="chat-input">
+      <input id="input" type="text" placeholder="Напиши сообщение..." />
+      <button onclick="sendMessage()">Отправить</button>
+    </div>
 
   </div>
 
-</div>
+  <!-- markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-<div class="app">
+  <!-- highlight.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
-  <header class="topbar">
-    <div class="title">💬 AI Chat</div>
+  <script>
+    const messages = document.getElementById("messages");
+    const input = document.getElementById("input");
 
-    <div class="actions">
+    function addMessage(content, type){
+      const div = document.createElement("div");
+      div.className = "message " + type;
 
-      <button id="btnPrivate" class="btn" type="button">
-        🔒 Приватный
-      </button>
+      div.innerHTML = marked.parse(content);
 
-      <select id="clearTimer" class="btn">
-        <option value="">🧹 Очистить</option>
-        <option value="now">Очистить сейчас</option>
-        <option value="1">Через 1 минуту</option>
-        <option value="5">Через 5 минут</option>
-        <option value="10">Через 10 минут</option>
-        <option value="30">Через 30 минут</option>
-        <option value="60">Через 1 час</option>
-      </select>
+      messages.appendChild(div);
 
-    </div>
-  </header>
+      enhanceCodeBlocks(div);
 
-  <main id="messages" class="messages"></main>
+      messages.scrollTop = messages.scrollHeight;
+    }
 
-  <form id="form" class="input-area">
+    function enhanceCodeBlocks(container){
+      container.querySelectorAll("pre").forEach((pre) => {
 
-    <textarea
-      id="input"
-      autocomplete="off"
-      placeholder="Напишите сообщение..."
-      rows="1"
-    ></textarea>
+        pre.classList.add("code-block");
 
-    <input
-      type="file"
-      id="imageInput"
-      accept="image/*"
-      hidden
-    />
+        const code = pre.querySelector("code");
 
-    <button
-      type="button"
-      id="imageBtn"
-    >
-      📷
-    </button>
+        if(code){
+          hljs.highlightElement(code);
+        }
 
-    <button type="submit">➤</button>
+        const btn = document.createElement("button");
+        btn.innerText = "Copy";
+        btn.className = "copy-btn";
 
-  </form>
+        btn.onclick = () => {
+          navigator.clipboard.writeText(code.innerText);
+          btn.innerText = "Copied!";
+          setTimeout(() => btn.innerText = "Copy", 1500);
+        };
 
-</div>
+        pre.appendChild(btn);
+      });
+    }
 
-<script src="./main.js"></script>
+    // 🔥 новая функция: печатание текста
+    function typeText(element, text, speed = 15){
+      let i = 0;
+
+      function step(){
+        if(i < text.length){
+          element.innerHTML += text.charAt(i);
+          i++;
+          messages.scrollTop = messages.scrollHeight;
+          setTimeout(step, speed);
+        } else {
+          // после завершения можно обработать markdown
+          const finalHTML = marked.parse(text);
+          element.innerHTML = finalHTML;
+          enhanceCodeBlocks(element);
+        }
+      }
+
+      step();
+    }
+
+    async function sendMessage(){
+      const text = input.value;
+      if(!text) return;
+
+      addMessage(text, "user");
+      input.value = "";
+
+      // создаём пустое сообщение бота
+      const botDiv = document.createElement("div");
+      botDiv.className = "message bot";
+      messages.appendChild(botDiv);
+
+      messages.scrollTop = messages.scrollHeight;
+
+      const res = await fetch("https://new-1-5155.onrender.com/chat", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ message: text })
+      });
+
+      const data = await res.json();
+
+      const answer = data.answer || "Ошибка ответа";
+
+      // 🔥 эффект печати
+      typeText(botDiv, answer);
+    }
+
+  </script>
 
 </body>
 </html>
+```
