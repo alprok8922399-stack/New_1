@@ -89,7 +89,7 @@ async function send() {
   text.value = "";
 
   try {
-    const res = await fetch("https://YOUR_BACKEND_URL/chat", {
+    const res = await fetch("https://chat-ai-backend.onrender.com/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message })
