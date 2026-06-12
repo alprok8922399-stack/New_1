@@ -1,34 +1,20 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-
-app = FastAPI()
-
-# 🔥 ВАЖНО: правильный CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://chat-ai-frontend-y1bt.onrender.com",
-        "http://localhost",
-        "*"
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-class ChatRequest(BaseModel):
-    message: str
-
-@app.get("/")
-def root():
-    return {"status": "ok"}
-
 @app.post("/api/chat")
 def chat(req: ChatRequest):
     if not req.message:
         return {"response": "Пустое сообщение"}
 
+    msg = req.message.lower()
+
+    # простая "логика памяти"
+    if "как меня зовут" in msg:
+        answer = "Я пока не знаю твоего имени 🙂"
+    elif "привет" in msg:
+        answer = "Привет! 👋"
+    elif "что ты умеешь" in msg:
+        answer = "Я простой чат. Пока без ИИ, но уже работаю 🙂"
+    else:
+        answer = "Я получил: " + req.message
+
     return {
-        "response": "🤖 Ответ: " + req.message
+        "response": "🤖 " + answer
     }
