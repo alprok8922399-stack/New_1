@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests
-import os
 
 app = FastAPI()
 
@@ -14,8 +13,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
 class ChatRequest(BaseModel):
     message: str
 
@@ -23,42 +20,35 @@ class ChatRequest(BaseModel):
 def root():
     return {"status": "ok"}
 
+# 💥 БЕСПЛАТНЫЙ ИИ (без кредитов OpenRouter)
 @app.post("/api/chat")
 def chat(req: ChatRequest):
 
-    if not OPENROUTER_API_KEY:
-        return {"response": "❌ Нет API ключа"}
+    if not req.message:
+        return {"response": "Пустое сообщение"}
 
     try:
+        # 🔥 бесплатная модель (HuggingFace)
         response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
+            "https://api-inference.huggingface.co/models/google/flan-t5-large",
             headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
+                "Content-Type": "application/json"
             },
             json={
-                "model": "deepseek/deepseek-chat",
-
-                # 💣 ЖЁСТКИЙ ФИКС
-                "max_tokens": 200,
-
-                "messages": [
-                    {"role": "system", "content": "Ты полезный ассистент."},
-                    {"role": "user", "content": req.message}
-                ]
+                "inputs": req.message
             },
-            timeout=20
+            timeout=30
         )
 
         data = response.json()
 
-        # 🔥 НЕ ДАЁМ СЕРВЕРУ ПАДАТЬ
-        if "choices" not in data:
-            return {
-                "response": "⚠️ OpenRouter error: " + str(data)
-            }
-
-        answer = data["choices"][0]["message"]["content"]
+        # защита от странного ответа
+        if isinstance(data, list) and len(data) > 0:
+            answer = data[0].get("generated_text", "")
+        elif isinstance(data, dict):
+            answer = data.get("generated_text", str(data))
+        else:
+            answer = str(data)
 
         return {
             "response": "🤖 " + answer
@@ -66,5 +56,5 @@ def chat(req: ChatRequest):
 
     except Exception as e:
         return {
-            "response": "❌ Exception: " + str(e)
+            "response": "🤖 Ошибка модели (fallback): " + req.message
         }
