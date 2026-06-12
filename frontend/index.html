@@ -2,49 +2,45 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Chat</title>
   <style>
-    .chat-container { display: flex; flex-direction: column; height: 90vh; max-width: 600px; margin: 0 auto; padding: 10px; }
-    #messages { flex: 1; overflow-y: auto; border: 1px solid #ccc; margin-bottom: 10px; padding: 10px; }
-    .message { margin: 5px; padding: 8px; border-radius: 8px; }
+    body { font-family: sans-serif; display: flex; flex-direction: column; height: 95vh; max-width: 600px; margin: 0 auto; }
+    #messages { flex: 1; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
+    .message { margin: 10px; padding: 10px; border-radius: 8px; }
     .user { background: #dcf8c6; text-align: right; }
     .bot { background: #f1f0f0; text-align: left; }
-    .input-area { display: flex; gap: 5px; }
-    #input { flex: 1; padding: 10px; }
   </style>
 </head>
 <body>
-  <div class="chat-container">
-    <div id="messages"></div>
-    <div class="input-area">
-      <input id="input" type="text" placeholder="Напиши сообщение...">
-      <button onclick="sendMessage()">Отправить</button>
-    </div>
+  <div id="messages"></div>
+  <div style="display: flex;">
+    <input id="input" type="text" style="flex:1" placeholder="Сообщение...">
+    <button onclick="send()">Отправить</button>
   </div>
 
   <script>
-    async function sendMessage() {
+    async function send() {
       const input = document.getElementById("input");
       const messages = document.getElementById("messages");
       const text = input.value.trim();
       if (!text) return;
 
-      // Добавляем сообщение пользователя
-      messages.innerHTML += `<div class="message user">Вы: ${text}</div>`;
+      messages.innerHTML += `<div class="message user">${text}</div>`;
       input.value = "";
 
       try {
-        const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
+        const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
           method: "POST",
+          mode: 'cors',
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: text, secret: "test-secret" })
         });
-        const data = await res.json();
-        messages.innerHTML += `<div class="message bot">Бот: ${data.text}</div>`;
+        
+        const data = await response.json();
+        messages.innerHTML += `<div class="message bot">${data.text || 'Нет ответа'}</div>`;
         messages.scrollTop = messages.scrollHeight;
       } catch (err) {
-        messages.innerHTML += `<div class="message bot">Ошибка подключения</div>`;
+        messages.innerHTML += `<div class="message bot">Ошибка: ${err.message}</div>`;
       }
     }
   </script>
