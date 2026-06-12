@@ -1,23 +1,16 @@
 const messagesDiv = document.getElementById("messages");
 const form = document.getElementById("form");
 const input = document.getElementById("input");
-const autoClearSelect = document.getElementById("autoClearSelect");
-const privateBtn = document.getElementById("privateBtn");
 
-// Загрузка истории при старте
-async function loadHistory() {
-  const res = await fetch("https://new-1-5155.onrender.com/api/history");
-  const data = await res.json();
-  data.forEach(msg => addMessage(msg.content, msg.role));
-}
+// ВРЕМЕННО: используем ключ, чтобы бэкенд нас пустил
+const MY_SECRET = "test-secret"; 
 
 function addMessage(text, role) {
   const div = document.createElement("div");
   div.className = `message ${role}`;
-  div.innerHTML = marked.parse(text);
+  div.innerText = text; // Убрали marked пока что для теста
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  div.querySelectorAll("pre code").forEach(hljs.highlightElement);
 }
 
 form.onsubmit = async (e) => {
@@ -28,24 +21,16 @@ form.onsubmit = async (e) => {
   addMessage(text, "user");
   input.value = "";
 
-  const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: text })
-  });
+  try {
+    const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text, secret: MY_SECRET })
+    });
 
-  const data = await res.json();
-  addMessage(data.text, "assistant");
-};
-
-// Таймер очистки (базовая логика)
-autoClearSelect.onchange = () => {
-  const minutes = parseInt(autoClearSelect.value);
-  if (minutes > 0) {
-    setTimeout(() => {
-      messagesDiv.innerHTML = "";
-    }, minutes * 60000);
+    const data = await res.json();
+    addMessage(data.text || "Ошибка: сервер не ответил", "bot");
+  } catch (err) {
+    addMessage("Ошибка сети", "bot");
   }
 };
-
-loadHistory();
