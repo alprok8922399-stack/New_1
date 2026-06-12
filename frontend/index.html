@@ -4,54 +4,30 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>AI Chat</title>
-
   <link rel="stylesheet" href="styles.css"/>
-
-  <!-- highlight.js -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-
   <style>
-    .code-block {
-      position: relative;
-    }
-
-    .copy-btn {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      background: #444;
-      color: white;
-      border: none;
-      padding: 4px 8px;
-      font-size: 12px;
-      border-radius: 5px;
-      cursor: pointer;
-      opacity: 0.7;
-    }
-
-    .copy-btn:hover {
-      opacity: 1;
-    }
+    .chat-container { display: flex; flex-direction: column; height: 100vh; max-width: 600px; margin: 0 auto; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 10px; }
+    .message { margin: 10px; padding: 10px; border-radius: 10px; }
+    .user { background: #333; color: white; text-align: right; }
+    .bot { background: #444; color: white; }
+    .code-block { position: relative; }
+    .copy-btn { position: absolute; top: 6px; right: 6px; background: #444; color: white; border: none; padding: 4px 8px; font-size: 12px; border-radius: 5px; cursor: pointer; }
+    .chat-input { display: flex; padding: 10px; }
+    #input { flex: 1; padding: 10px; }
   </style>
-
 </head>
 <body>
-
   <div class="chat-container">
-
     <div id="messages" class="chat-messages"></div>
-
     <div class="chat-input">
       <input id="input" type="text" placeholder="Напиши сообщение..." />
       <button onclick="sendMessage()">Отправить</button>
     </div>
-
   </div>
 
-  <!-- markdown -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-  <!-- highlight.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
   <script>
@@ -61,60 +37,9 @@
     function addMessage(content, type){
       const div = document.createElement("div");
       div.className = "message " + type;
-
       div.innerHTML = marked.parse(content);
-
       messages.appendChild(div);
-
-      enhanceCodeBlocks(div);
-
       messages.scrollTop = messages.scrollHeight;
-    }
-
-    function enhanceCodeBlocks(container){
-      container.querySelectorAll("pre").forEach((pre) => {
-
-        pre.classList.add("code-block");
-
-        const code = pre.querySelector("code");
-
-        if(code){
-          hljs.highlightElement(code);
-        }
-
-        const btn = document.createElement("button");
-        btn.innerText = "Copy";
-        btn.className = "copy-btn";
-
-        btn.onclick = () => {
-          navigator.clipboard.writeText(code.innerText);
-          btn.innerText = "Copied!";
-          setTimeout(() => btn.innerText = "Copy", 1500);
-        };
-
-        pre.appendChild(btn);
-      });
-    }
-
-    // 🔥 новая функция: печатание текста
-    function typeText(element, text, speed = 15){
-      let i = 0;
-
-      function step(){
-        if(i < text.length){
-          element.innerHTML += text.charAt(i);
-          i++;
-          messages.scrollTop = messages.scrollHeight;
-          setTimeout(step, speed);
-        } else {
-          // после завершения можно обработать markdown
-          const finalHTML = marked.parse(text);
-          element.innerHTML = finalHTML;
-          enhanceCodeBlocks(element);
-        }
-      }
-
-      step();
     }
 
     async function sendMessage(){
@@ -124,28 +49,15 @@
       addMessage(text, "user");
       input.value = "";
 
-      // создаём пустое сообщение бота
-      const botDiv = document.createElement("div");
-      botDiv.className = "message bot";
-      messages.appendChild(botDiv);
-
-      messages.scrollTop = messages.scrollHeight;
-
-      const res = await fetch("https://new-1-5155.onrender.com/chat", {
+      const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
         method:"POST",
         headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ message: text })
+        body: JSON.stringify({ text: text })
       });
 
       const data = await res.json();
-
-      const answer = data.answer || "Ошибка ответа";
-
-      // 🔥 эффект печати
-      typeText(botDiv, answer);
+      addMessage(data.text || "Ошибка ответа", "bot");
     }
-
   </script>
-
 </body>
 </html>
