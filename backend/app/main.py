@@ -27,7 +27,7 @@ def root():
 def chat(req: ChatRequest):
 
     if not OPENROUTER_API_KEY:
-        return {"response": "❌ API KEY НЕ ЗАГРУЖЕН"}
+        return {"response": "❌ Нет API ключа"}
 
     try:
         response = requests.post(
@@ -39,21 +39,24 @@ def chat(req: ChatRequest):
             json={
                 "model": "deepseek/deepseek-chat",
 
-                # 🔥 КРИТИЧЕСКИЙ ФИКС
-                "max_tokens": 300,
+                # 💣 ЖЁСТКИЙ ФИКС
+                "max_tokens": 200,
 
                 "messages": [
                     {"role": "system", "content": "Ты полезный ассистент."},
                     {"role": "user", "content": req.message}
                 ]
             },
-            timeout=30
+            timeout=20
         )
 
         data = response.json()
 
+        # 🔥 НЕ ДАЁМ СЕРВЕРУ ПАДАТЬ
         if "choices" not in data:
-            return {"response": f"❌ OpenRouter error: {data}"}
+            return {
+                "response": "⚠️ OpenRouter error: " + str(data)
+            }
 
         answer = data["choices"][0]["message"]["content"]
 
@@ -63,5 +66,5 @@ def chat(req: ChatRequest):
 
     except Exception as e:
         return {
-            "response": f"❌ EXCEPTION: {str(e)}"
+            "response": "❌ Exception: " + str(e)
         }
