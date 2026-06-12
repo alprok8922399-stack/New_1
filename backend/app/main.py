@@ -6,8 +6,13 @@ from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
-# Настройка базы данных
+# Настройка базы данных с исправлением старого формата Render
 SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# ЕСЛИ РЕНДЕР ДАЛ ССЫЛКУ С postgres://, МЕНЯЕМ ЕЁ НА postgresql:// ДЛЯ SQLALCHEMY 2.0
+if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -28,12 +33,12 @@ class Message(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     user = relationship("User", back_populates="messages")
 
-# Создание таблиц, если их нет
+# Создание таблиц
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# НАСТРОЙКА CORS: разрешаем абсолютно все подключения
+# НАСТРОЙКА CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -45,18 +50,15 @@ app.add_middleware(
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     db = SessionLocal()
-    
-    # Безопасное чтение данных в любом формате (JSON или обычный текст)
     try:
         body_bytes = await request.body()
         data = json.loads(body_bytes.decode("utf-8"))
     except Exception:
         data = {}
 
-    # Получаем секретную фразу (если пустая — ставим дефолтную)
     secret = data.get("secret", "test-secret")
     
-    # Авто-создание пользователя, если его ещё нет в БД
+    # Авто-создание пользователя
     user = db.query(User).filter(User.secret_phrase == secret).first()
     if not user:
         user = User(secret_phrase=secret, name="Пользователь")
@@ -64,16 +66,15 @@ async def chat_endpoint(request: Request):
         db.commit()
         db.refresh(user)
     
-    # Сохраняем сообщение от пользователя
+    # Сохраняем сообщение пользователя
     user_message = data.get("text", "").strip()
     msg = Message(role="user", content=user_message, user_id=user.id)
     db.add(msg)
     db.commit()
     
-    # Ответ логики (заглушка)
-    reply_text = f"Привет, {user.name}! Твой бэкенд ожил и получил сообщение: {user_message}"
+    # Ответ бота
+    reply_text = f"Привет, {user.name}! Твой бэкенд наконец-то ожил и база данных работает!"
     
-    # Сохраняем ответ бота в БД
     bot_msg = Message(role="assistant", content=reply_text, user_id=user.id)
     db.add(bot_msg)
     db.commit()
