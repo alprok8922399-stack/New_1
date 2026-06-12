@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>AI Chat 1.0</title>
+  <title>AI Chat 1.0 FIX</title>
 
   <style>
     body {
@@ -24,6 +24,7 @@
       padding: 10px;
       border-radius: 10px;
       max-width: 80%;
+      white-space: pre-wrap;
     }
 
     .user {
@@ -73,6 +74,9 @@
 const chat = document.getElementById("chat");
 const text = document.getElementById("text");
 
+// ⚠️ ТВОЙ РЕАЛЬНЫЙ BACKEND
+const API_URL = "https://new-1-5155.onrender.com/api/chat";
+
 function addMsg(content, type) {
   const div = document.createElement("div");
   div.className = "msg " + type;
@@ -89,17 +93,21 @@ async function send() {
   text.value = "";
 
   try {
-    const res = await fetch("https://chat-ai-backend.onrender.com/chat", {
+    const res = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({ message })
     });
 
     const data = await res.json();
-    addMsg(data.response, "bot");
+
+    addMsg(data.response || "нет ответа", "bot");
 
   } catch (e) {
     addMsg("Ошибка соединения с сервером", "bot");
+    console.log(e);
   }
 }
 </script>
