@@ -1,51 +1,69 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import requests
+import os
 
 app = FastAPI()
 
-# 🔥 CORS (разрешаем фронтенд)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://chat-ai-frontend-y1bt.onrender.com",
-        "http://localhost",
-        "*"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ====== МОДЕЛЬ ======
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
 class ChatRequest(BaseModel):
     message: str
 
-# ====== ROOT ======
 @app.get("/")
 def root():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "key_exists": OPENROUTER_API_KEY is not None
+    }
 
-# ====== CHAT ======
 @app.post("/api/chat")
 def chat(req: ChatRequest):
-    if not req.message:
-        return {"response": "Пустое сообщение"}
 
-    msg = req.message.lower()
+    if not OPENROUTER_API_KEY:
+        return {"response": "❌ API KEY НЕ ЗАГРУЖЕН"}
 
-    # простая логика (без БД и без пользователей)
-    if "привет" in msg:
-        answer = "Привет! 👋"
-    elif "как меня зовут" in msg:
-        answer = "Я пока не знаю твоего имени 🙂"
-    elif "что ты умеешь" in msg:
-        answer = "Я простой рабочий чат. Без базы и без пользователей, но стабильно 🙂"
-    elif "пока" in msg:
-        answer = "Пока! 👋"
-    else:
-        answer = "Я получил: " + req.message
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "deepseek/deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": "Ты полезный ассистент."},
+                    {"role": "user", "content": req.message}
+                ]
+            },
+            timeout=30
+        )
 
-    return {
-        "response": "🤖 " + answer
-    }
+        data = response.json()
+
+        print("OPENROUTER RAW RESPONSE:", data)
+
+        # защита от битого ответа
+        if "choices" not in data:
+            return {"response": f"❌ Нет choices: {data}"}
+
+        answer = data["choices"][0]["message"]["content"]
+
+        return {
+            "response": "🤖 " + answer
+        }
+
+    except Exception as e:
+        return {
+            "response": f"❌ EXCEPTION: {str(e)}"
+        }
