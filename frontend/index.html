@@ -5,47 +5,63 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Chat</title>
   <style>
-    body { background-color: #121212; color: white; font-family: sans-serif; margin: 0; padding: 10px; height: 100vh; display: flex; flex-direction: column; }
+    body { background-color: #121212; color: white; font-family: sans-serif; margin: 0; padding: 10px; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
     #messages { flex: 1; overflow-y: auto; border: 1px solid #333; padding: 10px; margin-bottom: 10px; border-radius: 8px; }
-    .message { margin: 10px 0; padding: 10px; border-radius: 8px; }
-    .user { background: #1e88e5; text-align: right; }
-    .bot { background: #333; text-align: left; }
-    .input-area { display: flex; gap: 5px; }
-    input { flex: 1; padding: 12px; background: #222; color: white; border: 1px solid #444; border-radius: 5px; }
-    button { padding: 12px; background: #4caf50; color: white; border: none; border-radius: 5px; }
+    .message { margin: 10px 0; padding: 10px; border-radius: 8px; max-width: 85%; word-wrap: break-word; }
+    .user { background: #1e88e5; text-align: right; margin-left: auto; }
+    .bot { background: #333; text-align: left; margin-right: auto; }
+    #chat-form { display: flex; gap: 5px; }
+    input { flex: 1; padding: 12px; background: #222; color: white; border: 1px solid #444; border-radius: 5px; font-size: 16px; }
+    button { padding: 12px 20px; background: #4caf50; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
   </style>
 </head>
 <body>
 
   <div id="messages"></div>
-  <div class="input-area">
-    <input id="input" type="text" placeholder="Сообщение...">
-    <button onclick="send()">Отправить</button>
-  </div>
+  
+  <form id="chat-form" onsubmit="return send(event)">
+    <input id="input" type="text" placeholder="Сообщение..." required autocomplete="off">
+    <button type="submit">Отправить</button>
+  </form>
 
   <script>
-    async function send() {
+    async function send(e) {
+      // Останавливаем перезагрузку страницы
+      e.preventDefault(); 
+      
       const input = document.getElementById("input");
       const msgs = document.getElementById("messages");
       const text = input.value.trim();
-      if (!text) return;
+      if (!text) return false;
 
+      // Отображаем сообщение пользователя
       msgs.innerHTML += `<div class="message user">${text}</div>`;
       input.value = "";
+      msgs.scrollTop = msgs.scrollHeight;
 
       try {
+        // Упрощенный запрос без лишних заголовков, которые могут триггерить CORS
         const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "text/plain" // Меняем на plain, это часто обходит строгие блокировки браузеров
+          },
           body: JSON.stringify({ text: text, secret: "test-secret" })
         });
         
+        if (!response.ok) {
+          throw new Error("Сервер ответил с кодом " + response.status);
+        }
+        
         const data = await response.json();
-        msgs.innerHTML += `<div class="message bot">${data.text || 'Нет ответа'}</div>`;
-        msgs.scrollTop = msgs.scrollHeight;
+        msgs.innerHTML += `<div class="message bot">${data.text || 'Нет текста в ответе'}</div>`;
       } catch (err) {
-        msgs.innerHTML += `<div class="message bot" style="color:red">Ошибка: ${err.message}</div>`;
+        // Выводим максимум инфы об ошибке
+        msgs.innerHTML += `<div class="message bot" style="color:#ff5252; border: 1px solid #ff5252;">⚠️ Ошибка: ${err.message}<br><small>Проверь отключение VPN на телефоне</small></div>`;
       }
+      
+      msgs.scrollTop = msgs.scrollHeight;
+      return false;
     }
   </script>
 </body>
