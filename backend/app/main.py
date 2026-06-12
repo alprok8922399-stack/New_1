@@ -21,10 +21,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/")
 def root():
-    return {
-        "status": "ok",
-        "key_exists": OPENROUTER_API_KEY is not None
-    }
+    return {"status": "ok"}
 
 @app.post("/api/chat")
 def chat(req: ChatRequest):
@@ -41,6 +38,10 @@ def chat(req: ChatRequest):
             },
             json={
                 "model": "deepseek/deepseek-chat",
+
+                # 🔥 КРИТИЧЕСКИЙ ФИКС
+                "max_tokens": 300,
+
                 "messages": [
                     {"role": "system", "content": "Ты полезный ассистент."},
                     {"role": "user", "content": req.message}
@@ -51,11 +52,8 @@ def chat(req: ChatRequest):
 
         data = response.json()
 
-        print("OPENROUTER RAW RESPONSE:", data)
-
-        # защита от битого ответа
         if "choices" not in data:
-            return {"response": f"❌ Нет choices: {data}"}
+            return {"response": f"❌ OpenRouter error: {data}"}
 
         answer = data["choices"][0]["message"]["content"]
 
