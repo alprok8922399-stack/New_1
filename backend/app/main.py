@@ -4,37 +4,31 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-# CORS (чтобы фронт работал)
+# 🔥 ВАЖНО: правильный CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://chat-ai-frontend-y1bt.onrender.com",
+        "http://localhost",
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ====== МОДЕЛЬ ЗАПРОСА ======
 class ChatRequest(BaseModel):
     message: str
 
-# ====== ИИ ОТВЕТ (ЗАГЛУШКА) ======
-def generate_answer(text: str) -> str:
-    # тут потом подключишь GPT / свою модель
-    return f"🤖 Ответ: {text}"
+@app.get("/")
+def root():
+    return {"status": "ok"}
 
-# ====== ОСНОВНОЙ ЧАТ ======
-@app.post("/chat")
+@app.post("/api/chat")
 def chat(req: ChatRequest):
     if not req.message:
         return {"response": "Пустое сообщение"}
 
-    answer = generate_answer(req.message)
-
     return {
-        "response": answer
+        "response": "🤖 Ответ: " + req.message
     }
-
-# ====== ПРОВЕРКА СЕРВЕРА ======
-@app.get("/")
-def root():
-    return {"status": "ok"}
