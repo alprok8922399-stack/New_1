@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ИИ-Чат</title>
-    <!-- Подключаем стили -->
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="app">
@@ -12,16 +12,45 @@
         <div class="actions"></div>
     </div>
 
-    <!-- Блок с сообщениями -->
-    <div class="messages"></div>
+    <div class="messages" id="messages-box"></div>
 
-    <!-- Форма ввода -->
-    <form class="input-area">
+    <div class="input-area">
         <textarea id="input" placeholder="Напиши сообщение..."></textarea>
-        <button type="submit">Отправить</button>
-    </form>
+        <button onclick="send_message()">Отправить</button>
+    </div>
 
-    <!-- Подключаем JS -->
-    <script src="/main.js"></script>
+    <script>
+        async function send_message() {
+            const input = document.getElementById("input");
+            const box = document.getElementById("messages-box");
+            const text = input.value.trim();
+            
+            if (!text) return;
+
+            // Отображаем сообщение пользователя
+            box.innerHTML += `<div class="message user"><strong>Вы:</strong><br>${text}</div>`;
+            input.value = "";
+            box.scrollTop = box.scrollHeight;
+
+            try {
+                // Отправляем запрос на твой бэкенд Render
+                const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text: text, secret: "test-secret" })
+                });
+                
+                const data = await response.json();
+                
+                // Отображаем ответ бота
+                box.innerHTML += `<div class="message bot"><strong>Бот:</strong><br>${data.text}</div>`;
+            } catch (err) {
+                // Если что-то пойдет не так — мы увидим реальную ошибку
+                box.innerHTML += `<div class="message bot" style="color:red"><strong>Ошибка связи:</strong><br>${err.message}</div>`;
+            }
+            
+            box.scrollTop = box.scrollHeight;
+        }
+    </script>
 </body>
 </html>
