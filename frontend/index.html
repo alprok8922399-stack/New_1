@@ -1,116 +1,27 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>AI Chat 1.0 FIX</title>
-
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial;
-      background: #111;
-      color: #fff;
-    }
-
-    #chat {
-      height: 90vh;
-      overflow-y: auto;
-      padding: 10px;
-    }
-
-    .msg {
-      margin: 10px 0;
-      padding: 10px;
-      border-radius: 10px;
-      max-width: 80%;
-      white-space: pre-wrap;
-    }
-
-    .user {
-      background: #2b7cff;
-      margin-left: auto;
-    }
-
-    .bot {
-      background: #333;
-    }
-
-    #inputBox {
-      display: flex;
-      position: fixed;
-      bottom: 0;
-      width: 100%;
-      background: #000;
-      padding: 10px;
-    }
-
-    #text {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      outline: none;
-    }
-
-    button {
-      padding: 10px;
-      background: #2b7cff;
-      color: white;
-      border: none;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>ИИ-Чат</title>
+    <!-- Подключаем стили -->
+    <link rel="stylesheet" href="/styles.css">
 </head>
+<body class="app">
+    <div class="topbar">
+        <span>ИИ-Помощник</span>
+        <div class="actions"></div>
+    </div>
 
-<body>
+    <!-- Блок с сообщениями -->
+    <div class="messages"></div>
 
-<div id="chat"></div>
+    <!-- Форма ввода -->
+    <form class="input-area">
+        <textarea id="input" placeholder="Напиши сообщение..."></textarea>
+        <button type="submit">Отправить</button>
+    </form>
 
-<div id="inputBox">
-  <input id="text" placeholder="Напиши сообщение..." />
-  <button onclick="send()">Отправить</button>
-</div>
-
-<script>
-const chat = document.getElementById("chat");
-const text = document.getElementById("text");
-
-// ⚠️ ТВОЙ РЕАЛЬНЫЙ BACKEND
-const API_URL = "https://new-1-5155.onrender.com/api/chat";
-
-function addMsg(content, type) {
-  const div = document.createElement("div");
-  div.className = "msg " + type;
-  div.innerText = content;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-}
-
-async function send() {
-  const message = text.value.trim();
-  if (!message) return;
-
-  addMsg(message, "user");
-  text.value = "";
-
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ message })
-    });
-
-    const data = await res.json();
-
-    addMsg(data.response || "нет ответа", "bot");
-
-  } catch (e) {
-    addMsg("Ошибка соединения с сервером", "bot");
-    console.log(e);
-  }
-}
-</script>
-
+    <!-- Подключаем JS -->
+    <script src="/main.js"></script>
 </body>
 </html>
