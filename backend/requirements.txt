@@ -7,3 +7,4 @@ sqlalchemy
 python-multipart
 requests
 databases==0.8.0
+openai~=0.27.8
