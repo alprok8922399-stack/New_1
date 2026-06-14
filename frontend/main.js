@@ -1,39 +1,65 @@
-const messagesDiv = document.getElementById("messages");
-const form = document.getElementById("form");
-const input = document.getElementById("input");
+document.addEventListener("DOMContentLoaded", () => {
+    const inputArea = document.querySelector(".input-area");
+    const messagesDiv = document.querySelector(".messages");
+    const serverUrl = "https://new-1-5155.onrender.com";
 
-function addMessage(text, role) {
-  const div = document.createElement("div");
-  div.className = `message ${role}`;
-  div.innerText = text;
-  messagesDiv.appendChild(div);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
-}
+    // Функция для отображения сообщений
+    function renderMessage(msg, role) {
+        let cls = "";
+        if (role === "user") cls = "msg user";
+        else cls = "msg bot";
 
-form.onsubmit = async (e) => {
-  e.preventDefault();
-  const text = input.value.trim();
-  if (!text) return;
-
-  addMessage("Вы: " + text, "user");
-  input.value = "";
-
-  try {
-    const res = await fetch("https://new-1-5155.onrender.com/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text, secret: "test-secret" })
-    });
-
-    if (!res.ok) {
-      addMessage("Ошибка сети: " + res.status, "bot");
-      return;
+        const div = document.createElement("div");
+        div.classList.add(cls);
+        div.textContent = msg;
+        messagesDiv.appendChild(div);
+        scrollToBottom();
     }
 
-    const data = await res.json();
-    addMessage("Бот: " + data.text, "bot");
-    
-  } catch (err) {
-    addMessage("Ошибка подключения: " + err.message, "bot");
-  }
-};
+    // Прокрутка вниз
+    function scrollToBottom() {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // Загрузка истории при старте
+    fetch(`${serverUrl}/api/history`)
+        .then(response => response.json())
+        .then(history => {
+            console.log("История:", history);
+            history.forEach(msg => {
+                renderMessage(msg.content, msg.role);
+            });
+        })
+        .catch(error => console.error("Ошибка при получении истории:", error));
+
+    // Обработка формы
+    inputArea.addEventListener("submit", async event => {
+        event.preventDefault(); // Отмена стандартной отправки формы
+
+        const inputField = document.getElementById("input");
+        const userMsg = inputField.value.trim();
+
+        if (!userMsg) return;
+
+        // Показываем сообщение пользователя
+        renderMessage(userMsg, "user");
+        inputField.value = ""; // Очищаем поле
+
+        // Отправляем на сервер
+        const data = { message: userMsg };
+        const options = {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        };
+
+        const res = await fetch(`${serverUrl}/api/chat`, options);
+        const result = await res.json();
+
+        if (result.response) {
+            renderMessage(result.response, "bot");
+        } else {
+            renderMessage(`Ошибка: ${result.error}`, "bot");
+        }
+    });
+});
