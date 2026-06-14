@@ -1,153 +1,55 @@
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import databases
-import sqlalchemy
-import openai
 import os
-import uuid
-from datetime import datetime
-from .database import messages, database, users  # ← добавили users
+import json
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.orm import sessionmaker, declarative_base, scoped_session
+
+# Получаем ссылку на БД
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# Создаем движок
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
+Base = declarative_base()
+
+# Модель
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    secret_phrase = Column(String, unique=True, index=True)
+    name = Column(String, default="Друг")
+
+# --- ВОТ ЭТОТ КУСОК СБРОСИТ СТАРУЮ БАЗУ И СОЗДАСТ ПРАВИЛЬНУЮ ---
+# Сначала удаляем старое, чтобы стереть ошибку UndefinedColumn
+Base.metadata.drop_all(bind=engine) 
+# Создаем чистые таблицы с нужными колонками
+Base.metadata.create_all(bind=engine)
+# -------------------------------------------------------------
 
 app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# 🔥 CORS (разрешаем фронтенд)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://chat-ai-frontend-y1bt.onrender.com",
-        "http://localhost",
-        "*"
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Класс для запроса
-class ChatRequest(BaseModel):
-    message: str
-
-# Подключение к базе
-@app.on_event("startup")
-async def startup():
-    await database.connect()
-
-    # ❗❗❗ Новый блок для загрузки админа
-    query = users.select(users.c.username == "admin")
-    existing = await database.fetch_one(query)
-
-    if existing is None:
-        now = datetime.utcnow()
-        insert_query = users.insert().values(username="admin", created_at=now)
-        await database.execute(insert_query)
-        print("Админ успешно создан!")
-    else:
-        print("Админ уже есть.")
-
-# Отключение от базы
-@app.on_event("shutdown")
-async def shutdown():
-    await database.disconnect()
-
-# === НОВЫЙ ЭНДПОИНТ ===
-@app.get("/api/history")
-async def get_history():
-    """Возвращает последние 10 сообщений админа"""
-
-    # Берем ID админа
-    query = users.select(users.c.username == "admin")
-    user_data = await database.fetch_one(query)
-    user_id = user_data.id
-
-    # Достаем историю
-    query = (
-        messages
-        .select()
-        .where(messages.c.user_id == user_id)
-        .order_by(messages.c.timestamp.desc())
-        .limit(10)
-    )
-    records = await database.fetch_all(query)
-
-    # Преобразуем в удобный формат
-    history = []
-    for record in reversed(records):
-        item = {
-            "role": record.role,
-            "content": record.content,
-        }
-        history.append(item)
-
-    return history
-
-# === ОСНОВНОЙ ЭНДПОИНТ ===
 @app.post("/api/chat")
-async def chat(req: ChatRequest):
+async def chat_endpoint(request: Request):
+    db = db_session()
     try:
-        # Получаем сообщение
-        user_msg = req.message
+        data = await request.json()
+        secret = data.get("secret", "test-secret")
+        user_message = data.get("text", "")
 
-        # ❗❗❗ Берем ID админа
-        query = users.select(users.c.username == "admin")
-        user_data = await database.fetch_one(query)
-        user_id = user_data.id
-
-        # Сохраняем сообщение пользователя
-        now = datetime.utcnow()
-        query = messages.insert().values(
-            user_id=user_id,
-            role="user",
-            content=user_msg,
-            timestamp=now
-        )
-        await database.execute(query)
-
-        # Формируем полный контекст
-        context = [
-            {"role": "system", "content": "Ты помощник."},
-            {"role": "user", "content": user_msg}
-        ]
-
-        # Получаем полную историю
-        hist_query = (
-            messages
-            .select()
-            .where(messages.c.user_id == user_id)
-            .order_by(messages.c.timestamp.asc())
-        )
-        history = await database.fetch_all(hist_query)
-
-        # Добавляем историю в контекст
-        for rec in history:
-            context.append({
-                "role": rec.role,
-                "content": rec.content
-            })
-
-        # Отправляем в модель
-        OPENAI_API_KEY = os.getenv("OPENROUTER_API_KEY")
-        openai.api_base = "https://api.openrouter.ai/v1"
-        openai.api_key = OPENAI_API_KEY
-
-        resp = openai.ChatCompletion.create(
-            model="light-llama-2-70b-q4k-sft",
-            messages=context,
-            temperature=0.7,
-            max_tokens=2000
-        )
-
-        # Сохраняем ответ ИИ
-        bot_answer = resp.choices[0].message.content
-        query = messages.insert().values(
-            user_id=user_id,
-            role="bot",
-            content=bot_answer,
-            timestamp=datetime.utcnow()
-        )
-        await database.execute(query)
-
-        return {"response": bot_answer}
-
+        # Теперь колонка secret_phrase точно существует!
+        user = db.query(User).filter(User.secret_phrase == secret).first()
+        if not user:
+            user = User(secret_phrase=secret, name="Пользователь")
+            db.add(user)
+            db.commit()
+        
+        reply = f"Привет, {user.name}! Твой бэкенд ожил, база пересоздалась, и всё работает!"
+        return {"text": reply}
     except Exception as e:
-        return {"error": str(e)}
+        return {"text": f"Ошибка БД: {str(e)}"}
+    finally:
+        db.close()
