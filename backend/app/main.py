@@ -2,7 +2,7 @@ import os
 import json
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, Column, Integer, String, text
+from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, declarative_base, scoped_session
 
 # Получаем ссылку на БД
@@ -22,14 +22,10 @@ class User(Base):
     secret_phrase = Column(String, unique=True, index=True)
     name = Column(String, default="Друг")
 
-# НАДЁЖНЫЙ КАСКАДНЫЙ СБРОС ТАБЛИЦ ПЕРЕД ЗАПУСКОМ
-with engine.connect() as connection:
-    # Эта команда силой удаляет таблицы users и messages, игнорируя старые связи
-    connection.execute(text("DROP TABLE IF EXISTS messages CASCADE;"))
-    connection.execute(text("DROP TABLE IF EXISTS users CASCADE;"))
-    connection.commit()
-
-# Теперь создаем чистые, правильные таблицы
+# НАДЕЖНЫЙ СБРОС ТАБЛИЦ БЕЗ РУЧНЫХ КОММИТОВ
+# Сначала принудительно удаляем всё, что связано с текущими моделями
+Base.metadata.drop_all(bind=engine)
+# Затем создаем абсолютно чистые таблицы
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -43,7 +39,7 @@ async def chat_endpoint(request: Request):
         secret = data.get("secret", "test-secret")
         user_message = data.get("text", "")
 
-        # Ищем пользователя по новой колонке secret_phrase
+        # Теперь колонка secret_phrase гарантированно существует
         user = db.query(User).filter(User.secret_phrase == secret).first()
         if not user:
             user = User(secret_phrase=secret, name="Пользователь")
@@ -51,7 +47,7 @@ async def chat_endpoint(request: Request):
             db.commit()
             db.refresh(user)
         
-        reply = f"Привет, {user.name}! База данных полностью очищена и теперь работает без ошибок!"
+        reply = f"Привет, {user.name}! База данных успешно пересоздана, и всё работает стабильно!"
         return {"text": reply}
     except Exception as e:
         return {"text": f"Ошибка БД: {str(e)}"}
