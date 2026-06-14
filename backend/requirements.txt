@@ -6,3 +6,4 @@ psycopg2-binary
 sqlalchemy
 python-multipart
 requests
+databases==0.8.1
