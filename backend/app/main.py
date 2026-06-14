@@ -1,3 +1,5 @@
+import sys
+sys.path.append("../")
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
