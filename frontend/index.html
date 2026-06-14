@@ -32,8 +32,13 @@
             input.value = "";
             box.scrollTop = box.scrollHeight;
 
+            // Создаем временное сообщение ожидания, чтобы не казалось, что бот молчит
+            const loadingId = "loading-" + Date.now();
+            box.innerHTML += `<div class="message bot" id="${loadingId}" style="color: #aaa;"><strong>Бот:</strong><br>Печатает ответ...</div>`;
+            box.scrollTop = box.scrollHeight;
+
             try {
-                // Отправляем запрос на твой бэкенд Render
+                // Отправляем запрос на бэкенд Render
                 const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -42,11 +47,17 @@
                 
                 const data = await response.json();
                 
-                // Отображаем ответ бота
+                // Удаляем надпись ожидания и вставляем реальный ответ
+                const loadingEl = document.getElementById(loadingId);
+                if (loadingEl) loadingEl.remove();
+                
                 box.innerHTML += `<div class="message bot"><strong>Бот:</strong><br>${data.text}</div>`;
             } catch (err) {
-                // Если что-то пойдет не так — мы увидим реальную ошибку
-                box.innerHTML += `<div class="message bot" style="color:red"><strong>Ошибка связи:</strong><br>${err.message}</div>`;
+                // Если сервер упал или долго отвечает — заменим надпись на ошибку
+                const loadingEl = document.getElementById(loadingId);
+                if (loadingEl) loadingEl.remove();
+                
+                box.innerHTML += `<div class="message bot" style="color:#ff5252"><strong>Ошибка связи:</strong><br>${err.message}. Сервер на Render просыпается, подожди 30 секунд и отправь еще раз.</div>`;
             }
             
             box.scrollTop = box.scrollHeight;
