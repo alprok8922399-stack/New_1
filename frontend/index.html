@@ -12,56 +12,13 @@
         <div class="actions"></div>
     </div>
 
-    <div class="messages" id="messages-box"></div>
+    <div class="messages"></div>
 
     <div class="input-area">
         <textarea id="input" placeholder="Напиши сообщение..."></textarea>
-        <button onclick="send_message()">Отправить</button>
+        <button type="button">Отправить</button>
     </div>
 
-    <script>
-        async function send_message() {
-            const input = document.getElementById("input");
-            const box = document.getElementById("messages-box");
-            const text = input.value.trim();
-            
-            if (!text) return;
-
-            // Отображаем сообщение пользователя
-            box.innerHTML += `<div class="message user"><strong>Вы:</strong><br>${text}</div>`;
-            input.value = "";
-            box.scrollTop = box.scrollHeight;
-
-            // Создаем временное сообщение ожидания, чтобы не казалось, что бот молчит
-            const loadingId = "loading-" + Date.now();
-            box.innerHTML += `<div class="message bot" id="${loadingId}" style="color: #aaa;"><strong>Бот:</strong><br>Печатает ответ...</div>`;
-            box.scrollTop = box.scrollHeight;
-
-            try {
-                // Отправляем запрос на бэкенд Render
-                const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ text: text, secret: "test-secret" })
-                });
-                
-                const data = await response.json();
-                
-                // Удаляем надпись ожидания и вставляем реальный ответ
-                const loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.remove();
-                
-                box.innerHTML += `<div class="message bot"><strong>Бот:</strong><br>${data.text}</div>`;
-            } catch (err) {
-                // Если сервер упал или долго отвечает — заменим надпись на ошибку
-                const loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.remove();
-                
-                box.innerHTML += `<div class="message bot" style="color:#ff5252"><strong>Ошибка связи:</strong><br>${err.message}. Сервер на Render просыпается, подожди 30 секунд и отправь еще раз.</div>`;
-            }
-            
-            box.scrollTop = box.scrollHeight;
-        }
-    </script>
+    <script src="/main.js"></script>
 </body>
 </html>
