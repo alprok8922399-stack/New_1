@@ -19,7 +19,6 @@ async def chat_endpoint(request: Request):
         user_message = data.get("text") or ""
         image_base64 = data.get("image") or ""
         
-        # Строгая инструкция для общения
         system_prompt = "Ты — мудрый и вежливый ИИ-помощник. Отвечай всегда подробно, развернуто и исключительно на русском языке."
 
         content = [{"type": "text", "text": user_message}]
@@ -33,8 +32,8 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    # Включаем железно бесплатную и умную Gemini 2.5 Flash
-                    "model": "google/gemini-2.5-flash:free", 
+                    # Новая бесплатная модель
+                    "model": "google/gemini-2.0-flash-lite:free", 
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": content}
