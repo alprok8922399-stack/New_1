@@ -20,6 +20,7 @@ class MessageRequest(BaseModel):
 
 @app.post("/api/chat")
 async def chat_endpoint(request: MessageRequest):
+    # Теперь используем корректное имя переменной
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise HTTPException(
@@ -45,7 +46,7 @@ async def chat_endpoint(request: MessageRequest):
         try:
             response = await client.post(url, headers=headers, json=data, timeout=30.0)
             
-            # Если OpenRouter вернул ошибку (например, 404), мы перехватим её здесь
+            # Если OpenRouter вернул ошибку, мы перехватим её здесь
             if response.status_code != 200:
                 raise HTTPException(
                     status_code=response.status_code, 
