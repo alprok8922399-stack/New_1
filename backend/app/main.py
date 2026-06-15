@@ -47,8 +47,8 @@ async def chat_endpoint(request: Request):
                     "Content-Type": "application/json"
                 },
                 json={
-                    # Включаем Qwen 2 — она бесплатная, мощная и отлично знает русский язык
-                    "model": "qwen/qwen-2-7b-instruct:free",
+                    # Ставим авто-модель, она сама найдет живую бесплатную сеть
+                    "model": "openrouter/auto",
                     "max_tokens": 1000,
                     "messages": [
                         {"role": "system", "content": "Ты мудрый, вежливый ИИ-помощник. Отвечай всегда подробно, развернуто, грамотно и исключительно на русском языке."},
