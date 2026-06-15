@@ -47,8 +47,8 @@ async def chat_endpoint(request: Request):
                     "Content-Type": "application/json"
                 },
                 json={
-                    # Поменяли на мощную русскую модель Gemma 27B
-                    "model": "google/gemma-2-27b-it:free",
+                    # Включаем Qwen 2 — она бесплатная, мощная и отлично знает русский язык
+                    "model": "qwen/qwen-2-7b-instruct:free",
                     "max_tokens": 1000,
                     "messages": [
                         {"role": "system", "content": "Ты мудрый, вежливый ИИ-помощник. Отвечай всегда подробно, развернуто, грамотно и исключительно на русском языке."},
