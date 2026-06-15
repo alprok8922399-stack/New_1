@@ -19,10 +19,9 @@ async def chat_endpoint(request: Request):
         user_message = data.get("text") or ""
         image_base64 = data.get("image") or ""
         
-        # Инструкция для ИИ
-        system_prompt = "Ты — полезный, вежливый и умный ИИ-помощник. Отвечай всегда на чистом, грамотном русском языке. Пиши развернуто и понятно."
+        # Жесткая системная инструкция против иероглифов
+        system_prompt = "Ты мудрый ИИ-помощник. Отвечай ВСЕГДА только на русском языке. Использование иностранных языков или иероглифов строго запрещено."
 
-        # Формируем контент
         content = [{"type": "text", "text": user_message}]
         if image_base64:
             content.append({"type": "image_url", "image_url": {"url": image_base64}})
@@ -34,7 +33,7 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": "qwen/qwen-2.5-7b-instruct", # Стабильная модель
+                    "model": "meta-llama/llama-3-8b-instruct:free", # Вернули стабильную Llama 3 Free
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": content}
@@ -47,6 +46,6 @@ async def chat_endpoint(request: Request):
                 reply = response.json()['choices'][0]['message']['content']
                 return {"text": reply}
             else:
-                return {"text": f"Ошибка {response.status_code}: {response.text}"}
+                return {"text": f"Ошибка OpenRouter: {response.text}"}
     except Exception as e:
         return {"text": f"Ошибка: {str(e)}"}
