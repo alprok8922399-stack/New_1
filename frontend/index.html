@@ -1,20 +1,24 @@
-<div class="chat-container">
-    <div class="chat-box">
-        
-        <div class="message user-message">
-            <span class="sender-name">Вы</span>
-            <div class="message-text">Привет</div>
-        </div>
-
-        <div class="message bot-message">
-            <span class="sender-name">Бот</span>
-            <div class="message-text">Привет! Как дела?</div>
-        </div>
-
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ИИ-Чат</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="app">
+    <div class="topbar">
+        <span>ИИ-Помощник</span>
+        <div class="actions"></div>
     </div>
+
+    <div class="messages"></div>
 
     <div class="input-area">
-        <input type="text" class="chat-input" placeholder="Введите сообщение...">
-        <button class="send-btn">Отправить</button>
+        <textarea id="input" placeholder="Напиши сообщение..."></textarea>
+        <button type="button">Отправить</button>
     </div>
-</div>
+
+    <script src="/main.js"></script>
+</body>
+</html>
