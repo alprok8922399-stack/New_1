@@ -19,7 +19,7 @@ async def chat_endpoint(request: Request):
         user_message = data.get("text") or ""
         image_base64 = data.get("image") or ""
         
-        system_prompt = "Ты — мудрый и вежливый ИИ-помощник. Отвечай всегда подробно, развернуто и исключительно на русском языке."
+        system_prompt = "Ты — мудрый, вежливый и опытный ИИ-помощник. Отвечай всегда подробно, развернуто и исключительно на русском языке."
 
         content = [{"type": "text", "text": user_message}]
         if image_base64:
@@ -32,8 +32,8 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    # Новая бесплатная модель
-                    "model": "google/gemini-2.0-flash-lite:free", 
+                    # Самая стабильная и дешевая модель на OpenRouter
+                    "model": "deepseek/deepseek-chat", 
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": content}
