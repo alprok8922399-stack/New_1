@@ -27,7 +27,6 @@ async def chat_endpoint(request: Request):
         if not api_key:
             return {"text": "Ошибка: OPENROUTER_API_KEY отсутствует."}
         
-        # Собираем содержимое для текущего сообщения
         content_list = []
         if user_message:
             content_list.append({"type": "text", "text": user_message})
@@ -48,11 +47,11 @@ async def chat_endpoint(request: Request):
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "meta-llama/llama-3-8b-instruct",
-                    "max_tokens": 1000,  # Заставляем модель давать развернутые ответы без обрывов
+                    # Поменяли на мощную русскую модель Gemma 27B
+                    "model": "google/gemma-2-27b-it:free",
+                    "max_tokens": 1000,
                     "messages": [
-                        # Возвращаем жесткую инструкцию общаться ТОЛЬКО на русском
-                        {"role": "system", "content": "Ты мудрый, вежливый ИИ-помощник. Отвечай всегда подробно, развернуто и исключительно на русском языке."},
+                        {"role": "system", "content": "Ты мудрый, вежливый ИИ-помощник. Отвечай всегда подробно, развернуто, грамотно и исключительно на русском языке."},
                         {"role": "user", "content": content_list}
                     ]
                 },
