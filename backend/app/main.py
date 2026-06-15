@@ -18,26 +18,25 @@ async def chat_endpoint(request: Request):
     try:
         data = await request.json()
         user_message = data.get("text") or data.get("message") or ""
-        image_base64 = data.get("image") or "" # Получаем фото от телефона, если оно есть
+        image_base64 = data.get("image") or ""
         
         if not user_message and not image_base64:
             return {"text": "Ошибка: Бэкенд получил пустое сообщение."}
 
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         if not api_key:
-            return {"text": "Ошибка: OPENROUTER_API_KEY отсутствует в настройках Render."}
+            return {"text": "Ошибка: OPENROUTER_API_KEY отсутствует."}
         
-        # Собираем содержимое сообщения для нейросети
+        # Собираем содержимое для текущего сообщения
         content_list = []
         if user_message:
             content_list.append({"type": "text", "text": user_message})
         
         if image_base64:
-            # Форматируем картинку так, как требует OpenRouter
             content_list.append({
                 "type": "image_url",
                 "image_url": {
-                    "url": image_base64 # Передаем строку картинки
+                    "url": image_base64
                 }
             })
 
@@ -50,8 +49,11 @@ async def chat_endpoint(request: Request):
                 },
                 json={
                     "model": "meta-llama/llama-3-8b-instruct",
+                    "max_tokens": 1000,  # Заставляем модель давать развернутые ответы без обрывов
                     "messages": [
-                        {"role": "user", "content": content_list} # Отправляем текст + фото вместе
+                        # Возвращаем жесткую инструкцию общаться ТОЛЬКО на русском
+                        {"role": "system", "content": "Ты мудрый, вежливый ИИ-помощник. Отвечай всегда подробно, развернуто и исключительно на русском языке."},
+                        {"role": "user", "content": content_list}
                     ]
                 },
                 timeout=30.0
