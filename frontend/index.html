@@ -12,11 +12,20 @@
         <div class="actions"></div>
     </div>
 
+    <div id="image-preview-container" style="display: none; padding: 10px; background: #2a2a2a; align-items: center; gap: 10px;">
+        <img id="image-preview" src="" alt="Превью" style="max-height: 60px; max-width: 60px; border-radius: 6px; object-fit: cover;">
+        <button id="cancel-image-btn" type="button" style="background: #dc3545; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer;">×</button>
+    </div>
+
     <div class="messages"></div>
 
     <div class="input-area">
+        <input type="file" id="file-input" accept="image/*" style="display: none;">
+        
+        <button type="button" id="attach-btn" style="background: none; border: none; font-size: 22px; cursor: pointer; padding: 0 5px;">📎</button>
+        
         <textarea id="input" placeholder="Напиши сообщение..."></textarea>
-        <button type="button">Отправить</button>
+        <button type="button" id="send-btn">Отправить</button>
     </div>
 
     <script src="/main.js"></script>
