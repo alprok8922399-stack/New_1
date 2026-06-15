@@ -35,7 +35,7 @@ async def chat_endpoint(request: Request):
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "meta-llama/llama-3-8b-instruct:free",
+                    "model": "meta-llama/llama-3-8b-instruct",  # Убрали :free
                     "messages": [
                         {"role": "user", "content": user_message}
                     ]
@@ -48,12 +48,11 @@ async def chat_endpoint(request: Request):
                 reply = result['choices'][0]['message']['content']
                 return {"text": reply}
             else:
-                # Показываем реальную причину от OpenRouter
                 try:
                     error_details = response.json()
                 except:
                     error_details = response.text
-                return {"text": f"OpenRouter отлуп (Код {response.status_code}): {error_details}"}
+                return {"text": f"OpenRouter ответил ошибкой (Код {response.status_code}): {error_details}"}
         
     except Exception as e:
         return {"text": f"Ошибка бэкенда: {str(e)}"}
