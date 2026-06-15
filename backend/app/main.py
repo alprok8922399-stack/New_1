@@ -19,8 +19,8 @@ async def chat_endpoint(request: Request):
         user_message = data.get("text") or ""
         image_base64 = data.get("image") or ""
         
-        # Жесткая системная инструкция против иероглифов
-        system_prompt = "Ты мудрый ИИ-помощник. Отвечай ВСЕГДА только на русском языке. Использование иностранных языков или иероглифов строго запрещено."
+        # Строгая инструкция для общения
+        system_prompt = "Ты — мудрый и вежливый ИИ-помощник. Отвечай всегда подробно, развернуто и исключительно на русском языке."
 
         content = [{"type": "text", "text": user_message}]
         if image_base64:
@@ -33,7 +33,8 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": "meta-llama/llama-3-8b-instruct:free", # Вернули стабильную Llama 3 Free
+                    # Включаем железно бесплатную и умную Gemini 2.5 Flash
+                    "model": "google/gemini-2.5-flash:free", 
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": content}
@@ -48,4 +49,4 @@ async def chat_endpoint(request: Request):
             else:
                 return {"text": f"Ошибка OpenRouter: {response.text}"}
     except Exception as e:
-        return {"text": f"Ошибка: {str(e)}"}
+        return {"text": f"Ошибка бэкенда: {str(e)}"}
