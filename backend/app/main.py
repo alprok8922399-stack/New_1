@@ -20,7 +20,7 @@ async def chat_endpoint(request: Request):
         # Получаем данные из чата
         data = await request.json()
         
-        # Берем текст сообщения (проверяем оба возможных варианта названия поля)
+        # Берем текст сообщения
         user_message = data.get("text") or data.get("message") or ""
         
         if not user_message:
@@ -41,7 +41,7 @@ async def chat_endpoint(request: Request):
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "google/gemma-2-9b-it:free",  # Бесплатная модель ИИ
+                    "model": "meta-llama/llama-3-8b-instruct:free",  # Стабильная бесплатная модель Llama 3
                     "messages": [
                         {"role": "system", "content": "Ты вежливый ИИ-помощник в чате. Отвечай кратко и по делу."},
                         {"role": "user", "content": user_message}
