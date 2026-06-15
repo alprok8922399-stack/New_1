@@ -22,7 +22,6 @@ body, .app {
     flex-shrink: 0;
 }
 
-/* Область чата скроллится, сообщения ложатся в колонку */
 .messages { 
     flex: 1; 
     overflow-y: auto; 
@@ -32,7 +31,6 @@ body, .app {
     gap: 12px;
 }
 
-/* Блоки сообщений */
 .message { 
     padding: 12px 16px; 
     border-radius: 12px; 
@@ -40,7 +38,7 @@ body, .app {
     word-break: break-word;
 }
 
-/* Бот — серый блок, почти на всю ширину экрана */
+/* Бот — темно-серый, широкий блок */
 .message.bot { 
     background-color: #232323; 
     color: #ffffff; 
@@ -48,15 +46,14 @@ body, .app {
     width: 95%;
 }
 
-/* Пользователь — синий компактный блок справа */
+/* Твои сообщения — теперь СЕРЫЕ (вместо синих) и прижаты вправо */
 .message.user { 
-    background-color: #007bff; 
-    color: white; 
+    background-color: #3a3a3a; 
+    color: #ffffff; 
     align-self: flex-end; 
     max-width: 80%;
 }
 
-/* Картинки внутри сообщений */
 .message img {
     max-width: 100%;
     max-height: 250px;
@@ -65,7 +62,6 @@ body, .app {
     margin-bottom: 8px;
 }
 
-/* Контейнер превью фотографии над полем ввода */
 #image-preview-container {
     background: #1e1e1e;
     padding: 10px 15px;
@@ -96,7 +92,6 @@ body, .app {
     display: none !important; 
 }
 
-/* Нижняя зона ввода */
 .input-area { 
     flex-shrink: 0; 
     display: flex; 
@@ -119,7 +114,6 @@ body, .app {
     font-size: 16px;
 }
 
-/* Вот этот блок мы чиним: кнопки строго в столбик! */
 .button-group {
     display: flex;
     flex-direction: column;
@@ -127,11 +121,12 @@ body, .app {
     justify-content: center;
 }
 
+/* Кнопка «Отправить» тоже стала серой в тон интерфейса */
 #send-btn { 
     padding: 8px 12px; 
-    background: #007bff; 
+    background: #3a3a3a; 
     color: white; 
-    border: none; 
+    border: 1px solid #555; 
     border-radius: 6px;
     font-weight: bold;
     font-size: 14px;
