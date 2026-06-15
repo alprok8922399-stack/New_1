@@ -6,7 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# Разрешаем доступ для твоего фронтенда
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,22 +16,19 @@ app.add_middleware(
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     try:
-        # Получаем данные из чата
         data = await request.json()
-        
-        # Берем текст сообщения
         user_message = data.get("text") or data.get("message") or ""
         
         if not user_message:
             return {"text": "Ошибка: Бэкенд получил пустое сообщение."}
 
-        # Получаем ключ OpenRouter из настроек Render
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        # ОТЛАДКА: выведет длину ключа в логи Render (сам ключ не покажет)
+        print(f"DEBUG: Key loaded, length: {len(api_key)}")
         
         if not api_key:
-            return {"text": "Ошибка: OPENROUTER_API_KEY не найден в настройках Environment на Render."}
+            return {"text": "Ошибка: OPENROUTER_API_KEY не найден в настройках."}
         
-        # Делаем прямой запрос к нейросети
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
@@ -41,21 +37,20 @@ async def chat_endpoint(request: Request):
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "google/gemma-2-27b-it:free",  # Поставил мощную модель Gemma 27B вместо старой Llama
+                    "model": "google/gemma-2-27b-it:free",
                     "messages": [
-                        {"role": "system", "content": "Ты вежливый ИИ-помощник в чате. Отвечай кратко и по делу."},
+                        {"role": "system", "content": "Ты вежливый ИИ-помощник."},
                         {"role": "user", "content": user_message}
                     ]
                 },
                 timeout=30.0
             )
             
-            # Если нейросеть ответила успешно
             if response.status_code == 200:
                 result = response.json()
                 reply = result['choices'][0]['message']['content']
             else:
-                reply = f"Ошибка ИИ (Код {response.status_code}): Ошибка со стороны OpenRouter. Проверь баланс ключа или сам ключ."
+                reply = f"Ошибка ИИ (Код {response.status_code}): Проверь ключ."
 
         return {"text": reply}
         
