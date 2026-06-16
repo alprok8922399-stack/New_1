@@ -30,10 +30,14 @@ async def chat_endpoint(request: Request):
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "HTTP-Referer": "https://chat-ai-frontend-y1bt.onrender.com",
+                    "X-Title": "My AI Chat"
+                },
                 json={
-                    # Самая стабильная и дешевая модель на OpenRouter
                     "model": "deepseek/deepseek-chat", 
+                    "max_tokens": 4096,
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": content}
@@ -43,9 +47,10 @@ async def chat_endpoint(request: Request):
             )
             
             if response.status_code == 200:
-                reply = response.json()['choices'][0]['message']['content']
+                reply = response.json()['choices']['message']['content']
                 return {"text": reply}
             else:
                 return {"text": f"Ошибка OpenRouter: {response.text}"}
     except Exception as e:
         return {"text": f"Ошибка бэкенда: {str(e)}"}
+        
