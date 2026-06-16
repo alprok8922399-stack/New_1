@@ -1,8 +1,13 @@
 import os
 import httpx
+import logging
+from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -22,6 +27,9 @@ async def chat_endpoint(request: Request):
         data = await request.json()
         user_message = data.get("text") or ""
         image_base64 = data.get("image") or ""
+
+        # Логируем начало обработки запроса
+        logger.info(f"[{datetime.now()}] Получен запрос. Текст: '{user_message[:50]}...'")
 
         # Проверка на пустое сообщение (без текста и без картинки)
         if not user_message and not image_base64:
@@ -49,3 +57,26 @@ async def chat_endpoint(request: Request):
                 },
                 json={
                     "model": "deepseek/deepseek-chat",
+                    "max_tokens": 4096,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": content}
+                    ]
+                },
+                timeout=30.0
+            )
+
+            if response.status_code == 200:
+                reply = response.json()['choices'][0]['message']['content']
+                # Логируем ответ
+                logger.info(f"[{datetime.now()}] Ответ получен. Первые символы: '{reply[:10]}...'")
+                return {"text": reply}
+            else:
+                error_msg = f"Ошибка OpenRouter: {response.text}"
+                logger.error(f"[{datetime.now()}] {error_msg}")
+                return {"text": error_msg}
+    except Exception as e:
+        error_msg = f"Ошибка бэкенда: {str(e)}"
+        logger.error(f"[{datetime.now()}] {error_msg}")
+        return {"text": error_msg}
+        
