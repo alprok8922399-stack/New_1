@@ -46,4 +46,4 @@ def startup_event():
     conn.close()
 
 @app.post("/api/chat")
-async def chat_endpoint(request:
+async def chat_endpoint(request: Request):
