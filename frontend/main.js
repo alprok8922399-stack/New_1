@@ -40,13 +40,16 @@ function appendMessage(text, isUser, imageUrl = "") {
     // 1. Превращаем двойные звёздочки **текст** в жирный шрифт
     formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     
-    // 2. Превращаем одиночные звёздочки *текст* в красивый курсив (наклонный текст)
+    // 2. Превращаем одиночные звёздочки *текст* в красивый курсив
     formattedText = formattedText.replace(/\*(.*?)\*/g, '<em>$1</em>');
     
-    // 3. Превращаем три дефиса или три звёздочки (--- или ***) в красивую тонкую линию разделителя
+    // 3. Вычищаем любые сиротливые, одиночные звёздочки, которые ИИ забыл закрыть
+    formattedText = formattedText.replace(/\*/g, '');
+    
+    // 4. Превращаем три дефиса или три звёздочки (---) в тонкую линию разделителя
     formattedText = formattedText.replace(/(?:^|\n)(?:---|\*\*\*+)(?:\n|$)/g, '<hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">');
     
-    // 4. Заменяем переносы строк на тег <br>, чтобы текст разделялся на абзацы
+    // 5. Заменяем переносы строк на тег <br>, чтобы текст разбивался на абзацы
     formattedText = formattedText.replace(/\n/g, '<br>');
     
     let content = `<div>${formattedText}</div>`;
@@ -73,7 +76,7 @@ async function loadChatHistory() {
             appendMessage(msg.text, msg.role === 'user');
         });
     } catch (error) {
-        console.error("Не удалось загрузить приветствие:", error);
+        console.error("Не удалось加载приветствие:", error);
     }
 }
 
