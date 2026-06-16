@@ -35,7 +35,16 @@ function appendMessage(text, isUser, imageUrl = "") {
     const messageDiv = document.createElement('div');
     messageDiv.className = isUser ? 'message user' : 'message bot';
     
-    let content = `<div>${text}</div>`;
+    // Очищаем текст от возможных системных пробелов
+    let formattedText = text || "";
+    
+    // ЧИСТИМ ЗВЁЗДОЧКИ: заменяем **текст** на красивый жирный шрифт в HTML
+    formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Заменяем переносы строк на тег <br>, чтобы текст не слипался в одну строчку
+    formattedText = formattedText.replace(/\n/g, '<br>');
+    
+    let content = `<div>${formattedText}</div>`;
     if (imageUrl) {
         content = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 5px;">` + content;
     }
