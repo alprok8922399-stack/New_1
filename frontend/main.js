@@ -9,6 +9,8 @@ const cancelImageBtn = document.getElementById('cancel-image-btn');
 
 let selectedImageBase64 = "";
 const BACKEND_URL = "https://new-1-5155.onrender.com/api/chat";
+// Ссылка на историю (заменяем /api/chat на /api/history)
+const HISTORY_URL = "https://new-1-5155.onrender.com/api/history"; 
 
 attachBtn.addEventListener('click', () => fileInput.click());
 
@@ -44,6 +46,27 @@ function appendMessage(text, isUser, imageUrl = "") {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
+// НОВАЯ ФУНКЦИЯ: Официант запрашивает меню (историю) у кухни (бэкенда)
+async function loadChatHistory() {
+    try {
+        const response = await fetch(HISTORY_URL);
+        if (!response.ok) return;
+        
+        const history = await response.json();
+        
+        // Очищаем контейнер перед загрузкой, чтобы сообщения не дублировались
+        messagesContainer.innerHTML = "";
+        
+        // Раскладываем сообщения по экрану
+        history.forEach(msg => {
+            // Если роль 'user', то это сообщение пользователя (true), иначе — бота (false)
+            appendMessage(msg.text, msg.role === 'user');
+        });
+    } catch (error) {
+        console.error("Не удалось загрузить историю:", error);
+    }
+}
+
 async function sendMessage() {
     const text = inputArea.value.trim();
     if (!text && !selectedImageBase64) return;
@@ -71,3 +94,6 @@ async function sendMessage() {
 sendBtn.addEventListener('click', sendMessage);
 
 // ВСЁ! Удалили слушатель Enter, теперь Enter делает перенос строки автоматически.
+
+// Автоматически загружаем историю, как только страница открылась на телефоне
+document.addEventListener('DOMContentLoaded', loadChatHistory);
