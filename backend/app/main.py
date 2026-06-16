@@ -19,7 +19,6 @@ async def chat_endpoint(request: Request):
         user_message = data.get("text") or ""
         image_base64 = data.get("image") or ""
         
-        # Инструкция для ИИ
         system_prompt = "Ты — полезный, вежливый и умный ИИ-помощник. Отвечай всегда подробно, развернуто и только на русском языке."
 
         content = [{"type": "text", "text": user_message}]
@@ -33,8 +32,8 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    # Авто-выбор ЛЮБОЙ доступной бесплатной модели от самого OpenRouter
-                    "model": "openrouter/auto-free", 
+                    # ВОТ ОНА, правильная авто-модель!
+                    "model": "openrouter/auto", 
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": content}
