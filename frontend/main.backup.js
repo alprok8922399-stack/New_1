@@ -1,93 +1,95 @@
-document.addEventListener("DOMContentLoaded", () => {
-    const inputField = document.getElementById("input");
-    const sendButton = document.querySelector(".input-area button");
-    const messagesDiv = document.querySelector(".messages");
-    const serverUrl = "https://new-1-5155.onrender.com";
+const messagesContainer = document.querySelector('.messages');
+const inputArea = document.getElementById('input');
+const sendBtn = document.getElementById('send-btn');
+const attachBtn = document.getElementById('attach-btn');
+const fileInput = document.getElementById('file-input');
+const previewContainer = document.getElementById('image-preview-container');
+const imagePreview = document.getElementById('image-preview');
+const cancelImageBtn = document.getElementById('cancel-image-btn');
 
-    // Функция для отображения сообщений (используем твои классы стилей)
-    function renderMessage(msg, role, isError = false) {
-        let cls = role === "user" ? "message user" : "message bot";
-        
-        const div = document.createElement("div");
-        div.className = cls;
-        if (isError) div.style.color = "#ff5252";
-        
-        // Добавляем красивую разметку с жирным шрифтом
-        const senderName = role === "user" ? "Вы" : "Бот";
-        div.innerHTML = `<strong>${senderName}:</strong><br>${msg}`;
-        
-        messagesDiv.appendChild(div);
-        scrollToBottom();
-    }
+let selectedImageBase64 = "";
+const BACKEND_URL = "https://new-1-5155.onrender.com/api/chat";
+const HISTORY_URL = "https://new-1-5155.onrender.com/api/history"; 
 
-    // Прокрутка вниз
-    function scrollToBottom() {
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
+attachBtn.addEventListener('click', () => fileInput.click());
 
-    // Главная функция отправки сообщения
-    async function sendMessage() {
-        const userMsg = inputField.value.trim();
-        if (!userMsg) return;
-
-        // 1. Показываем сообщение пользователя на экране
-        renderMessage(userMsg, "user");
-        inputField.value = ""; // Очищаем поле ввода
-        scrollToBottom();
-
-        // 2. Создаем временную плашку ожидания
-        const loadingDiv = document.createElement("div");
-        loadingDiv.className = "message bot";
-        loadingDiv.style.color = "#aaa";
-        loadingDiv.innerHTML = "<strong>Бот:</strong><br>Печатает ответ...";
-        messagesDiv.appendChild(loadingDiv);
-        scrollToBottom();
-
-        try {
-            // 3. Отправляем правильные данные на бэкенд
-            const response = await fetch(`${serverUrl}/api/chat`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    text: userMsg, 
-                    secret: "test-secret" 
-                })
-            });
-            
-            const result = await response.json();
-            
-            // Удаляем плашку ожидания
-            loadingDiv.remove();
-
-            // 4. Проверяем ответ сервера
-            if (result.text) {
-                renderMessage(result.text, "bot");
-            } else {
-                renderMessage(result.error || "Неизвестная ошибка сервера", "bot", true);
-            }
-        } catch (error) {
-            // Удаляем плашку ожидания в случае сбоя сети
-            loadingDiv.remove();
-            renderMessage(`Ошибка связи. Бэкенд на Render просыпается, подожди 30 секунд и попробуй еще раз.`, "bot", true);
-            console.error("Ошибка запроса:", error);
-        }
-    }
-
-    // Привязываем отправку к твоей кнопке
-    if (sendButton) {
-        sendButton.addEventListener("click", (e) => {
-            e.preventDefault();
-            sendMessage();
-        });
-    }
-
-    // Разрешаем отправку по нажатию Enter (но без Shift)
-    if (inputField) {
-        inputField.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-    }
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        selectedImageBase64 = event.target.result;
+        imagePreview.src = selectedImageBase64;
+        previewContainer.className = ""; // Показываем превью
+    };
+    reader.readAsDataURL(file);
 });
+
+cancelImageBtn.addEventListener('click', () => {
+    selectedImageBase64 = "";
+    fileInput.value = "";
+    previewContainer.className = "preview-hidden";
+});
+
+function appendMessage(text, isUser, imageUrl = "") {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = isUser ? 'message user' : 'message bot';
+    
+    let content = `<div>${text}</div>`;
+    if (imageUrl) {
+        content = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 5px;">` + content;
+    }
+    
+    messageDiv.innerHTML = content;
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Умная загрузка стартового приветствия
+async function loadChatHistory() {
+    try {
+        const response = await fetch(HISTORY_URL);
+        if (!response.ok) return;
+        
+        const history = await response.json();
+        
+        // Очищаем экран, чтобы старая история не мозолила глаза
+        messagesContainer.innerHTML = "";
+        
+        // Выводим только сгенерированное ИИ приветствие
+        history.forEach(msg => {
+            appendMessage(msg.text, msg.role === 'user');
+        });
+    } catch (error) {
+        console.error("Не удалось загрузить приветствие:", error);
+    }
+}
+
+async function sendMessage() {
+    const text = inputArea.value.trim();
+    if (!text && !selectedImageBase64) return;
+
+    appendMessage(text || "Фото", true, selectedImageBase64);
+    
+    const imageToSend = selectedImageBase64;
+    inputArea.value = "";
+    previewContainer.className = "preview-hidden"; // Прячем превью после отправки
+
+    try {
+        const response = await fetch(BACKEND_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text, image: imageToSend })
+        });
+        const data = await response.json();
+        appendMessage(data.text, false);
+    } catch (error) {
+        appendMessage("Ошибка соединения.", false);
+    }
+}
+
+// Слушаем нажатие кнопки отправки
+sendBtn.addEventListener('click', sendMessage);
+
+// Автоматически запрашиваем умное приветствие при открытии чата на телефоне
+document.addEventListener('DOMContentLoaded', loadChatHistory);
