@@ -33,8 +33,8 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    # Стабильная и бесплатная Qwen, никакой Лламы!
-                    "model": "qwen/qwen-2.5-7b-instruct:free", 
+                    # Авто-выбор ЛЮБОЙ доступной бесплатной модели от самого OpenRouter
+                    "model": "openrouter/auto-free", 
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": content}
