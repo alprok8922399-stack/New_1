@@ -1,8 +1,12 @@
 import os
-import json
 import httpx
+import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+import psycopg2
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -13,46 +17,183 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+def get_db_connection():
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        return None
+    try:
+        conn = psycopg2.connect(db_url, connect_timeout=3)
+        return conn
+    except Exception as e:
+        logger.error(f"Не удалось подключиться к БД: {e}")
+        return None
+
+@app.on_event("startup")
+def startup_event():
+    conn = get_db_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id SERIAL PRIMARY KEY,
+                    role VARCHAR(20) NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+            cur.close()
+            conn.close()
+            logger.info("База данных успешно проверена.")
+        except Exception as e:
+            logger.error(f"Ошибка при создании таблицы: {e}")
+
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     try:
         data = await request.json()
-        user_message = data.get("text") or data.get("message") or ""
+        user_message = data.get("text") or ""
+        image_base64 = data.get("image") or ""
         
-        if not user_message:
-            return {"text": "Ошибка: Бэкенд получил пустое сообщение."}
+        system_prompt = "Ты — полезный, вежливый и умный ИИ-помощник. Отвечай всегда подробно, развернуто и только на русском языке."
+
+        conn = get_db_connection()
+        if conn:
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
+                    ("user", user_message)
+                )
+                conn.commit()
+            except Exception as e:
+                logger.error(f"Не удалось записать сообщение пользователя: {e}")
+
+        history_messages = []
+        if conn:
+            try:
+                cur.execute("""
+                    SELECT role, content 
+                    FROM chat_messages 
+                    WHERE id < (SELECT MAX(id) FROM chat_messages)
+                    ORDER BY id DESC 
+                    LIMIT 10
+                """)
+                rows = cur.fetchall()
+                for row in rows[::-1]:
+                    history_messages.append({"role": row[0], "content": row[1]})
+            except Exception as e:
+                logger.error(f"Не удалось достать контекст для ИИ: {e}")
+
+        messages_for_ai = [{"role": "system", "content": system_prompt}]
+        messages_for_ai.extend(history_messages)
+        
+        current_content = [{"type": "text", "text": user_message}]
+        if image_base64:
+            current_content.append({"type": "image_url", "image_url": {"url": image_base64}})
+            
+        messages_for_ai.append({"role": "user", "content": current_content})
 
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
-        
-        if not api_key:
-            return {"text": "Ошибка: OPENROUTER_API_KEY отсутствует в настройках Render."}
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                },
+                headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": "meta-llama/llama-3-8b-instruct",  # Убрали :free
-                    "messages": [
-                        {"role": "user", "content": user_message}
-                    ]
+                    "model": "openrouter/auto", 
+                    "messages": messages_for_ai
                 },
                 timeout=30.0
             )
             
             if response.status_code == 200:
-                result = response.json()
-                reply = result['choices'][0]['message']['content']
+                reply = response.json()['choices'][0]['message']['content']
+                
+                if conn:
+                    try:
+                        cur.execute(
+                            "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
+                            ("assistant", reply)
+                        )
+                        conn.commit()
+                    except Exception as e:
+                        logger.error(f"Не удалось записать ответ ИИ: {e}")
+                
+                if conn:
+                    cur.close()
+                    conn.close()
+
                 return {"text": reply}
             else:
-                try:
-                    error_details = response.json()
-                except:
-                    error_details = response.text
-                return {"text": f"OpenRouter ответил ошибкой (Код {response.status_code}): {error_details}"}
-        
+                if conn:
+                    cur.close()
+                    conn.close()
+                return {"text": f"Ошибка OpenRouter: {response.text}"}
+                
     except Exception as e:
         return {"text": f"Ошибка бэкенда: {str(e)}"}
+
+# УМНАЯ РУЧКА ПРИВЕТСТВИЯ: Анализирует базу и генерирует стартовую фразу
+@app.get("/api/history")
+async def get_history():
+    conn = get_db_connection()
+    if not conn:
+        return [{"role": "assistant", "text": "Привет, Алексей! База данных недоступна, но я готов к работе."}]
+    
+    try:
+        cur = conn.cursor() 
+        # Берем последние 15 сообщений для плотного анализа контекста
+        cur.execute("""
+            SELECT role, content 
+            FROM chat_messages 
+            ORDER BY id DESC 
+            LIMIT 15
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        # Если база вообще пустая (первый запуск)
+        if not rows:
+            return [{"role": "assistant", "text": "Привет, Алексей! Рад тебя видеть. О чём пообщаемся?"}]
+            
+        # Формируем историю для ИИ, чтобы он понял, о чём шла речь
+        history_summary = []
+        for row in rows[::-1]:
+            history_summary.append({"role": row[0], "content": row[1]})
+            
+        # Добавляем секретную команду для генерации приветствия
+        messages_for_welcome = [
+            {
+                "role": "system", 
+                "content": "Ты — ИИ-помощник. Проанализируй историю переписки с пользователем по имени Алексей. Напиши ОДНО короткое, дружелюбное приветствие в духе: 'Ну что, Алексей, продолжим...?' и упомяни главную тему последних сообщений. Не пиши лишнего, только само приветствие."
+            }
+        ]
+        messages_for_welcome.extend(history_summary)
+        
+        api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        
+        # Просим OpenRouter сделать красивое саммари-приветствие
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": "openrouter/auto", 
+                    "messages": messages_for_welcome
+                },
+                timeout=15.0
+            )
+            
+            if response.status_code == 200:
+                welcome_text = response.json()['choices'][0]['message']['content']
+                # Возвращаем фронтенду ТОЛЬКО ОДНО это сообщение
+                return [{"role": "assistant", "text": welcome_text}]
+            
+        return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
+        
+    except Exception as e:
+        logger.error(f"Ошибка при генерации приветствия: {e}")
+        return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
