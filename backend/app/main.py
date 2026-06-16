@@ -35,13 +35,9 @@ def startup_event():
     if conn:
         try:
             cur = conn.cursor()
-            
-            # ВНИМАНИЕ: Чиним косяк Алисы. 
-            # Если старая таблица была кривой, мы её удаляем и создаем заново с колонкой role!
-            cur.execute("DROP TABLE IF EXISTS chat_messages CASCADE;")
-            
+            # Таблицу больше не удаляем, она уже создана правильно!
             cur.execute("""
-                CREATE TABLE chat_messages (
+                CREATE TABLE IF NOT EXISTS chat_messages (
                     id SERIAL PRIMARY KEY,
                     role VARCHAR(20) NOT NULL,
                     content TEXT NOT NULL,
@@ -51,7 +47,7 @@ def startup_event():
             conn.commit()
             cur.close()
             conn.close()
-            logger.info("База данных успешно ПЕРЕСОЗДАНА с правильными колонками.")
+            logger.info("База данных успешно проверена.")
         except Exception as e:
             logger.error(f"Ошибка при создании таблицы: {e}")
 
@@ -64,11 +60,7 @@ async def chat_endpoint(request: Request):
         
         system_prompt = "Ты — полезный, вежливый и умный ИИ-помощник. Отвечай всегда подробно, развернуто и только на русском языке."
 
-        content = [{"type": "text", "text": user_message}]
-        if image_base64:
-            content.append({"type": "image_url", "image_url": {"url": image_base64}})
-
-        # Сохраняем сообщение пользователя в базу
+        # Сохраняем новое сообщение пользователя в базу данных ГЛАВНОГО чата
         conn = get_db_connection()
         if conn:
             try:
@@ -81,18 +73,50 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Не удалось записать сообщение пользователя: {e}")
 
+        # СОБИРАЕМ ИСТОРИЮ ДЛЯ ИИ: Достаем последние 10 сообщений ПЕРЕД текущим запросом
+        history_messages = []
+        if conn:
+            try:
+                # Берем последние 10 записей, но исключаем только что добавленное сообщение пользователя,
+                # чтобы не дублировать его (мы добавим его в самом конце как контент с картинкой)
+                cur.execute("""
+                    SELECT role, content 
+                    FROM chat_messages 
+                    WHERE id < (SELECT MAX(id) FROM chat_messages)
+                    ORDER BY id DESC 
+                    LIMIT 10
+                """)
+                rows = cur.fetchall()
+                
+                # Переворачиваем, чтобы история шла от старых к новым
+                for row in rows[::-1]:
+                    history_messages.append({"role": row[0], "content": row[1]})
+            except Exception as e:
+                logger.error(f"Не удалось достать контекст для ИИ: {e}")
+
+        # Формируем массив сообщений для OpenRouter
+        messages_for_ai = [{"role": "system", "content": system_prompt}]
+        
+        # Добавляем прошлую историю (если она есть в базе)
+        messages_for_ai.extend(history_messages)
+        
+        # Добавляем текущее сообщение пользователя (вместе с фото, если оно есть)
+        current_content = [{"type": "text", "text": user_message}]
+        if image_base64:
+            current_content.append({"type": "image_url", "image_url": {"url": image_base64}})
+            
+        messages_for_ai.append({"role": "user", "content": current_content})
+
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         
+        # Отправляем ИИ полную историю переписки!
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
                     "model": "openrouter/auto", 
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": content}
-                    ]
+                    "messages": messages_for_ai
                 },
                 timeout=30.0
             )
