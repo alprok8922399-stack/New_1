@@ -35,7 +35,24 @@ function appendMessage(text, isUser, imageUrl = "") {
     const messageDiv = document.createElement('div');
     messageDiv.className = isUser ? 'message user' : 'message bot';
     
-    let content = `<div>${text}</div>`;
+    let formattedText = text || "";
+    
+    // 1. Превращаем двойные звёздочки **текст** в жирный шрифт
+    formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // 2. Превращаем одиночные звёздочки *текст* в красивый курсив
+    formattedText = formattedText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // 3. Вычищаем любые сиротливые, одиночные звёздочки, которые ИИ забыл закрыть
+    formattedText = formattedText.replace(/\*/g, '');
+    
+    // 4. Превращаем три дефиса или три звёздочки (---) в тонкую линию разделителя
+    formattedText = formattedText.replace(/(?:^|\n)(?:---|\*\*\*+)(?:\n|$)/g, '<hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">');
+    
+    // 5. Заменяем переносы строк на тег <br>, чтобы текст разбивался на абзацы
+    formattedText = formattedText.replace(/\n/g, '<br>');
+    
+    let content = `<div>${formattedText}</div>`;
     if (imageUrl) {
         content = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 5px;">` + content;
     }
@@ -53,15 +70,13 @@ async function loadChatHistory() {
         
         const history = await response.json();
         
-        // Очищаем экран, чтобы старая история не мозолила глаза
         messagesContainer.innerHTML = "";
         
-        // Выводим только сгенерированное ИИ приветствие
         history.forEach(msg => {
             appendMessage(msg.text, msg.role === 'user');
         });
     } catch (error) {
-        console.error("Не удалось загрузить приветствие:", error);
+        console.error("Не удалось加载приветствие:", error);
     }
 }
 
@@ -88,8 +103,6 @@ async function sendMessage() {
     }
 }
 
-// Слушаем нажатие кнопки отправки
 sendBtn.addEventListener('click', sendMessage);
 
-// Автоматически запрашиваем умное приветствие при открытии чата на телефоне
 document.addEventListener('DOMContentLoaded', loadChatHistory);
