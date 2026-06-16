@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 
+# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -135,16 +136,15 @@ async def chat_endpoint(request: Request):
     except Exception as e:
         return {"text": f"Ошибка бэкенда: {str(e)}"}
 
-# УМНАЯ РУЧКА ПРИВЕТСТВИЯ: Анализирует базу и генерирует стартовую фразу
+# Наш обновленный строгий генератор приветствий
 @app.get("/api/history")
 async def get_history():
     conn = get_db_connection()
     if not conn:
-        return [{"role": "assistant", "text": "Привет, Алексей! База данных недоступна, но я готов к работе."}]
+        return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
     
     try:
         cur = conn.cursor() 
-        # Берем последние 15 сообщений для плотного анализа контекста
         cur.execute("""
             SELECT role, content 
             FROM chat_messages 
@@ -155,27 +155,30 @@ async def get_history():
         cur.close()
         conn.close()
         
-        # Если база вообще пустая (первый запуск)
         if not rows:
             return [{"role": "assistant", "text": "Привет, Алексей! Рад тебя видеть. О чём пообщаемся?"}]
             
-        # Формируем историю для ИИ, чтобы он понял, о чём шла речь
         history_summary = []
         for row in rows[::-1]:
             history_summary.append({"role": row[0], "content": row[1]})
             
-        # Добавляем секретную команду для генерации приветствия
+        # Задали максимально жесткие рамки, чтобы ИИ выдавал только одну фразу
         messages_for_welcome = [
             {
                 "role": "system", 
-                "content": "Ты — ИИ-помощник. Проанализируй историю переписки с пользователем по имени Алексей. Напиши ОДНО короткое, дружелюбное приветствие в духе: 'Ну что, Алексей, продолжим...?' и упомяни главную тему последних сообщений. Не пиши лишнего, только само приветствие."
+                "content": (
+                    "Ты — ИИ-помощник. Посмотри на тему последней переписки с Алексеем и напиши "
+                    "ОДНО КОРОТКОЕ предложение приветствия строго в формате: 'Ну что, Алексей, продолжим "
+                    "обсуждать [кратко главную тему последних сообщений]?' или 'Привет, Алексей! Продолжим нашу "
+                    "беседу про [тема]?'. Не пиши рассказов, анекдотов, параграфов или списков. "
+                    "Только ОДНА короткая фраза-приветствие."
+                )
             }
         ]
         messages_for_welcome.extend(history_summary)
         
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         
-        # Просим OpenRouter сделать красивое саммари-приветствие
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
@@ -189,7 +192,6 @@ async def get_history():
             
             if response.status_code == 200:
                 welcome_text = response.json()['choices'][0]['message']['content']
-                # Возвращаем фронтенду ТОЛЬКО ОДНО это сообщение
                 return [{"role": "assistant", "text": welcome_text}]
             
         return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
