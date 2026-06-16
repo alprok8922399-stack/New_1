@@ -35,13 +35,18 @@ function appendMessage(text, isUser, imageUrl = "") {
     const messageDiv = document.createElement('div');
     messageDiv.className = isUser ? 'message user' : 'message bot';
     
-    // Очищаем текст от возможных системных пробелов
     let formattedText = text || "";
     
-    // ЧИСТИМ ЗВЁЗДОЧКИ: заменяем **текст** на красивый жирный шрифт в HTML
+    // 1. Превращаем двойные звёздочки **текст** в жирный шрифт
     formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     
-    // Заменяем переносы строк на тег <br>, чтобы текст не слипался в одну строчку
+    // 2. Превращаем одиночные звёздочки *текст* в красивый курсив (наклонный текст)
+    formattedText = formattedText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // 3. Превращаем три дефиса или три звёздочки (--- или ***) в красивую тонкую линию разделителя
+    formattedText = formattedText.replace(/(?:^|\n)(?:---|\*\*\*+)(?:\n|$)/g, '<hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">');
+    
+    // 4. Заменяем переносы строк на тег <br>, чтобы текст разделялся на абзацы
     formattedText = formattedText.replace(/\n/g, '<br>');
     
     let content = `<div>${formattedText}</div>`;
@@ -62,10 +67,8 @@ async function loadChatHistory() {
         
         const history = await response.json();
         
-        // Очищаем экран, чтобы старая история не мозолила глаза
         messagesContainer.innerHTML = "";
         
-        // Выводим только сгенерированное ИИ приветствие
         history.forEach(msg => {
             appendMessage(msg.text, msg.role === 'user');
         });
@@ -97,8 +100,6 @@ async function sendMessage() {
     }
 }
 
-// Слушаем нажатие кнопки отправки
 sendBtn.addEventListener('click', sendMessage);
 
-// Автоматически запрашиваем умное приветствие при открытии чата на телефоне
 document.addEventListener('DOMContentLoaded', loadChatHistory);
