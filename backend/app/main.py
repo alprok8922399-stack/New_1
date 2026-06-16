@@ -5,7 +5,6 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,6 @@ def startup_event():
     if conn:
         try:
             cur = conn.cursor()
-            # Таблицу больше не удаляем, она уже создана правильно!
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS chat_messages (
                     id SERIAL PRIMARY KEY,
@@ -60,7 +58,6 @@ async def chat_endpoint(request: Request):
         
         system_prompt = "Ты — полезный, вежливый и умный ИИ-помощник. Отвечай всегда подробно, развернуто и только на русском языке."
 
-        # Сохраняем новое сообщение пользователя в базу данных ГЛАВНОГО чата
         conn = get_db_connection()
         if conn:
             try:
@@ -73,12 +70,9 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Не удалось записать сообщение пользователя: {e}")
 
-        # СОБИРАЕМ ИСТОРИЮ ДЛЯ ИИ: Достаем последние 10 сообщений ПЕРЕД текущим запросом
         history_messages = []
         if conn:
             try:
-                # Берем последние 10 записей, но исключаем только что добавленное сообщение пользователя,
-                # чтобы не дублировать его (мы добавим его в самом конце как контент с картинкой)
                 cur.execute("""
                     SELECT role, content 
                     FROM chat_messages 
@@ -87,20 +81,14 @@ async def chat_endpoint(request: Request):
                     LIMIT 10
                 """)
                 rows = cur.fetchall()
-                
-                # Переворачиваем, чтобы история шла от старых к новым
                 for row in rows[::-1]:
                     history_messages.append({"role": row[0], "content": row[1]})
             except Exception as e:
                 logger.error(f"Не удалось достать контекст для ИИ: {e}")
 
-        # Формируем массив сообщений для OpenRouter
         messages_for_ai = [{"role": "system", "content": system_prompt}]
-        
-        # Добавляем прошлую историю (если она есть в базе)
         messages_for_ai.extend(history_messages)
         
-        # Добавляем текущее сообщение пользователя (вместе с фото, если оно есть)
         current_content = [{"type": "text", "text": user_message}]
         if image_base64:
             current_content.append({"type": "image_url", "image_url": {"url": image_base64}})
@@ -109,7 +97,6 @@ async def chat_endpoint(request: Request):
 
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         
-        # Отправляем ИИ полную историю переписки!
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
@@ -124,7 +111,6 @@ async def chat_endpoint(request: Request):
             if response.status_code == 200:
                 reply = response.json()['choices'][0]['message']['content']
                 
-                # Сохраняем ответ ИИ в базу
                 if conn:
                     try:
                         cur.execute(
@@ -149,31 +135,65 @@ async def chat_endpoint(request: Request):
     except Exception as e:
         return {"text": f"Ошибка бэкенда: {str(e)}"}
 
+# УМНАЯ РУЧКА ПРИВЕТСТВИЯ: Анализирует базу и генерирует стартовую фразу
 @app.get("/api/history")
 async def get_history():
     conn = get_db_connection()
     if not conn:
-        return []
+        return [{"role": "assistant", "text": "Привет, Алексей! База данных недоступна, но я готов к работе."}]
+    
     try:
         cur = conn.cursor() 
+        # Берем последние 15 сообщений для плотного анализа контекста
         cur.execute("""
             SELECT role, content 
             FROM chat_messages 
             ORDER BY id DESC 
-            LIMIT 50
+            LIMIT 15
         """)
         rows = cur.fetchall()
         cur.close()
         conn.close()
         
-        messages = []
-        for row in rows:
-            messages.append({
-                "role": row[0],
-                "text": row[1]
-            })
+        # Если база вообще пустая (первый запуск)
+        if not rows:
+            return [{"role": "assistant", "text": "Привет, Алексей! Рад тебя видеть. О чём пообщаемся?"}]
             
-        return messages[::-1]
+        # Формируем историю для ИИ, чтобы он понял, о чём шла речь
+        history_summary = []
+        for row in rows[::-1]:
+            history_summary.append({"role": row[0], "content": row[1]})
+            
+        # Добавляем секретную команду для генерации приветствия
+        messages_for_welcome = [
+            {
+                "role": "system", 
+                "content": "Ты — ИИ-помощник. Проанализируй историю переписки с пользователем по имени Алексей. Напиши ОДНО короткое, дружелюбное приветствие в духе: 'Ну что, Алексей, продолжим...?' и упомяни главную тему последних сообщений. Не пиши лишнего, только само приветствие."
+            }
+        ]
+        messages_for_welcome.extend(history_summary)
+        
+        api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        
+        # Просим OpenRouter сделать красивое саммари-приветствие
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": "openrouter/auto", 
+                    "messages": messages_for_welcome
+                },
+                timeout=15.0
+            )
+            
+            if response.status_code == 200:
+                welcome_text = response.json()['choices'][0]['message']['content']
+                # Возвращаем фронтенду ТОЛЬКО ОДНО это сообщение
+                return [{"role": "assistant", "text": welcome_text}]
+            
+        return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
+        
     except Exception as e:
-        logger.error(f"Ошибка при получении истории: {e}")
-        return []
+        logger.error(f"Ошибка при генерации приветствия: {e}")
+        return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
