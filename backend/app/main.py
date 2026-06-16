@@ -4,7 +4,6 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
-from psycopg2.extras import RealDictCursor
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -36,18 +35,23 @@ def startup_event():
     if conn:
         try:
             cur = conn.cursor()
+            
+            # ВНИМАНИЕ: Чиним косяк Алисы. 
+            # Если старая таблица была кривой, мы её удаляем и создаем заново с колонкой role!
+            cur.execute("DROP TABLE IF EXISTS chat_messages CASCADE;")
+            
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS chat_messages (
+                CREATE TABLE chat_messages (
                     id SERIAL PRIMARY KEY,
-                    role VARCHAR(20),
-                    content TEXT,
+                    role VARCHAR(20) NOT NULL,
+                    content TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             conn.commit()
             cur.close()
             conn.close()
-            logger.info("База данных успешно проверена/создана.")
+            logger.info("База данных успешно ПЕРЕСОЗДАНА с правильными колонками.")
         except Exception as e:
             logger.error(f"Ошибка при создании таблицы: {e}")
 
@@ -64,6 +68,7 @@ async def chat_endpoint(request: Request):
         if image_base64:
             content.append({"type": "image_url", "image_url": {"url": image_base64}})
 
+        # Сохраняем сообщение пользователя в базу
         conn = get_db_connection()
         if conn:
             try:
@@ -95,6 +100,7 @@ async def chat_endpoint(request: Request):
             if response.status_code == 200:
                 reply = response.json()['choices'][0]['message']['content']
                 
+                # Сохраняем ответ ИИ в базу
                 if conn:
                     try:
                         cur.execute(
@@ -119,26 +125,30 @@ async def chat_endpoint(request: Request):
     except Exception as e:
         return {"text": f"Ошибка бэкенда: {str(e)}"}
 
-# НОВАЯ РУЧКА: Отдает историю сообщений фронтенду
 @app.get("/api/history")
 async def get_history():
     conn = get_db_connection()
     if not conn:
         return []
     try:
-        # Используем RealDictCursor, чтобы данные отдавались в удобном формате со словарями
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        # Достаем последние 50 сообщений
+        cur = conn.cursor() 
         cur.execute("""
-            SELECT role, content as text 
+            SELECT role, content 
             FROM chat_messages 
             ORDER BY id DESC 
             LIMIT 50
         """)
-        messages = cur.fetchall()
+        rows = cur.fetchall()
         cur.close()
         conn.close()
-        # Переворачиваем список, чтобы старые сообщения были сверху, а новые снизу
+        
+        messages = []
+        for row in rows:
+            messages.append({
+                "role": row[0],
+                "text": row[1]
+            })
+            
         return messages[::-1]
     except Exception as e:
         logger.error(f"Ошибка при получении истории: {e}")
