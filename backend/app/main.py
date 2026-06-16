@@ -4,8 +4,9 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
+from psycopg2.extras import RealDictCursor
 
-# Настройка логирования, чтобы видеть ошибки в панели Render
+# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,6 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Функция безопасного подключения к базе данных
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
@@ -30,7 +30,6 @@ def get_db_connection():
         logger.error(f"Не удалось подключиться к БД: {e}")
         return None
 
-# Создаем таблицу при запуске, если её еще нет
 @app.on_event("startup")
 def startup_event():
     conn = get_db_connection()
@@ -56,7 +55,6 @@ def startup_event():
 async def chat_endpoint(request: Request):
     try:
         data = await request.json()
-        # Сохраняем совместимость с твоим фронтендом (используем "text")
         user_message = data.get("text") or ""
         image_base64 = data.get("image") or ""
         
@@ -66,7 +64,6 @@ async def chat_endpoint(request: Request):
         if image_base64:
             content.append({"type": "image_url", "image_url": {"url": image_base64}})
 
-        # Пробуем сохранить сообщение пользователя в базу
         conn = get_db_connection()
         if conn:
             try:
@@ -81,7 +78,6 @@ async def chat_endpoint(request: Request):
 
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         
-        # Запрос к OpenRouter (наша проверенная бесплатная авто-модель)
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
@@ -99,7 +95,6 @@ async def chat_endpoint(request: Request):
             if response.status_code == 200:
                 reply = response.json()['choices'][0]['message']['content']
                 
-                # Пробуем сохранить ответ ИИ в базу
                 if conn:
                     try:
                         cur.execute(
@@ -123,3 +118,28 @@ async def chat_endpoint(request: Request):
                 
     except Exception as e:
         return {"text": f"Ошибка бэкенда: {str(e)}"}
+
+# НОВАЯ РУЧКА: Отдает историю сообщений фронтенду
+@app.get("/api/history")
+async def get_history():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        # Используем RealDictCursor, чтобы данные отдавались в удобном формате со словарями
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # Достаем последние 50 сообщений
+        cur.execute("""
+            SELECT role, content as text 
+            FROM chat_messages 
+            ORDER BY id DESC 
+            LIMIT 50
+        """)
+        messages = cur.fetchall()
+        cur.close()
+        conn.close()
+        # Переворачиваем список, чтобы старые сообщения были сверху, а новые снизу
+        return messages[::-1]
+    except Exception as e:
+        logger.error(f"Ошибка при получении истории: {e}")
+        return []
