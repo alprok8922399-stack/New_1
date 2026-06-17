@@ -64,13 +64,11 @@
 
         let selectedImageBase64 = "";
 
-        // Поле ввода растет при наборе текста
         inputArea.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = (this.scrollHeight) + 'px';
         });
 
-        // Выбор картинки
         attachBtn.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -84,14 +82,12 @@
             reader.readAsDataURL(file);
         });
 
-        // Отмена картинки
         cancelImageBtn.addEventListener('click', () => {
             selectedImageBase64 = "";
             fileInput.value = "";
             previewContainer.classList.add('preview-hidden');
         });
 
-        // Форматирование текста
         function formatAiText(text) {
             let rawText = text || "";
             rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
