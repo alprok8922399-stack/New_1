@@ -6,13 +6,13 @@
     <title>AI Chat</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, sans-serif; background: #000000; color: #fff; height: 100vh; overflow: hidden; }
-        .chat-container { width: 100%; max-width: 100%; height: 100vh; margin: 0 auto; display: flex; flex-direction: column; background: #000000; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #000000; color: #fff; height: 100vh; overflow: hidden; }
+        .chat-container { width: 100vw; max-width: 100%; height: 100vh; margin: 0; display: flex; flex-direction: column; background: #000000; }
         
         header { background: #000000; padding: 15px; text-align: center; border-bottom: 1px solid #222; font-weight: bold; font-size: 18px; color: #fff; }
 
         .messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .message { max-width: 85%; padding: 10px 14px; border-radius: 18px; font-size: 15px; word-wrap: break-word; }
+        .message { max-width: 85%; padding: 10px 14px; border-radius: 18px; font-size: 15px; word-wrap: break-word; font-family: inherit; }
         .message.bot { background: #1c1c1e; align-self: flex-start; border-bottom-left-radius: 4px; color: #e5e7eb; }
         .message.user { background: #2c2c2e; align-self: flex-end; border-bottom-right-radius: 4px; color: #fff; }
         
@@ -23,7 +23,7 @@
         .input-area { padding: 10px; background: #000000; border-top: 1px solid #222; display: flex; flex-direction: column; gap: 5px; }
         .input-row { display: flex; align-items: flex-end; gap: 8px; }
         
-        textarea { flex: 1; background: #1c1c1e; border: 1px solid #333; border-radius: 18px; color: #fff; padding: 10px 15px; outline: none; resize: none; min-height: 40px; max-height: 120px; line-height: 1.4; font-size: 15px; }
+        textarea { flex: 1; background: #1c1c1e; border: 1px solid #333; border-radius: 18px; color: #fff; padding: 10px 15px; outline: none; resize: none; min-height: 40px; max-height: 120px; line-height: 1.4; font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         button { background: none; border: none; color: #0a84ff; font-size: 22px; cursor: pointer; padding: 5px; }
         #attach-btn { color: #8e8e93; }
 
