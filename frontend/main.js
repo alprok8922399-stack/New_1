@@ -35,26 +35,33 @@ function appendMessage(text, isUser, imageUrl = "") {
     const messageDiv = document.createElement('div');
     messageDiv.className = isUser ? 'message user' : 'message bot';
     
-    let formattedText = text || "";
+    let rawText = text || "";
     
     // 1. Превращаем двойные звёздочки **текст** в жирный шрифт
-    formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     
     // 2. Превращаем одиночные звёздочки *текст* в красивый курсив
-    formattedText = formattedText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
     
-    // 3. Вычищаем любые сиротливые, одиночные звёздочки, которые ИИ забыл закрыть
-    formattedText = formattedText.replace(/\*/g, '');
+    // 3. Вычищаем любые сиротливые, одиночные звёздочки
+    rawText = rawText.replace(/\*/g, '');
     
-    // 4. Превращаем три дефиса или три звёздочки (---) в тонкую линию разделителя
-    formattedText = formattedText.replace(/(?:^|\n)(?:---|\*\*\*+)(?:\n|$)/g, '<hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">');
+    // 4. Разбиваем текст на абзацы по переносам строк и заворачиваем каждый абзац в <p>
+    const paragraphs = rawText.split('\n').filter(p => p.trim() !== "");
+    let formattedHtml = paragraphs.map(p => {
+        // Если это разделительная линия
+        if (p.trim() === '---' || p.trim() === '***') {
+            return '<hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 12px 0;">';
+        }
+        return `<p style="margin-bottom: 10px; line-height: 1.5;">${p}</p>`;
+    }).join('');
     
-    // 5. Заменяем переносы строк на тег <br>, чтобы текст разбивался на абзацы
-    formattedText = formattedText.replace(/\n/g, '<br>');
-    
-    let content = `<div>${formattedText}</div>`;
+    // Убираем отступ у самого последнего абзаца, чтобы облачко снизу не было пустым
+    formattedHtml = formattedHtml.replace(/margin-bottom: 10px;(?=[^;]*">[^<]*<\/p>$)/, 'margin-bottom: 0;');
+
+    let content = `<div>${formattedHtml}</div>`;
     if (imageUrl) {
-        content = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 5px;">` + content;
+        content = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">` + content;
     }
     
     messageDiv.innerHTML = content;
@@ -69,14 +76,13 @@ async function loadChatHistory() {
         if (!response.ok) return;
         
         const history = await response.json();
-        
         messagesContainer.innerHTML = "";
         
         history.forEach(msg => {
             appendMessage(msg.text, msg.role === 'user');
         });
     } catch (error) {
-        console.error("Не удалось加载приветствие:", error);
+        console.error("Не удалось загрузить приветствие:", error);
     }
 }
 
@@ -88,7 +94,7 @@ async function sendMessage() {
     
     const imageToSend = selectedImageBase64;
     inputArea.value = "";
-    previewContainer.className = "preview-hidden"; // Прячем превью после отправки
+    previewContainer.className = "preview-hidden";
 
     try {
         const response = await fetch(BACKEND_URL, {
@@ -104,5 +110,4 @@ async function sendMessage() {
 }
 
 sendBtn.addEventListener('click', sendMessage);
-
 document.addEventListener('DOMContentLoaded', loadChatHistory);
