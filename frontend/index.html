@@ -28,11 +28,99 @@
         <div class="messages" id="messages"></div>
         <div class="input-area">
             <input type="file" id="file-input" accept="image/*" style="display: none;">
-            <button id="attach-btn">📎</button>
-            <textarea id="input" placeholder="Сообщение..." rows="1"></textarea>
+            <button id="attach-btn" style="display: none;">📎</button> <textarea id="input" placeholder="Сообщение..." rows="1"></textarea>
             <button id="send-btn">➤</button>
         </div>
     </div>
-    <script src="main.js"></script>
+
+    <script>
+        const messagesContainer = document.getElementById('messages');
+        const inputArea = document.getElementById('input');
+        const sendBtn = document.getElementById('send-btn');
+
+        // Автоматическое расширение поля ввода до 1/3 экрана
+        inputArea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // Функция, которая делает текст ИИ красивым (обрабатывает звёздочки и абзацы)
+        function formatAiText(text) {
+            let rawText = text || "";
+            
+            // Превращаем двойные звёздочки **текст** в жирный шрифт
+            rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // Превращаем одиночные звёздочки *текст* в красивый курсив
+            rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // Вычищаем сиротливые одиночные звёздочки
+            rawText = rawText.replace(/\*/g, '');
+            
+            // Разбиваем текст на абзацы по переносам строк
+            const paragraphs = rawText.split('\n');
+            
+            let formattedHtml = paragraphs.map(p => {
+                if (p.trim() === '---' || p.trim() === '***') {
+                    return '<hr style="border: 0; border-top: 1px solid #333; margin: 12px 0;">';
+                }
+                if (p.trim() === "") {
+                    return '<div style="height: 10px;"></div>';
+                }
+                return `<p style="margin-bottom: 8px; line-height: 1.5;">${p}</p>`;
+            }).join('');
+            
+            return formattedHtml;
+        }
+
+        // Функция добавления сообщений в ленту чата
+        function appendMessage(text, isUser) {
+            const className = isUser ? 'message user' : 'message bot';
+            const finalHtml = isUser ? text.replace(/\n/g, '<br>') : formatAiText(text);
+            
+            messagesContainer.insertAdjacentHTML('beforeend', `<div class="${className}">${finalHtml}</div>`);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Загрузка истории чата из базы данных
+        async function loadChatHistory() {
+            try {
+                const response = await fetch("https://new-1-5155.onrender.com/api/history");
+                const history = await response.json();
+                messagesContainer.innerHTML = ""; 
+                history.forEach(msg => {
+                    const isUser = msg.role === 'user';
+                    appendMessage(msg.content || msg.text, isUser);
+                });
+            } catch (e) {
+                console.error("Ошибка загрузки истории:", e);
+            }
+        }
+
+        // Нажатие на кнопку отправки
+        sendBtn.addEventListener('click', async () => {
+            const text = inputArea.value.trim();
+            if (!text) return;
+            
+            appendMessage(text, true); 
+            inputArea.value = '';
+            inputArea.style.height = '40px'; 
+
+            try {
+                const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+                const data = await response.json();
+                appendMessage(data.text, false); 
+            } catch (e) {
+                appendMessage("Ошибка соединения. Сервер на Render спит.", false);
+            }
+        });
+
+        // Запуск истории при открытии
+        document.addEventListener('DOMContentLoaded', loadChatHistory);
+    </script>
 </body>
 </html>
