@@ -110,7 +110,8 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": "google/gemini-flash-1.5-8b", 
+                    # Поставили самую стабильную и новую Gemini 2.5 Flash
+                    "model": "google/gemini-2.5-flash", 
                     "messages": messages_for_ai
                 },
                 timeout=30.0
@@ -188,7 +189,8 @@ async def get_history():
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": "google/gemini-flash-1.5-8b", 
+                    # Поставили стабильную модель и в приветствие
+                    "model": "google/gemini-2.5-flash", 
                     "messages": messages_for_welcome
                 },
                 timeout=15.0
