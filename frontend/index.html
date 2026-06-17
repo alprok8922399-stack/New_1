@@ -3,32 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ИИ-Чат</title>
-    <link rel="stylesheet" href="/styles.css">
+    <title>ИИ Чат с Памятью</title>
+    <link rel="stylesheet" href="styles.css?v=2">
 </head>
-<body class="app">
-    <div class="topbar">
-        <span>ИИ-Помощник</span>
-    </div>
+<body>
 
-    <div id="image-preview-container" class="preview-hidden">
-        <img id="image-preview" src="" alt="">
-        <button id="cancel-image-btn" type="button">×</button>
-    </div>
+    <div class="chat-container">
+        <div class="messages" id="messages"></div>
 
-    <div class="messages"></div>
+        <div id="image-preview-container" class="preview-hidden">
+            <img id="image-preview" src="" alt="Превью">
+            <button id="cancel-image-btn">X</button>
+        </div>
 
-    <div class="input-area">
-        <input type="file" id="file-input" accept="image/*" style="display: none;">
-        
-        <textarea id="input" placeholder="Напиши сообщение..."></textarea>
-        
-        <div class="button-group">
-            <button type="button" id="send-btn">Отправить</button>
-            <button type="button" id="attach-btn">📎</button>
+        <div class="input-container">
+            <button id="attach-btn">📎</button>
+            <input type="file" id="file-input" accept="image/*" style="display: none;">
+            
+            <textarea id="input" placeholder="Напишите сообщение..." rows="1"></textarea>
+            
+            <button id="send-btn">📌</button>
         </div>
     </div>
 
-    <script src="/main.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>
