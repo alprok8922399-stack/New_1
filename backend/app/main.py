@@ -110,7 +110,6 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    # Исправлено имя модели для OpenRouter
                     "model": "google/gemini-flash-1.5-8b", 
                     "messages": messages_for_ai
                 },
@@ -189,7 +188,6 @@ async def get_history():
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    # Исправлено имя модели для OpenRouter
                     "model": "google/gemini-flash-1.5-8b", 
                     "messages": messages_for_welcome
                 },
@@ -203,3 +201,5 @@ async def get_history():
         return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
         
     except Exception as e:
+        logger.error(f"Ошибка при генерации приветствия: {e}")
+        return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
