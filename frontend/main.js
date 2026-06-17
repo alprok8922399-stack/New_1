@@ -2,34 +2,77 @@ const messagesContainer = document.getElementById('messages');
 const inputArea = document.getElementById('input');
 const sendBtn = document.getElementById('send-btn');
 
-// Функция добавления сообщений (теперь надежная)
+// Автоматическое расширение поля ввода при написании текста
+inputArea.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+});
+
+// Функция, которая делает текст ИИ красивым (как у Gemini)
+function formatAiText(text) {
+    let rawText = text || "";
+    
+    // 1. Превращаем двойные звёздочки **текст** в жирный шрифт
+    rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // 2. Превращаем одиночные звёздочки *текст* в красивый курсив
+    rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // 3. Вычищаем сиротливые одиночные звёздочки, если остались
+    rawText = rawText.replace(/\*/g, '');
+    
+    // 4. Разбиваем текст на абзацы по переносам строк
+    const paragraphs = rawText.split('\n');
+    
+    // Заворачиваем каждую строчку в абзац с отступом снизу
+    let formattedHtml = paragraphs.map(p => {
+        if (p.trim() === '---' || p.trim() === '***') {
+            return '<hr style="border: 0; border-top: 1px solid #333; margin: 12px 0;">';
+        }
+        if (p.trim() === "") {
+            return '<div style="height: 10px;"></div>'; // Пустая строка для отступа
+        }
+        return `<p style="margin-bottom: 8px; line-height: 1.5;">${p}</p>`;
+    }).join('');
+    
+    return formattedHtml;
+}
+
+// Функция добавления сообщений в ленту
 function appendMessage(text, isUser) {
     const className = isUser ? 'message user' : 'message bot';
-    // Используем insertAdjacentHTML, чтобы не трогать старые сообщения
-    messagesContainer.insertAdjacentHTML('beforeend', `<div class="${className}">${text.replace(/\n/g, '<br>')}</div>`);
+    
+    // Если пишет пользователь - оставляем обычный текст, если ИИ - форматируем до красоты
+    const finalHtml = isUser ? text.replace(/\n/g, '<br>') : formatAiText(text);
+    
+    messagesContainer.insertAdjacentHTML('beforeend', `<div class="${className}">${finalHtml}</div>`);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-// Загрузка истории
+// Загрузка истории чата из базы данных
 async function loadChatHistory() {
     try {
         const response = await fetch("https://new-1-5155.onrender.com/api/history");
         const history = await response.json();
-        // Очищаем только при первой загрузке!
         messagesContainer.innerHTML = ""; 
-        history.forEach(msg => appendMessage(msg.content, msg.role === 'user'));
+        history.forEach(msg => {
+            // В базе данных OpenRouter роли называются 'user' и 'assistant' (или 'bot')
+            const isUser = msg.role === 'user';
+            appendMessage(msg.content || msg.text, isUser);
+        });
     } catch (e) {
         console.error("Ошибка загрузки истории:", e);
     }
 }
 
+// Нажатие на кнопку отправки
 sendBtn.addEventListener('click', async () => {
     const text = inputArea.value.trim();
     if (!text) return;
     
-    appendMessage(text, true); // Добавляем сообщение пользователя
+    appendMessage(text, true); // Сразу выводим сообщение пользователя
     inputArea.value = '';
-    inputArea.style.height = '40px';
+    inputArea.style.height = '40px'; // Возвращаем исходный размер полю ввода
 
     try {
         const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
@@ -38,11 +81,11 @@ sendBtn.addEventListener('click', async () => {
             body: JSON.stringify({ text: text })
         });
         const data = await response.json();
-        appendMessage(data.text, false); // Добавляем ответ бота
+        appendMessage(data.text, false); // Выводим красивый ответ бота
     } catch (e) {
-        appendMessage("Ошибка соединения.", false);
+        appendMessage("Ошибка соединения. Кажется, сервер спит.", false);
     }
 });
 
-// Запуск при открытии
+// Запуск истории при открытии страницы
 document.addEventListener('DOMContentLoaded', loadChatHistory);
