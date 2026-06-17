@@ -57,7 +57,14 @@ async def chat_endpoint(request: Request):
         user_message = data.get("text") or ""
         image_base64 = data.get("image") or ""
         
-        system_prompt = "Ты — полезный, вежливый и умный ИИ-помощник. Отвечай всегда подробно, развернуто и только на русском языке."
+        # Жесткий характер: убираем робота, добавляем живого друга
+        system_prompt = (
+            "Ты — близкий друг и крутой ИИ-помощник Алексея. Твой стиль общения — живой, "
+            "свободный, с юмором и иронией, как в реальном разговоре. Никакой официальщины, "
+            "никаких фраз 'Чем могу быть полезен' или 'Как я могу помочь'. "
+            "Отвечай всегда только на русском языке, просто, емко и по-человечески. "
+            "Если Алексей просит шутку — шути смешно, жизненно, избегай избитых шаблонов."
+        )
 
         conn = get_db_connection()
         if conn:
@@ -103,8 +110,9 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": "openrouter/auto", 
-                    "messages": messages_for_ai
+                    "model": "google/gemini-2.5-flash", 
+                    "messages": messages_for_ai,
+                    "max_tokens": 1000  # Жестко ограничили аппетит модели, чтобы пролезть по лимитам денег
                 },
                 timeout=30.0
             )
@@ -136,7 +144,6 @@ async def chat_endpoint(request: Request):
     except Exception as e:
         return {"text": f"Ошибка бэкенда: {str(e)}"}
 
-# Наш обновленный строгий генератор приветствий
 @app.get("/api/history")
 async def get_history():
     conn = get_db_connection()
@@ -162,16 +169,14 @@ async def get_history():
         for row in rows[::-1]:
             history_summary.append({"role": row[0], "content": row[1]})
             
-        # Задали максимально жесткие рамки, чтобы ИИ выдавал только одну фразу
         messages_for_welcome = [
             {
                 "role": "system", 
                 "content": (
-                    "Ты — ИИ-помощник. Посмотри на тему последней переписки с Алексеем и напиши "
-                    "ОДНО КОРОТКОЕ предложение приветствия строго в формате: 'Ну что, Алексей, продолжим "
-                    "обсуждать [кратко главную тему последних сообщений]?' или 'Привет, Алексей! Продолжим нашу "
-                    "беседу про [тема]?'. Не пиши рассказов, анекдотов, параграфов или списков. "
-                    "Только ОДНА короткая фраза-приветствие."
+                    "Ты — ИИ-помощник и друг. Посмотри на тему последней переписки с Алексеем и напиши "
+                    "ОДНО КОРОТКОЕ, живое и неформальное предложение приветствия строго в формате: "
+                    "'Ну что, Алексей, погнали дальше тестить [тема]?' или 'Привет, Алексей! На чем мы там "
+                    "остановились в [тема]?'. Никакой вежливости техподдержки, общайся по-дружески."
                 )
             }
         ]
@@ -184,8 +189,9 @@ async def get_history():
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": "openrouter/auto", 
-                    "messages": messages_for_welcome
+                    "model": "google/gemini-2.5-flash", 
+                    "messages": messages_for_welcome,
+                    "max_tokens": 100  # Для приветствия 100 токенов хватит выше крыши
                 },
                 timeout=15.0
             )
