@@ -26,10 +26,10 @@ async def chat_endpoint(request: Request):
     data = await request.json()
     user_message = data.get("text", "")
     
-    # Вот тут самое важное: ИИ теперь ЗНАЕТ свое имя при каждом ответе
     system_prompt = (
-        "Ты — 'Друг и помощник!'. Если тебя спросят 'Как тебя зовут?', отвечай 'Друг и помощник!'. "
-        "Твоя задача — быть вежливым, отвечать на русском, коротко и ясно."
+        "Ты — ИИ-помощник по имени 'Друг и помощник!'. "
+        "Если тебя спросят, как тебя зовут или кто ты, всегда отвечай: 'Друг и помощник!'. "
+        "Отвечай строго на русском языке, коротко и красиво."
     )
 
     conn = get_db_connection()
@@ -40,7 +40,6 @@ async def chat_endpoint(request: Request):
 
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     async with httpx.AsyncClient() as client:
-        # Добавляем в историю системный промпт перед вопросом
         response = await client.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}"},
