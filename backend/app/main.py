@@ -29,7 +29,7 @@ async def chat_endpoint(request: Request):
     system_prompt = (
         "Ты — ИИ-помощник по имени 'Друг и помощник!'. "
         "Если тебя спросят, как тебя зовут или кто ты, всегда отвечай: 'Друг и помощник!'. "
-        "Отвечай строго на русском языке, коротко и красиво."
+        "Твоя задача — общаться вежливо, на русском языке, делать красивые абзацы."
     )
 
     conn = get_db_connection()
@@ -67,7 +67,8 @@ async def get_history():
     conn = get_db_connection()
     if not conn: return []
     with conn.cursor() as cur:
-        cur.execute("SELECT role, content FROM chat_messages ORDER BY id ASC LIMIT 20")
+        # ЗАБИРАЕМ 50 ПОСЛЕДНИХ СВЕЖИХ СООБЩЕНИЙ
+        cur.execute("SELECT role, content FROM (SELECT id, role, content FROM chat_messages ORDER BY id DESC LIMIT 50) as sub ORDER BY id ASC")
         rows = cur.fetchall()
         conn.close()
     return [{"role": r[0], "content": r[1]} for r in rows]
