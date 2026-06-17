@@ -1,113 +1,39 @@
-const messagesContainer = document.querySelector('.messages');
+const messagesContainer = document.getElementById('messages');
 const inputArea = document.getElementById('input');
 const sendBtn = document.getElementById('send-btn');
-const attachBtn = document.getElementById('attach-btn');
-const fileInput = document.getElementById('file-input');
-const previewContainer = document.getElementById('image-preview-container');
-const imagePreview = document.getElementById('image-preview');
-const cancelImageBtn = document.getElementById('cancel-image-btn');
 
-let selectedImageBase64 = "";
-const BACKEND_URL = "https://new-1-5155.onrender.com/api/chat";
-const HISTORY_URL = "https://new-1-5155.onrender.com/api/history"; 
-
-attachBtn.addEventListener('click', () => fileInput.click());
-
-fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        selectedImageBase64 = event.target.result;
-        imagePreview.src = selectedImageBase64;
-        previewContainer.className = ""; // Показываем превью
-    };
-    reader.readAsDataURL(file);
+// Авто-рост поля ввода
+inputArea.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
 });
 
-cancelImageBtn.addEventListener('click', () => {
-    selectedImageBase64 = "";
-    fileInput.value = "";
-    previewContainer.className = "preview-hidden";
-});
-
-function appendMessage(text, isUser, imageUrl = "") {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = isUser ? 'message user' : 'message bot';
-    
-    let rawText = text || "";
-    
-    // 1. Превращаем двойные звёздочки **текст** в жирный шрифт
-    rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    
-    // 2. Превращаем одиночные звёздочки *текст* в красивый курсив
-    rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    
-    // 3. Вычищаем любые сиротливые, одиночные звёздочки
-    rawText = rawText.replace(/\*/g, '');
-    
-    // 4. Разбиваем текст на абзацы по переносам строк и заворачиваем каждый абзац в <p>
-    const paragraphs = rawText.split('\n').filter(p => p.trim() !== "");
-    let formattedHtml = paragraphs.map(p => {
-        // Если это разделительная линия
-        if (p.trim() === '---' || p.trim() === '***') {
-            return '<hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 12px 0;">';
-        }
-        return `<p style="margin-bottom: 10px; line-height: 1.5;">${p}</p>`;
-    }).join('');
-    
-    // Убираем отступ у самого последнего абзаца, чтобы облачко снизу не было пустым
-    formattedHtml = formattedHtml.replace(/margin-bottom: 10px;(?=[^;]*">[^<]*<\/p>$)/, 'margin-bottom: 0;');
-
-    let content = `<div>${formattedHtml}</div>`;
-    if (imageUrl) {
-        content = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">` + content;
-    }
-    
-    messageDiv.innerHTML = content;
-    messagesContainer.appendChild(messageDiv);
+function appendMessage(text, isUser) {
+    const div = document.createElement('div');
+    div.className = isUser ? 'message user' : 'message bot';
+    // Простая обработка абзацев
+    div.innerHTML = text.replace(/\n/g, '<br>');
+    messagesContainer.appendChild(div);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-// Умная загрузка стартового приветствия
-async function loadChatHistory() {
-    try {
-        const response = await fetch(HISTORY_URL);
-        if (!response.ok) return;
-        
-        const history = await response.json();
-        messagesContainer.innerHTML = "";
-        
-        history.forEach(msg => {
-            appendMessage(msg.text, msg.role === 'user');
-        });
-    } catch (error) {
-        console.error("Не удалось загрузить приветствие:", error);
-    }
-}
-
-async function sendMessage() {
+sendBtn.addEventListener('click', async () => {
     const text = inputArea.value.trim();
-    if (!text && !selectedImageBase64) return;
-
-    appendMessage(text || "Фото", true, selectedImageBase64);
+    if (!text) return;
     
-    const imageToSend = selectedImageBase64;
-    inputArea.value = "";
-    previewContainer.className = "preview-hidden";
+    appendMessage(text, true); // Добавляем сразу!
+    inputArea.value = '';
+    inputArea.style.height = '40px';
 
     try {
-        const response = await fetch(BACKEND_URL, {
+        const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: text, image: imageToSend })
+            body: JSON.stringify({ text: text })
         });
         const data = await response.json();
-        appendMessage(data.text, false);
-    } catch (error) {
-        appendMessage("Ошибка соединения.", false);
+        appendMessage(data.text, false); // Ответ бота
+    } catch (e) {
+        appendMessage("Ошибка соединения", false);
     }
-}
-
-sendBtn.addEventListener('click', sendMessage);
-document.addEventListener('DOMContentLoaded', loadChatHistory);
+});
