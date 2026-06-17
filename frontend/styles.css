@@ -6,8 +6,8 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #f4f5f7;
-    color: #333;
+    background-color: #111418; /* Глубокий тёмный фон */
+    color: #f3f4f6;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -18,10 +18,10 @@ body {
     width: 100%;
     max-width: 480px;
     height: 100vh;
-    background: #fff;
+    background: #181c22; /* Тёмный фон контейнера */
     display: flex;
     flex-direction: column;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 
 .messages {
@@ -31,7 +31,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    background-color: #f9fafb;
+    background-color: #111418; /* Фон самого окна сообщений */
 }
 
 .message {
@@ -43,35 +43,37 @@ body {
     word-wrap: break-word;
 }
 
-/* СТИЛИЗАЦИЯ ТЕКСТА ИИ (Как у Gemini) */
+/* СТИЛИЗАЦИЯ ТЕКСТА ИИ (В тёмных тонах) */
 .message.bot {
-    background-color: #fff;
-    color: #2d3748;
+    background-color: #22272f; /* Графитовое облачко бота */
+    color: #e5e7eb; /* Светлый текст */
     align-self: flex-start;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #2d3540;
     border-bottom-left-radius: 4px;
 }
 
 /* Красивые отступы между абзацами */
-.message.bot br {
-    content: "";
-    display: block;
+.message.bot p {
     margin-bottom: 10px;
+}
+.message.bot p:last-child {
+    margin-bottom: 0;
 }
 
 /* Если ИИ пришлет жирный текст */
 .message.bot strong {
-    color: #1a202c;
+    color: #ffffff;
     font-weight: 600;
 }
 
 /* Если ИИ пришлет разделительную линию */
 .message.bot hr {
     border: 0;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid #2d3540;
     margin: 12px 0;
 }
 
+/* Облачко пользователя (Яркий синий акцент) */
 .message.user {
     background-color: #007aff;
     color: #fff;
@@ -79,11 +81,11 @@ body {
     border-bottom-right-radius: 4px;
 }
 
-/* Зона ввода */
+/* Зона ввода (Тёмная) */
 .input-container {
     padding: 10px;
-    background: #fff;
-    border-top: 1px solid #eee;
+    background: #181c22;
+    border-top: 1px solid #2d3540;
     display: flex;
     align-items: flex-end;
     gap: 8px;
@@ -95,11 +97,17 @@ textarea {
     height: 40px;
     max-height: 120px;
     padding: 10px 12px;
-    border: 1px solid #ddd;
+    background-color: #22272f; /* Тёмное поле ввода */
+    border: 1px solid #2d3540;
+    color: #fff;
     border-radius: 20px;
     font-size: 15px;
     outline: none;
     font-family: inherit;
+}
+
+textarea::placeholder {
+    color: #718096;
 }
 
 button {
@@ -122,19 +130,19 @@ button:active {
 }
 
 #attach-btn {
-    background: #e4e6eb;
-    color: #333;
+    background: #22272f;
+    color: #a0aec0;
 }
 
 #attach-btn:active {
-    background: #d8dadf;
+    background: #2d3540;
 }
 
 /* Превью картинок */
 #image-preview-container {
     padding: 8px 15px;
-    background: #fff;
-    border-top: 1px solid #eee;
+    background: #181c22;
+    border-top: 1px solid #2d3540;
     display: flex;
     align-items: center;
     gap: 10px;
