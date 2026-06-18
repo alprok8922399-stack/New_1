@@ -112,8 +112,8 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    # Прописали новую бесплатную модель Gemini 2.5 Pro
-                    "model": "google/gemini-2.5-pro:free", 
+                    # Прописали новую стабильную бесплатную модель Qwen
+                    "model": "qwen/qwen-2.5-7b-instruct:free", 
                     "messages": messages_for_ai,
                     "max_tokens": 400
                 },
