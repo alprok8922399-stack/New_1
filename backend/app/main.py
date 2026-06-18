@@ -152,7 +152,6 @@ async def get_history():
     
     try:
         cur = conn.cursor() 
-        # Теперь вытаскиваем еще и id из базы данных!
         cur.execute("""
             SELECT id, role, content 
             FROM chat_messages 
@@ -167,7 +166,6 @@ async def get_history():
             return []
             
         history_summary = []
-        # Сохраняем id, чтобы фронтенд знал точный номер каждого сообщения
         for row in rows[::-1]:
             history_summary.append({"id": row[0], "role": row[1], "content": row[2]})
             
@@ -176,3 +174,21 @@ async def get_history():
     except Exception as e:
         logger.error(f"Ошибка при получении истории: {e}")
         return []
+
+# НОВАЯ ФУНКЦИЯ: Удаление старого сообщения из базы данных по его ID
+@app.delete("/api/delete/{msg_id}")
+async def delete_message(msg_id: int):
+    conn = get_db_connection()
+    if not conn:
+        return {"status": "error", "message": "Нет подключения к БД"}
+    try:
+        cur = conn.cursor()
+        # Удаляем сообщение с конкретным номером из таблицы
+        cur.execute("DELETE FROM chat_messages WHERE id = %s", (msg_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "success", "message": f"Сообщение {msg_id} удалено"}
+    except Exception as e:
+        logger.error(f"Ошибка при удалении сообщения {msg_id}: {e}")
+        return {"status": "error", "message": str(e)}
