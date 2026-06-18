@@ -112,7 +112,6 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    # Поставили авто-выбор бесплатной модели
                     "model": "openrouter/auto", 
                     "messages": messages_for_ai,
                     "max_tokens": 400
@@ -140,3 +139,56 @@ async def chat_endpoint(request: Request):
                 return {"text": reply}
             else:
                 if conn:
+                    cur.close()
+                    conn.close()
+                return {"text": f"Ошибка OpenRouter: {response.text}"}
+                
+    except Exception as e:
+        return {"text": f"Ошибка бэкенда: {str(e)}"}
+
+@app.get("/api/history")
+async def get_history():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    
+    try:
+        cur = conn.cursor() 
+        cur.execute("""
+            SELECT id, role, content 
+            FROM chat_messages 
+            ORDER BY id DESC 
+            LIMIT 15
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        if not rows:
+            return []
+            
+        history_summary = []
+        for row in rows[::-1]:
+            history_summary.append({"id": row[0], "role": row[1], "content": row[2]})
+            
+        return history_summary
+        
+    except Exception as e:
+        logger.error(f"Ошибка при получении истории: {e}")
+        return []
+
+@app.delete("/api/delete/{msg_id}")
+async def delete_message(msg_id: int):
+    conn = get_db_connection()
+    if not conn:
+        return {"status": "error", "message": "Нет подключения к БД"}
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM chat_messages WHERE id = %s", (msg_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "success", "message": f"Сообщение {msg_id} удалено"}
+    except Exception as e:
+        logger.error(f"Ошибка при удалении сообщения {msg_id}: {e}")
+        return {"status": "error", "message": str(e)}
