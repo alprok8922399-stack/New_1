@@ -112,7 +112,7 @@ async def chat_endpoint(request: Request):
                 json={
                     "model": "google/gemini-2.5-flash", 
                     "messages": messages_for_ai,
-                    "max_tokens": 1000
+                    "max_tokens": 400
                 },
                 timeout=30.0
             )
@@ -175,7 +175,6 @@ async def get_history():
         logger.error(f"Ошибка при получении истории: {e}")
         return []
 
-# НОВАЯ ФУНКЦИЯ: Удаление старого сообщения из базы данных по его ID
 @app.delete("/api/delete/{msg_id}")
 async def delete_message(msg_id: int):
     conn = get_db_connection()
@@ -183,7 +182,6 @@ async def delete_message(msg_id: int):
         return {"status": "error", "message": "Нет подключения к БД"}
     try:
         cur = conn.cursor()
-        # Удаляем сообщение с конкретным номером из таблицы
         cur.execute("DELETE FROM chat_messages WHERE id = %s", (msg_id,))
         conn.commit()
         cur.close()
