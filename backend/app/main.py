@@ -110,7 +110,8 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": "google/gemini-2.5-flash", 
+                    # Поменяли модель на БЕСПЛАТНУЮ версию
+                    "model": "google/gemini-2.5-flash:free", 
                     "messages": messages_for_ai,
                     "max_tokens": 400
                 },
