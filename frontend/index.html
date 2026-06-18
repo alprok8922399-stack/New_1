@@ -11,10 +11,12 @@
         
         header { background: #000000; padding: 15px; text-align: center; border-bottom: 1px solid #222; font-weight: bold; font-size: 18px; color: #fff; }
 
-        .messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px; }
-        .message-wrapper { display: flex; flex-direction: column; width: 100%; margin-bottom: 5px; }
+        .messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 16px; }
         
-        .message { max-width: 95%; padding: 12px 16px; border-radius: 18px; font-size: 15px; word-wrap: break-word; font-family: inherit; }
+        /* Контейнер для сообщения и его кнопок */
+        .message-wrapper { display: flex; flex-direction: column; width: 100%; }
+        
+        .message { max-width: 90%; padding: 12px 16px; border-radius: 18px; font-size: 15px; word-wrap: break-word; font-family: inherit; }
         .message.bot { background: #1c1c1e; align-self: flex-start; border-bottom-left-radius: 4px; color: #f3f4f6; }
         .message.user { background: #2c2c2e; align-self: flex-end; border-bottom-right-radius: 4px; color: #fff; }
         
@@ -22,9 +24,10 @@
         .message p:last-child { margin-bottom: 0; }
         .message strong { color: #fff; font-weight: bold; }
 
-        /* Стили для кнопок управления сообщениями */
-        .message-buttons { display: flex; gap: 12px; padding: 4px 8px 0 8px; }
-        .message-buttons button { background: none; border: none; color: #777; font-size: 13px; cursor: pointer; padding: 2px 4px; }
+        /* Красивые и аккуратные кнопки под облачком */
+        .message-buttons { display: flex; gap: 12px; padding: 4px 10px 0 10px; width: 100%; }
+        .message-buttons button { background: none; border: none; color: #8a8a8f; font-size: 13px; cursor: pointer; padding: 4px 0; font-family: inherit; }
+        .message-buttons button:active { color: #0a84ff; }
 
         .input-area { padding: 10px; background: #000000; border-top: 1px solid #222; display: flex; flex-direction: column; gap: 5px; }
         .input-row { display: flex; align-items: flex-end; gap: 8px; }
@@ -115,7 +118,7 @@
         }
 
         function appendMessage(text, isUser, imageUrl = "") {
-            // Если текста нет и картинки нет — ничего не создаем
+            // Жёсткая проверка: если нет текста и нет картинки — игнорируем (убирает пустые кружки)
             if ((!text || text.trim() === "") && !imageUrl) return;
 
             const className = isUser ? 'message user' : 'message bot';
@@ -125,17 +128,17 @@
                 finalHtml = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">` + finalHtml;
             }
             
-            // Создаем обертку для сообщения и кнопок под ним
+            // Создаем обертку-контейнер для облачка и панели кнопок
             const wrapper = document.createElement('div');
             wrapper.className = 'message-wrapper';
             
-            // Облачко сообщения
+            // Облачко с текстом
             const messageDiv = document.createElement('div');
             messageDiv.className = className;
             messageDiv.innerHTML = finalHtml;
             wrapper.appendChild(messageDiv);
             
-            // Панель с кнопками
+            // Панель кнопок под облачком
             const buttonsDiv = document.createElement('div');
             buttonsDiv.className = 'message-buttons';
             
@@ -153,13 +156,13 @@
             }
             wrapper.appendChild(buttonsDiv);
 
-            // Навешиваем логику на кнопку копирования
+            // Обработчик для кнопки копирования
             const copyBtn = buttonsDiv.querySelector('.btn-copy');
             if (copyBtn) {
                 copyBtn.addEventListener('click', () => copyToClipboard(text || "Фото"));
             }
 
-            // Навешиваем логику на кнопку редактирования
+            // Обработчик для кнопки редактирования
             const editBtn = buttonsDiv.querySelector('.btn-edit');
             if (editBtn) {
                 editBtn.addEventListener('click', () => {
