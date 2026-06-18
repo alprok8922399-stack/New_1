@@ -38,6 +38,15 @@ function formatAiText(text) {
     return formattedHtml;
 }
 
+// Функция для копирования текста в буфер обмена
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Текст скопирован!');
+    }).catch(err => {
+        console.error('Не удалось скопировать: ', err);
+    });
+}
+
 // Функция добавления сообщений в ленту
 function appendMessage(text, isUser) {
     const className = isUser ? 'message user' : 'message bot';
@@ -45,7 +54,49 @@ function appendMessage(text, isUser) {
     // Если пишет пользователь - оставляем обычный текст, если ИИ - форматируем до красоты
     const finalHtml = isUser ? text.replace(/\n/g, '<br>') : formatAiText(text);
     
-    messagesContainer.insertAdjacentHTML('beforeend', `<div class="${className}">${finalHtml}</div>`);
+    // Генерируем кнопки в зависимости от того, кто отправил сообщение
+    let buttonsHtml = '';
+    if (isUser) {
+        buttonsHtml = `
+            <div class="message-buttons" style="text-align: right; margin-top: 4px;">
+                <button class="btn-edit" style="background: none; border: none; color: #888; cursor: pointer; font-size: 12px; margin-right: 8px;">✏️ Редактировать</button>
+                <button class="btn-copy" style="background: none; border: none; color: #888; cursor: pointer; font-size: 12px;">📋 Скопировать</button>
+            </div>
+        `;
+    } else {
+        buttonsHtml = `
+            <div class="message-buttons" style="text-align: left; margin-top: 4px;">
+                <button class="btn-copy" style="background: none; border: none; color: #888; cursor: pointer; font-size: 12px;">📋 Скопировать</button>
+            </div>
+        `;
+    }
+    
+    // Создаем элемент сообщения
+    const messageElement = document.createElement('div');
+    messageElement.className = className;
+    messageElement.innerHTML = `
+        <div class="message-text">${finalHtml}</div>
+        ${buttonsHtml}
+    `;
+    
+    // Навешиваем событие на кнопку копирования
+    const copyBtn = messageElement.querySelector('.btn-copy');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => copyToClipboard(text));
+    }
+    
+    // Навешиваем событие на кнопку редактирования (пока просто заготовка для логики)
+    const editBtn = messageElement.querySelector('.btn-edit');
+    if (editBtn) {
+        editBtn.addEventListener('click', () => {
+            inputArea.value = text;
+            inputArea.focus();
+            inputArea.style.height = 'auto';
+            inputArea.style.height = (inputArea.scrollHeight) + 'px';
+        });
+    }
+    
+    messagesContainer.appendChild(messageElement);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
@@ -56,7 +107,6 @@ async function loadChatHistory() {
         const history = await response.json();
         messagesContainer.innerHTML = ""; 
         history.forEach(msg => {
-            // В базе данных OpenRouter роли называются 'user' и 'assistant' (или 'bot')
             const isUser = msg.role === 'user';
             appendMessage(msg.content || msg.text, isUser);
         });
