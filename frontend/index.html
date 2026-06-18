@@ -138,10 +138,9 @@
             }).join('');
         }
 
+        // Убрали отсюда строчку с раздражающим алертом
         function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Текст скопирован!');
-            }).catch(err => {
+            navigator.clipboard.writeText(text).catch(err => {
                 console.error('Не удалось скопировать: ', err);
             });
         }
@@ -229,14 +228,12 @@
             const text = inputArea.value.trim();
             if (!text && !selectedImageBase64) return;
             
-            // ЕСЛИ МЫ РЕДАКТИРОВАЛИ: Сначала отправляем запрос на бэкенд для удаления старого сообщения
             if (currentEditingMessageId !== null) {
                 try {
                     await fetch(`https://new-1-5155.onrender.com/api/delete/${currentEditingMessageId}`, {
                         method: 'DELETE'
                     });
                     
-                    // Находим старое сообщение на экране и визуально удаляем его, чтобы оно исчезло
                     const oldWrapper = document.querySelector(`[data-id="${currentEditingMessageId}"]`);
                     if (oldWrapper) {
                         oldWrapper.remove();
@@ -244,7 +241,6 @@
                 } catch (e) {
                     console.error("Не удалось удалить старое сообщение:", e);
                 }
-                // Сбрасываем ID редактирования, так как старое сообщение стёрто
                 currentEditingMessageId = null; 
             }
             
