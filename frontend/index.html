@@ -45,7 +45,7 @@
         .message-buttons button svg {
             width: 16px;
             height: 16px;
-            stroke: currentColor; /* Цвет берется из color кнопки */
+            stroke: currentColor; 
             fill: none;
             stroke-width: 2;
             stroke-linecap: round;
@@ -100,7 +100,6 @@
         const cancelImageBtn = document.getElementById('cancel-image-btn');
 
         let selectedImageBase64 = "";
-        // Переменная, которая будет хранить ID редактируемого сообщения
         let currentEditingMessageId = null; 
 
         inputArea.addEventListener('input', function() {
@@ -147,7 +146,6 @@
             });
         }
 
-        // Добавили параметр messageId в функцию
         function appendMessage(text, isUser, imageUrl = "", messageId = null) {
             if ((!text || text.trim() === "") && !imageUrl) return;
 
@@ -161,7 +159,7 @@
             const wrapper = document.createElement('div');
             wrapper.className = 'message-wrapper';
             if (messageId) {
-                wrapper.setAttribute('data-id', messageId); // Намертво привязываем ID из базы к блоку на экране
+                wrapper.setAttribute('data-id', messageId); 
             }
             
             const messageDiv = document.createElement('div');
@@ -205,7 +203,6 @@
                     inputArea.style.height = 'auto';
                     inputArea.style.height = (inputArea.scrollHeight) + 'px';
                     
-                    // Запоминаем ID сообщения, которое ты выбрал для редактирования
                     currentEditingMessageId = messageId; 
                 });
             }
@@ -221,7 +218,6 @@
                 messagesContainer.innerHTML = ""; 
                 history.forEach(msg => {
                     const textContent = msg.content || msg.text || "";
-                    // Передаем реальный id из базы данных в каждое сообщение
                     appendMessage(textContent, msg.role === 'user', "", msg.id);
                 });
             } catch (e) {
@@ -232,6 +228,25 @@
         sendBtn.addEventListener('click', async () => {
             const text = inputArea.value.trim();
             if (!text && !selectedImageBase64) return;
+            
+            // ЕСЛИ МЫ РЕДАКТИРОВАЛИ: Сначала отправляем запрос на бэкенд для удаления старого сообщения
+            if (currentEditingMessageId !== null) {
+                try {
+                    await fetch(`https://new-1-5155.onrender.com/api/delete/${currentEditingMessageId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    // Находим старое сообщение на экране и визуально удаляем его, чтобы оно исчезло
+                    const oldWrapper = document.querySelector(`[data-id="${currentEditingMessageId}"]`);
+                    if (oldWrapper) {
+                        oldWrapper.remove();
+                    }
+                } catch (e) {
+                    console.error("Не удалось удалить старое сообщение:", e);
+                }
+                // Сбрасываем ID редактирования, так как старое сообщение стёрто
+                currentEditingMessageId = null; 
+            }
             
             appendMessage(text || "Фото", true, selectedImageBase64); 
             const imgToSend = selectedImageBase64;
