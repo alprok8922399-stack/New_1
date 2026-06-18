@@ -112,7 +112,7 @@ async def chat_endpoint(request: Request):
                 json={
                     "model": "google/gemini-2.5-flash", 
                     "messages": messages_for_ai,
-                    "max_tokens": 1000  # Жестко ограничили аппетит модели, чтобы пролезть по лимитам денег
+                    "max_tokens": 1000
                 },
                 timeout=30.0
             )
@@ -148,12 +148,13 @@ async def chat_endpoint(request: Request):
 async def get_history():
     conn = get_db_connection()
     if not conn:
-        return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
+        return []
     
     try:
         cur = conn.cursor() 
+        # Теперь вытаскиваем еще и id из базы данных!
         cur.execute("""
-            SELECT role, content 
+            SELECT id, role, content 
             FROM chat_messages 
             ORDER BY id DESC 
             LIMIT 15
@@ -163,45 +164,15 @@ async def get_history():
         conn.close()
         
         if not rows:
-            return [{"role": "assistant", "text": "Привет, Алексей! Рад тебя видеть. О чём пообщаемся?"}]
+            return []
             
         history_summary = []
+        # Сохраняем id, чтобы фронтенд знал точный номер каждого сообщения
         for row in rows[::-1]:
-            history_summary.append({"role": row[0], "content": row[1]})
+            history_summary.append({"id": row[0], "role": row[1], "content": row[2]})
             
-        messages_for_welcome = [
-            {
-                "role": "system", 
-                "content": (
-                    "Ты — ИИ-помощник и друг. Посмотри на тему последней переписки с Алексеем и напиши "
-                    "ОДНО КОРОТКОЕ, живое и неформальное предложение приветствия строго в формате: "
-                    "'Ну что, Алексей, погнали дальше тестить [тема]?' или 'Привет, Алексей! На чем мы там "
-                    "остановились в [тема]?'. Никакой вежливости техподдержки, общайся по-дружески."
-                )
-            }
-        ]
-        messages_for_welcome.extend(history_summary)
-        
-        api_key = os.environ.get("OPENROUTER_API_KEY", "")
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": "google/gemini-2.5-flash", 
-                    "messages": messages_for_welcome,
-                    "max_tokens": 100  # Для приветствия 100 токенов хватит выше крыши
-                },
-                timeout=15.0
-            )
-            
-            if response.status_code == 200:
-                welcome_text = response.json()['choices'][0]['message']['content']
-                return [{"role": "assistant", "text": welcome_text}]
-            
-        return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
+        return history_summary
         
     except Exception as e:
-        logger.error(f"Ошибка при генерации приветствия: {e}")
-        return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
+        logger.error(f"Ошибка при получении истории: {e}")
+        return []
