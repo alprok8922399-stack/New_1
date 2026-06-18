@@ -100,6 +100,8 @@
         const cancelImageBtn = document.getElementById('cancel-image-btn');
 
         let selectedImageBase64 = "";
+        // Переменная, которая будет хранить ID редактируемого сообщения
+        let currentEditingMessageId = null; 
 
         inputArea.addEventListener('input', function() {
             this.style.height = 'auto';
@@ -145,7 +147,8 @@
             });
         }
 
-        function appendMessage(text, isUser, imageUrl = "") {
+        // Добавили параметр messageId в функцию
+        function appendMessage(text, isUser, imageUrl = "", messageId = null) {
             if ((!text || text.trim() === "") && !imageUrl) return;
 
             const className = isUser ? 'message user' : 'message bot';
@@ -157,6 +160,9 @@
             
             const wrapper = document.createElement('div');
             wrapper.className = 'message-wrapper';
+            if (messageId) {
+                wrapper.setAttribute('data-id', messageId); // Намертво привязываем ID из базы к блоку на экране
+            }
             
             const messageDiv = document.createElement('div');
             messageDiv.className = className;
@@ -166,7 +172,6 @@
             const buttonsDiv = document.createElement('div');
             buttonsDiv.className = 'message-buttons';
             
-            // Вставляем иконки через SVG-код для идеального контурного вида
             if (isUser) {
                 buttonsDiv.style.justifyContent = 'flex-end';
                 buttonsDiv.innerHTML = `
@@ -199,6 +204,9 @@
                     inputArea.focus();
                     inputArea.style.height = 'auto';
                     inputArea.style.height = (inputArea.scrollHeight) + 'px';
+                    
+                    // Запоминаем ID сообщения, которое ты выбрал для редактирования
+                    currentEditingMessageId = messageId; 
                 });
             }
             
@@ -213,7 +221,8 @@
                 messagesContainer.innerHTML = ""; 
                 history.forEach(msg => {
                     const textContent = msg.content || msg.text || "";
-                    appendMessage(textContent, msg.role === 'user');
+                    // Передаем реальный id из базы данных в каждое сообщение
+                    appendMessage(textContent, msg.role === 'user', "", msg.id);
                 });
             } catch (e) {
                 console.error("Ошибка загрузки истории:", e);
