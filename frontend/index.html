@@ -24,10 +24,26 @@
         .message p:last-child { margin-bottom: 0; }
         .message strong { color: #fff; font-weight: bold; }
 
-        /* Красивые и аккуратные кнопки под облачком */
-        .message-buttons { display: flex; gap: 12px; padding: 4px 10px 0 10px; width: 100%; }
-        .message-buttons button { background: none; border: none; color: #8a8a8f; font-size: 13px; cursor: pointer; padding: 4px 0; font-family: inherit; }
-        .message-buttons button:active { color: #0a84ff; }
+        /* Новые стили для кнопок в виде белого контура */
+        .message-buttons { display: flex; gap: 8px; padding: 6px 10px 0 10px; width: 100%; }
+        .message-buttons button { 
+            background: none; 
+            border: 1px solid rgba(255, 255, 255, 0.4); 
+            color: #fff; 
+            font-size: 14px; 
+            cursor: pointer; 
+            padding: 4px 8px; 
+            border-radius: 8px;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .message-buttons button:active { 
+            border-color: #0a84ff; 
+            color: #0a84ff; 
+        }
 
         .input-area { padding: 10px; background: #000000; border-top: 1px solid #222; display: flex; flex-direction: column; gap: 5px; }
         .input-row { display: flex; align-items: flex-end; gap: 8px; }
@@ -118,7 +134,6 @@
         }
 
         function appendMessage(text, isUser, imageUrl = "") {
-            // Жёсткая проверка: если нет текста и нет картинки — игнорируем (убирает пустые кружки)
             if ((!text || text.trim() === "") && !imageUrl) return;
 
             const className = isUser ? 'message user' : 'message bot';
@@ -128,41 +143,36 @@
                 finalHtml = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">` + finalHtml;
             }
             
-            // Создаем обертку-контейнер для облачка и панели кнопок
             const wrapper = document.createElement('div');
             wrapper.className = 'message-wrapper';
             
-            // Облачко с текстом
             const messageDiv = document.createElement('div');
             messageDiv.className = className;
             messageDiv.innerHTML = finalHtml;
             wrapper.appendChild(messageDiv);
             
-            // Панель кнопок под облачком
             const buttonsDiv = document.createElement('div');
             buttonsDiv.className = 'message-buttons';
             
             if (isUser) {
                 buttonsDiv.style.justifyContent = 'flex-end';
                 buttonsDiv.innerHTML = `
-                    <button class="btn-edit">✏️ Редактировать</button>
-                    <button class="btn-copy">📋 Копировать</button>
+                    <button class="btn-edit" title="Редактировать">✏️</button>
+                    <button class="btn-copy" title="Копировать">📋</button>
                 `;
             } else {
                 buttonsDiv.style.justifyContent = 'flex-start';
                 buttonsDiv.innerHTML = `
-                    <button class="btn-copy">📋 Копировать</button>
+                    <button class="btn-copy" title="Копировать">📋</button>
                 `;
             }
             wrapper.appendChild(buttonsDiv);
 
-            // Обработчик для кнопки копирования
             const copyBtn = buttonsDiv.querySelector('.btn-copy');
             if (copyBtn) {
                 copyBtn.addEventListener('click', () => copyToClipboard(text || "Фото"));
             }
 
-            // Обработчик для кнопки редактирования
             const editBtn = buttonsDiv.querySelector('.btn-edit');
             if (editBtn) {
                 editBtn.addEventListener('click', () => {
