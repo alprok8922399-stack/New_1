@@ -2,6 +2,12 @@ const messagesContainer = document.getElementById('messages');
 const inputArea = document.getElementById('input');
 const sendBtn = document.getElementById('send-btn');
 
+// Функция получения текущей даты
+function getCurrentDate() {
+    const now = new Date();
+    return now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 // Автоматическое расширение поля ввода при написании текста
 inputArea.addEventListener('input', function() {
     this.style.height = 'auto';
@@ -125,10 +131,13 @@ sendBtn.addEventListener('click', async () => {
     inputArea.style.height = '40px'; // Возвращаем исходный размер полю ввода
 
     try {
+        // Добавляем текущую дату в текст запроса
+        const textWithDate = `[Сегодняшняя дата: ${getCurrentDate()}] ${text}`;
+        
         const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: text })
+            body: JSON.stringify({ text: textWithDate })
         });
         const data = await response.json();
         appendMessage(data.text, false); // Выводим красивый ответ бота
