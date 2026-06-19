@@ -57,12 +57,14 @@ async def chat_endpoint(request: Request):
         user_message = data.get("text") or ""
         image_base64 = data.get("image") or ""
         
-        # Жесткий характер: убираем робота, добавляем живого друга
+        # Характер: пишем коротко, емко, без воды
         system_prompt = (
             "Ты — близкий друг и крутой ИИ-помощник Алексея. Твой стиль общения — живой, "
             "свободный, с юмором и иронией, как в реальном разговоре. Никакой официальщины, "
             "никаких фраз 'Чем могу быть полезен' или 'Как я могу помочь'. "
             "Отвечай всегда только на русском языке, просто, емко и по-человечески. "
+            "Старайся писать коротко и по делу, не расписывай длинные простыни текста, "
+            "если только Алексей сам не попросит ответить детально или развернуто. "
             "Если Алексей просит шутку — шути смешно, жизненно, избегай избитых шаблонов."
         )
 
@@ -110,9 +112,9 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": "google/gemini-2.5-flash", 
+                    "model": "openrouter/auto", 
                     "messages": messages_for_ai,
-                    "max_tokens": 1000  # Жестко ограничили аппетит модели, чтобы пролезть по лимитам денег
+                    "max_tokens": 400
                 },
                 timeout=30.0
             )
@@ -148,12 +150,12 @@ async def chat_endpoint(request: Request):
 async def get_history():
     conn = get_db_connection()
     if not conn:
-        return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
+        return []
     
     try:
         cur = conn.cursor() 
         cur.execute("""
-            SELECT role, content 
+            SELECT id, role, content 
             FROM chat_messages 
             ORDER BY id DESC 
             LIMIT 15
@@ -163,45 +165,30 @@ async def get_history():
         conn.close()
         
         if not rows:
-            return [{"role": "assistant", "text": "Привет, Алексей! Рад тебя видеть. О чём пообщаемся?"}]
+            return []
             
         history_summary = []
         for row in rows[::-1]:
-            history_summary.append({"role": row[0], "content": row[1]})
+            history_summary.append({"id": row[0], "role": row[1], "content": row[2]})
             
-        messages_for_welcome = [
-            {
-                "role": "system", 
-                "content": (
-                    "Ты — ИИ-помощник и друг. Посмотри на тему последней переписки с Алексеем и напиши "
-                    "ОДНО КОРОТКОЕ, живое и неформальное предложение приветствия строго в формате: "
-                    "'Ну что, Алексей, погнали дальше тестить [тема]?' или 'Привет, Алексей! На чем мы там "
-                    "остановились в [тема]?'. Никакой вежливости техподдержки, общайся по-дружески."
-                )
-            }
-        ]
-        messages_for_welcome.extend(history_summary)
-        
-        api_key = os.environ.get("OPENROUTER_API_KEY", "")
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": "google/gemini-2.5-flash", 
-                    "messages": messages_for_welcome,
-                    "max_tokens": 100  # Для приветствия 100 токенов хватит выше крыши
-                },
-                timeout=15.0
-            )
-            
-            if response.status_code == 200:
-                welcome_text = response.json()['choices'][0]['message']['content']
-                return [{"role": "assistant", "text": welcome_text}]
-            
-        return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
+        return history_summary
         
     except Exception as e:
-        logger.error(f"Ошибка при генерации приветствия: {e}")
-        return [{"role": "assistant", "text": "Ну что, Алексей, продолжим работу?"}]
+        logger.error(f"Ошибка при получении истории: {e}")
+        return []
+
+@app.delete("/api/delete/{msg_id}")
+async def delete_message(msg_id: int):
+    conn = get_db_connection()
+    if not conn:
+        return {"status": "error", "message": "Нет подключения к БД"}
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM chat_messages WHERE id = %s", (msg_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "success", "message": f"Сообщение {msg_id} удалено"}
+    except Exception as e:
+        logger.error(f"Ошибка при удалении сообщения {msg_id}: {e}")
+        return {"status": "error", "message": str(e)}
