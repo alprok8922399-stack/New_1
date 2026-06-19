@@ -9,7 +9,42 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #000000; color: #fff; height: 100vh; overflow: hidden; }
         .chat-container { width: 100vw; max-width: 100%; height: 100vh; margin: 0; display: flex; flex-direction: column; background: #000000; }
         
-        header { background: #000000; padding: 15px; text-align: center; border-bottom: 1px solid #222; font-weight: bold; font-size: 18px; color: #fff; }
+        header { 
+            background: #000000; 
+            padding: 15px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #222; 
+            font-weight: bold; 
+            font-size: 18px; 
+            color: #fff; 
+        }
+
+        /* Заголовок по центру */
+        .header-title {
+            flex: 1;
+            text-align: center;
+            padding-left: 70px; /* Сдвиг для идеальной центровки из-за кнопки справа */
+        }
+
+        /* Стильная кнопка Очистить в шапке */
+        .clear-btn {
+            background: none;
+            border: 1px solid #3a3a3c;
+            color: #ff3b30;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: normal;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .clear-btn:active {
+            background: #ff3b30;
+            color: #fff;
+        }
 
         .messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 16px; }
         
@@ -24,11 +59,11 @@
         .message p:last-child { margin-bottom: 0; }
         .message strong { color: #fff; font-weight: bold; }
 
-        /* Стильные контурные серые кнопки */
+        /* Кнопки под сообщениями без рамок (в цвет фона) */
         .message-buttons { display: flex; gap: 6px; padding: 4px 6px 0 6px; width: 100%; }
         .message-buttons button { 
             background: none; 
-            border: 1px solid #3a3a3c; 
+            border: 1px solid #000000; /* Контур теперь полностью невидимый на черном фоне */
             color: #77777a; 
             cursor: pointer; 
             width: 28px;
@@ -53,7 +88,6 @@
         }
 
         .message-buttons button:active { 
-            border-color: #0a84ff; 
             color: #0a84ff; 
         }
 
@@ -72,7 +106,10 @@
 </head>
 <body>
     <div class="chat-container">
-        <header>Друг и помощник</header>
+        <header>
+            <div class="header-title">Друг и помощник</div>
+            <button class="clear-btn" id="clear-btn">Очистить</button>
+        </header>
         <div class="messages" id="messages"></div>
         
         <div class="input-area">
@@ -98,6 +135,7 @@
         const previewContainer = document.getElementById('image-preview-container');
         const imagePreview = document.getElementById('image-preview');
         const cancelImageBtn = document.getElementById('cancel-image-btn');
+        const clearBtn = document.getElementById('clear-btn');
 
         let selectedImageBase64 = "";
         let currentEditingMessageId = null; 
@@ -138,7 +176,6 @@
             }).join('');
         }
 
-        // Убрали отсюда строчку с раздражающим алертом
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).catch(err => {
                 console.error('Не удалось скопировать: ', err);
@@ -223,6 +260,11 @@
                 console.error("Ошибка загрузки истории:", e);
             }
         }
+
+        // Логика для кнопки «Очистить» — очищает экран
+        clearBtn.addEventListener('click', () => {
+            messagesContainer.innerHTML = "";
+        });
 
         sendBtn.addEventListener('click', async () => {
             const text = inputArea.value.trim();
