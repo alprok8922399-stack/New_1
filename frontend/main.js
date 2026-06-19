@@ -155,4 +155,3 @@ sendBtn.addEventListener('click', async () => {
 
 // Запуск истории при открытии страницы
 document.addEventListener('DOMContentLoaded', loadChatHistory);
-                                 
