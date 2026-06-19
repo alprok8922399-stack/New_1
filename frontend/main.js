@@ -2,50 +2,146 @@ const messagesContainer = document.getElementById('messages');
 const inputArea = document.getElementById('input');
 const sendBtn = document.getElementById('send-btn');
 
+// Автоматическое расширение поля ввода при написании текста
+inputArea.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+});
 
-function getFormattedDate() {
-  const now = new Date();
-  const day = String(now.getDate()).padStart(2, '0');
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = now.getFullYear();
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  return `${day}.${month}.${year}, ${hours}:${minutes}`;
+// Функция, которая делает текст ИИ красивым (как у Gemini)
+function formatAiText(text) {
+    let rawText = text || "";
+    
+    // 1. Превращаем двойные звёздочки **текст** в жирный шрифт
+    rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // 2. Превращаем одиночные звёздочки *текст* в красивый курсив
+    rawText = rawText.replace(/\*(.*?)\*\/g, '<em>$1</em>');
+    
+    // 3. Вычищаем сиротливые одиночные звёздочки, если остались
+    rawText = rawText.replace(/\*/g, '');
+    
+    // 4. Разбиваем текст на абзацы по переносам строк
+    const paragraphs = rawText.split('\n');
+    
+    // Заворачиваем каждую строчку в абзац с отступом снизу
+    let formattedHtml = paragraphs.map(p => {
+        if (p.trim() === '---' || p.trim() === '***') {
+            return '<hr style="border: 0; border-top: 1px solid #333; margin: 12px 0;">';
+        }
+        if (p.trim() === "") {
+            return '<div style="height: 10px;"></div>'; // Пустая строка для отступа
+        }
+        return `<p style="margin-bottom: 8px; line-height: 1.5;">${p}</p>`;
+    }).join('');
+    
+    return formattedHtml;
 }
 
+// Функция для копирования текста в буфер обмена
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Текст скопирован!');
+    }).catch(err => {
+        console.error('Не удалось скопировать: ', err);
+    });
+}
+
+// Функция добавления сообщений в ленту
 function appendMessage(text, isUser) {
-  const messageElement = document.createElement('div');
-  messageElement.className = isUser ? 'message user' : 'message bot';
-  const date = getFormattedDate();
-  messageElement.innerHTML = `<div><strong>${date}</strong><br>${text}</div>`;
-  messagesContainer.appendChild(messageElement);
-  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    const className = isUser ? 'message user' : 'message bot';
+    
+    // Если пишет пользователь - оставляем обычный текст, если ИИ - форматируем до красоты
+    const finalHtml = isUser ? text.replace(/\n/g, '<br>') : formatAiText(text);
+    
+    // Генерируем кнопки в зависимости от того, кто отправил сообщение
+    let buttonsHtml = '';
+    if (isUser) {
+        buttonsHtml = `
+            <div class="message-buttons" style="text-align: right; margin-top: 4px;">
+                <button class="btn-edit" style="background: none; border: none; color: #888; cursor: pointer; font-size: 12px; margin-right: 8px;">✏️ Редактировать</button>
+                <button class="btn-copy" style="background: none; border: none; color: #888; cursor: pointer; font-size: 12px;">📋 Скопировать</button>
+            </div>
+        `;
+    } else {
+        buttonsHtml = `
+            <div class="message-buttons" style="text-align: left; margin-top: 4px;">
+                <button class="btn-copy" style="background: none; border: none; color: #888; cursor: pointer; font-size: 12px;">📋 Скопировать</button>
+            </div>
+        `;
+    }
+    
+    // Создаем элемент сообщения
+    const messageElement = document.createElement('div');
+    messageElement.className = className;
+    messageElement.innerHTML = `
+        <div class="message-text">${finalHtml}</div>
+        ${buttonsHtml}
+    `;
+    
+    // Навешиваем событие на кнопку копирования
+    const copyBtn = messageElement.querySelector('.btn-copy');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => copyToClipboard(text));
+    }
+    
+    // Навешиваем событие на кнопку редактирования (пока просто заготовка для логики)
+    const editBtn = messageElement.querySelector('.btn-edit');
+    if (editBtn) {
+        editBtn.addEventListener('click', () => {
+            inputArea.value = text;
+            inputArea.focus();
+            inputArea.style.height = 'auto';
+            inputArea.style.height = (inputArea.scrollHeight) + 'px';
+        });
+    }
+    
+    messagesContainer.appendChild(messageElement);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-sendBtn.addEventListener('click', () => {
-  const text = inputArea.value.trim();
-  if (!text) return;
+// Загрузка истории чата из базы данных
+async function loadChatHistory() {
+    try {
+        const response = await fetch("https://new-1-5155.onrender.com/api/history");
+        const history = await response.json();
+        messagesContainer.innerHTML = ""; 
+        history.forEach(msg => {
+            const isUser = msg.role === 'user';
+            appendMessage(msg.content || msg.text, isUser);
+        });
+    } catch (e) {
+        console.error("Ошибка загрузки истории:", e);
+    }
+}
 
-  // ЖЁСТКИЙ ПЕРЕХВАТ запросов про дату/время
-  const lowerText = text.toLowerCase();
-  if (
-    lowerText.includes('дата') ||
-    lowerText.includes('время') ||
-    lowerText.includes('который час') ||
-    lowerText.includes('сейчас') ||
-    lowerText.includes('какое число') ||
-    lowerText.includes('сегодняшняя дата')
-  ) {
-    appendMessage(`Текущая дата и время: ${getFormattedDate()}`, false);
+// Нажатие на кнопку отправки
+sendBtn.addEventListener('click', async () => {
+    const text = inputArea.value.trim();
+    if (!text) return;
+    
+    appendMessage(text, true); // Сразу выводим сообщение пользователя
     inputArea.value = '';
-    return; // Прерываем выполнение — не идём к fetch
-  }
+    inputArea.style.height = '40px'; // Возвращаем исходный размер полю ввода
 
-  // Если не запрос про дату — показываем сообщение пользователя
-  appendMessage(text, true);
-  inputArea.value = '';
+    // Получаем текущую дату и время на телефоне пользователя
+    const currentDateTime = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
+
+    try {
+        const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                text: text,
+                clientTime: currentDateTime // Передаем точное время на сервер
+            })
+        });
+        const data = await response.json();
+        appendMessage(data.text, false); // Выводим красивый ответ бота
+    } catch (e) {
+        appendMessage("Ошибка соединения. Кажется, сервер спит.", false);
+    }
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-  messagesContainer.innerHTML = '';
-});
+// Запуск истории при открытии страницы
+document.addEventListener('DOMContentLoaded', loadChatHistory);
