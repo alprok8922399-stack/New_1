@@ -121,8 +121,13 @@ async function loadChatHistory() {
 
 // Проверяем, является ли запрос запросом о дате/времени
 function isDateRequest(text) {
-  const lowerText = text.toLowerCase();
-  const keywords = ['дата', 'время', 'который час', 'сейчас', 'какое число', 'сегодняшняя дата'];
+  if (!text) return false;
+  const lowerText = text.toLowerCase().trim();
+  const keywords = [
+    'дата', 'время', 'который час', 'сейчас', 'какое число',
+    'сегодняшняя дата', 'текущая дата', 'который сейчас час',
+    'скажи дату', 'назови время', 'какое сегодня число'
+  ];
   return keywords.some(keyword => lowerText.includes(keyword));
 }
 
@@ -131,28 +136,34 @@ sendBtn.addEventListener('click', async () => {
   const text = inputArea.value.trim();
   if (!text) return;
 
-  // Если запрос про дату/время — показываем локальную дату без запроса к серверу
+  // ЖЁСТКИЙ ПЕРЕХВАТ запросов про дату/время
   if (isDateRequest(text)) {
+    // НЕ отправляем запрос к бэкенду — сразу отвечаем локальной датой
     const localDate = getFormattedDate();
     appendMessage(`Текущая дата и время: ${localDate}`, false);
-  } else {
-    // Иначе отправляем запрос к бэкенду
-    appendMessage(text, true); // Сразу выводим сообщение пользователя
     inputArea.value = '';
-    inputArea.style.height = '40px'; // Возвращаем исходный размер полю ввода
-    try {
-      const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text })
-      });
-      const data = await response.json();
-      appendMessage(data.text, false); // Выводим красивый ответ бота
-    } catch (e) {
-      appendMessage("Ошибка соединения. Кажется, сервер спит.", false);
-    }
+    inputArea.style.height = '40px';
+    return; // ВЫХОД из функции — дальше код не выполняется
+  }
+
+  // Если не запрос про дату — обычный сценарий
+  appendMessage(text, true); // Сразу выводим сообщение пользователя
+  inputArea.value = '';
+  inputArea.style.height = '40px';
+
+  try {
+    const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
+    });
+    const data = await response.json();
+    appendMessage(data.text, false); // Выводим красивый ответ бота
+  } catch (e) {
+    appendMessage("Ошибка соединения. Кажется, сервер спит.", false);
   }
 });
 
 // Запуск истории при открытии страницы
 document.addEventListener('DOMContentLoaded', loadChatHistory);
+    
