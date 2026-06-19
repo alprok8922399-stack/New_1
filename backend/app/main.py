@@ -1,6 +1,7 @@
 import os
 import httpx
 import logging
+import re
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
@@ -60,17 +61,29 @@ async def chat_endpoint(request: Request):
         client_history = data.get("history") or []
         client_time = data.get("clientTime") or "Неизвестно"
         
-        # Строка с текущим временем для ИИ
+        # Автоматически вытаскиваем реальное имя гостя из скрытой строки фронтенда
+        guest_name = "Пользователь"
+        if "Имя собеседника:" in user_message:
+            match = re.search(r"Имя собеседника:\s*([^\s\]]+)", user_message)
+            if match:
+                guest_name = match.group(1)
+
+        # Вытаскиваем точную дату из строки, чтобы не дублировать
         time_info = f"Текущие дата и время у пользователя (МСК): {client_time}.\n\n"
-        
-        # 1. НАСТРОЙКА СИСТЕМНЫХ ПРОМТОВ В ЗАВИСИМОСТИ ОТ РЕЖИМА (с добавлением времени)
+        if "Текущие дата и время:" in user_message:
+            time_match = re.search(r"Текущие дата и время:\s*([^\]\n]+)", user_message)
+            if time_match:
+                time_info = f"Текущие дата и время у пользователя (МСК): {time_match.group(1)}.\n\n"
+
+        # 1. НАСТРОЙКА СИСТЕМНЫХ ПРОМТОВ В ЗАВИСИМОСТИ ОТ РЕЖИМА
         if mode == "public":
             system_prompt = (
                 f"{time_info}"
-                "Ты — крутой, вежливый и отзывчивый ИИ-помощник. Твой стиль общения — живой, "
-                "свободный, понятный и по-человечески теплый. Никакой лишней официальщины. "
-                "Отвечай всегда только на русском языке, просто и емко. Не расписывай длинные простыни текста. "
-                "ВАЖНО: Ты общаешься в общем гостевом чате, не используй имя Алексей!"
+                f"Ты — крутой, вежливый и отзывчивый ИИ-помощник. Твой стиль общения — живой, "
+                f"свободный, понятный и по-человечески теплый. Никакой лишней официальщины. "
+                f"Отвечай всегда только на русском языке, просто и емко. Не расписывай длинные простыни текста.\n"
+                f"ВАЖНО: Твоего собеседника зовут {guest_name}. Обращайся к нему по этому имени! "
+                f"Не используй имя Алексей, сейчас ты общаешься именно с пользователем по имени {guest_name}."
             )
         else:
             system_prompt = (
@@ -104,7 +117,7 @@ async def chat_endpoint(request: Request):
         
         if mode == "public":
             # Для публичного чата берем только ту историю, которую прислал клиент (живет в памяти телефона)
-            for msg in client_history[:-1]:  # Последнее сообщение добавим отдельно с картинкой ниже
+            for msg in client_history[:-1]:
                 messages_for_ai.append({"role": msg.get("role"), "content": msg.get("content")})
         else:
             # Для Алексея достаем контекст из вечной базы PostgreSQL
