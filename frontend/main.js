@@ -122,7 +122,7 @@ async function loadChatHistory() {
 // Проверяем, является ли запрос запросом о дате/времени
 function isDateRequest(text) {
   const lowerText = text.toLowerCase();
-  const keywords = ['дата', 'время', 'который час', 'сейчас', 'какое число'];
+  const keywords = ['дата', 'время', 'который час', 'сейчас', 'какое число', 'сегодняшняя дата'];
   return keywords.some(keyword => lowerText.includes(keyword));
 }
 
