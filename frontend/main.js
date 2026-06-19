@@ -28,7 +28,6 @@ function formatAiText(text) {
 
   // 2. Превращаем одиночные звёздочки *текст* в красивый курсив
   rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
   // 3. Вычищаем сиротливые одиночные звёздочки, если остались
   rawText = rawText.replace(/\*/g, '');
 
@@ -65,7 +64,7 @@ function appendMessage(text, isUser) {
   // Получаем текущую дату и время
   const messageDate = getFormattedDate();
 
-  // Если пишет пользователь — оставляем обычный текст, если ИИ — форматируем до красоты
+  // Форматируем текст: добавляем дату в начале
   const finalHtml = isUser
     ? `${messageDate}<br>${text.replace(/\n/g, '<br>')}`
     : `${messageDate}<br>${formatAiText(text)}`;
@@ -101,7 +100,7 @@ function appendMessage(text, isUser) {
     copyBtn.addEventListener('click', () => copyToClipboard(text));
   }
 
-  // Навешиваем событие на кнопку редактирования (пока просто заготовка для логики)
+  // Навешиваем событие на кнопку редактирования
   const editBtn = messageElement.querySelector('.btn-edit');
   if (editBtn) {
     editBtn.addEventListener('click', () => {
@@ -155,3 +154,4 @@ sendBtn.addEventListener('click', async () => {
 
 // Запуск истории при открытии страницы
 document.addEventListener('DOMContentLoaded', loadChatHistory);
+  
