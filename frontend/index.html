@@ -199,33 +199,30 @@
         let selectedImageBase64 = "";
         let currentEditingMessageId = null; 
         
-        // Режим работы: по умолчанию "public" (общий), для тебя станет "private"
         let chatMode = "public"; 
+        let publicHistory = []; // Локальная память для общего чата (без БД)
 
-        // Твой секретный точный код
         const ADMIN_CODE = "alprok8922399";
 
-        // ЛОГИКА ВХОДА
         function handleAuth() {
             const value = authInput.value.trim();
             if (!value) return;
 
             if (value === ADMIN_CODE) {
-                // ВХОД ДЛЯ ТЕБЯ: Всё остается как сейчас
                 chatMode = "private";
                 authScreen.classList.add('hidden');
-                loadChatHistory(); // Загружаем твою вечную историю с сервера
+                // ТВОЙ ВХОД: Показываем шапку, кнопку и качаем вечную историю
+                headerTitle.innerText = "Друг и помощник";
+                clearBtn.classList.remove('hidden');
+                loadChatHistory(); 
             } else {
-                // ВХОД ДЛЯ ВСЕХ ОСТАЛЬНЫХ
                 chatMode = "public";
                 authScreen.classList.add('hidden');
-                
-                // Скрываем заголовок и кнопку «Очистить»
+                // ВХОД ДЛЯ ДРУГИХ: Прячем шапку и кнопку очистки полностью
                 headerTitle.innerText = "";
                 clearBtn.classList.add('hidden');
-                
-                // Очищаем экран (история не подгружается, чат пустой и чистый)
                 messagesContainer.innerHTML = "";
+                publicHistory = []; // Очищаем временную историю
             }
         }
 
@@ -363,6 +360,11 @@
             appendMessage(text || "Фото", true, selectedImageBase64); 
             const imgToSend = selectedImageBase64;
             
+            // Если мы в общем чате, сохраняем переписку в локальный массив для контекста текущей сессии
+            if (chatMode === "public") {
+                publicHistory.push({ role: "user", content: text });
+            }
+
             if (chatMode === "private" && currentEditingMessageId !== null) {
                 try {
                     await fetch(`https://new-1-5155.onrender.com/api/delete/${currentEditingMessageId}`, {
@@ -383,19 +385,31 @@
             previewContainer.classList.add('preview-hidden');
 
             try {
+                // Настраиваем тело запроса в зависимости от режима чата
+                let requestBody = { text: text, image: imgToSend };
+                
+                if (chatMode === "public") {
+                    // Для обычных пользователей пересылаем локальную историю без сохранения на сервере
+                    requestBody.mode = "public";
+                    requestBody.history = publicHistory;
+                }
+
                 const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: text, image: imgToSend })
+                    body: JSON.stringify(requestBody)
                 });
                 const data = await response.json();
+                
+                if (chatMode === "public") {
+                    publicHistory.push({ role: "assistant", content: data.text });
+                }
+                
                 appendMessage(data.text, false); 
             } catch (e) {
                 appendMessage("Ошибка соединения с сервером.", false);
             }
         });
-
-        // Убрали автоматическую загрузку истории при старте страницы, чтобы никто чужой её не увидел до ввода кода!
     </script>
 </body>
 </html>
