@@ -56,55 +56,77 @@ async def chat_endpoint(request: Request):
         data = await request.json()
         user_message = data.get("text") or ""
         image_base64 = data.get("image") or ""
+        mode = data.get("mode") or "private"
+        client_history = data.get("history") or []
         
-        # Характер: пишем коротко, емко, без воды
-        system_prompt = (
-            "Ты — близкий друг и крутой ИИ-помощник Алексея. Твой стиль общения — живой, "
-            "свободный, с юмором и иронией, как в реальном разговоре. Никакой официальщины, "
-            "никаких фраз 'Чем могу быть полезен' или 'Как я могу помочь'. "
-            "Отвечай всегда только на русском языке, просто, емко и по-человечески. "
-            "Старайся писать коротко и по делу, не расписывай длинные простыни текста, "
-            "если только Алексей сам не попросит ответить детально или развернуто. "
-            "Если Алексей просит шутку — шути смешно, жизненно, избегай избитых шаблонов."
-        )
+        # 1. НАСТРОЙКА СИСТЕМНЫХ ПРОМТОВ В ЗАВИСИМОСТИ ОТ РЕЖИМА
+        if mode == "public":
+            system_prompt = (
+                "Ты — крутой, вежливый и отзывчивый ИИ-помощник. Твой стиль общения — живой, "
+                "свободный, понятный и по-человечески теплый. Никакой лишней официальщины. "
+                "Отвечай всегда только на русском языке, просто и емко. Не расписывай длинные простыни текста. "
+                "ВАЖНО: Ты общаешься в общем гостевом чате, не используй имя Алексей!"
+            )
+        else:
+            system_prompt = (
+                "Ты — близкий друг и крутой ИИ-помощник Алексея. Твой стиль общения — живой, "
+                "свободный, с юмором и иронией, как в реальном разговоре. Никакой официальщины, "
+                "никаких фраз 'Чем могу быть полезен' или 'Как я могу помочь'. "
+                "Отвечай всегда только на русском языке, просто, емко и по-человечески. "
+                "Старайся писать коротко и по делу, не расписывай длинные простыни текста, "
+                "если только Алексей сам не попросит ответить детально или развернуто. "
+                "Если Алексей просит шутку — шути смешно, жизненно, избегай избитых шаблонов."
+            )
 
-        conn = get_db_connection()
-        if conn:
-            try:
-                cur = conn.cursor()
-                cur.execute(
-                    "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
-                    ("user", user_message)
-                )
-                conn.commit()
-            except Exception as e:
-                logger.error(f"Не удалось записать сообщение пользователя: {e}")
+        # 2. ЗАПИСЬ В БД ТОЛЬКО ДЛЯ ЛИЧНОГО РЕЖИМА АЛЕКСЕЯ
+        conn = None
+        if mode != "public":
+            conn = get_db_connection()
+            if conn:
+                try:
+                    cur = conn.cursor()
+                    cur.execute(
+                        "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
+                        ("user", user_message)
+                    )
+                    conn.commit()
+                except Exception as e:
+                    logger.error(f"Не удалось записать сообщение пользователя: {e}")
 
-        history_messages = []
-        if conn:
-            try:
-                cur.execute("""
-                    SELECT role, content 
-                    FROM chat_messages 
-                    WHERE id < (SELECT MAX(id) FROM chat_messages)
-                    ORDER BY id DESC 
-                    LIMIT 10
-                """)
-                rows = cur.fetchall()
-                for row in rows[::-1]:
-                    history_messages.append({"role": row[0], "content": row[1]})
-            except Exception as e:
-                logger.error(f"Не удалось достать контекст для ИИ: {e}")
-
+        # 3. СБОР КОНТЕКСТА ИСТОРИИ
         messages_for_ai = [{"role": "system", "content": system_prompt}]
-        messages_for_ai.extend(history_messages)
         
+        if mode == "public":
+            # Для публичного чата берем только ту историю, которую прислал клиент (живет в памяти телефона)
+            for msg in client_history[:-1]:  # Последнее сообщение добавим отдельно с картинкой ниже
+                messages_for_ai.append({"role": msg.get("role"), "content": msg.get("content")})
+        else:
+            # Для Алексея достаем контекст из вечной базы PostgreSQL
+            history_messages = []
+            if conn:
+                try:
+                    cur.execute("""
+                        SELECT role, content 
+                        FROM chat_messages 
+                        WHERE id < (SELECT MAX(id) FROM chat_messages)
+                        ORDER BY id DESC 
+                        LIMIT 10
+                    """)
+                    rows = cur.fetchall()
+                    for row in rows[::-1]:
+                        history_messages.append({"role": row[0], "content": row[1]})
+                except Exception as e:
+                    logger.error(f"Не удалось достать контекст для ИИ: {e}")
+            messages_for_ai.extend(history_messages)
+
+        # Формируем текущее сообщение (с поддержкой фото, если есть)
         current_content = [{"type": "text", "text": user_message}]
         if image_base64:
             current_content.append({"type": "image_url", "image_url": {"url": image_base64}})
             
         messages_for_ai.append({"role": "user", "content": current_content})
 
+        # 4. ЗАПРОС К OPENROUTER
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         
         async with httpx.AsyncClient() as client:
@@ -122,7 +144,8 @@ async def chat_endpoint(request: Request):
             if response.status_code == 200:
                 reply = response.json()['choices'][0]['message']['content']
                 
-                if conn:
+                # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
+                if mode != "public" and conn:
                     try:
                         cur.execute(
                             "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
