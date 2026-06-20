@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Обновленный список бесплатных моделей (Llama 3 заменена на 3.1)
+# Список бесплатных моделей для автоматического перебора
 FREE_MODELS = [
     "meta-llama/llama-3.1-8b-instruct:free",
     "mistralai/mistral-7b-instruct:free",
@@ -179,36 +179,34 @@ async def chat_endpoint(request: Request):
                         timeout=30.0
                     )
                     
-                    # Если модель стала платной (404) или кончились лимиты (402), переключаемся
-                    if response.status_code in [402, 404]:
-                        logger.warning(f"Модель {current_model} вернула статус {response.status_code}. Переключаемся...")
+                    # Если статус НЕ 200 (любая ошибка), переключаемся дальше
+                    if response.status_code != 200:
+                        logger.warning(f"Модель {current_model} вернула ошибку со статусом {response.status_code}. Переключаемся...")
                         continue
                         
-                    if response.status_code == 200:
-                        resp_json = response.json()
-                        # Дополнительная проверка на внутренние коды ошибок 402 или 404
-                        if "error" in resp_json and resp_json["error"].get("code") in [402, 404]:
-                            logger.warning(f"Внутренняя ошибка {resp_json['error'].get('code')} на {current_model}. Переключаемся...")
-                            continue
-                            
-                        reply = resp_json['choices'][0]['message']['content']
-                        break
-                    else:
-                        if conn:
-                            cur.close()
-                            conn.close()
-                        return {"text": f"Ошибка OpenRouter ({response.status_code}): {response.text}"}
+                    resp_json = response.json()
+                    
+                    # Проверяем, нет ли ошибки внутри успешного ответа (OpenRouter иногда так делает)
+                    if "error" in resp_json:
+                        logger.warning(f"Внутренняя ошибка в ответе модели {current_model}. Переключаемся...")
+                        continue
+                        
+                    # Если всё супер, забираем ответ
+                    reply = resp_json['choices'][0]['message']['content']
+                    break
                         
                 except Exception as model_err:
-                    logger.error(f"Ошибка при запросе к модели {current_model}: {model_err}")
+                    logger.error(f"Сбой сети или таймаут на модели {current_model}: {model_err}")
                     continue
 
+            # Если перебрали ВСЕ модели и ни одна не вернула нормальный ответ
             if reply is None:
                 if conn:
                     cur.close()
                     conn.close()
-                return {"text": "Ошибка: Все бесплатные модели сейчас недоступны или перегружены. Попробуй позже."}
+                return {"text": "Ошибка: Все бесплатные модели сейчас недоступны, перегружены или выдают сбои. Попробуй позже."}
                 
+            # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
             if mode != "public" and conn:
                 try:
                     cur.execute(
