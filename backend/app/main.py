@@ -19,6 +19,13 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# Список бесплатных моделей для автоматического перебора при ошибке 402
+FREE_MODELS = [
+    "meta-llama/llama-3-8b-instruct:free",
+    "mistralai/mistral-7b-instruct:free",
+    "microsoft/phi-3-mini-128k-instruct:free"
+]
+
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
@@ -152,46 +159,76 @@ async def chat_endpoint(request: Request):
             
         messages_for_ai.append({"role": "user", "content": current_content})
 
-        # 4. ЗАПРОС К OPENROUTER С ВКЛЮЧЕННЫМ ПЛАГИНОМ ПОИСКА
+        # 4. ЗАПРОС К OPENROUTER С АВТОМАТИЧЕСКИМ ПЕРЕБОРОМ МОДЕЛЕЙ
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        reply = None
         
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": "openrouter/auto", 
-                    "messages": messages_for_ai,
-                    "max_tokens": 400,
-                    "plugins": [{"id": "web"}]  # Подключаем официальный веб-поиск OpenRouter
-                },
-                timeout=30.0
-            )
-            
-            if response.status_code == 200:
-                reply = response.json()['choices'][0]['message']['content']
-                
-                # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
-                if mode != "public" and conn:
-                    try:
-                        cur.execute(
-                            "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
-                            ("assistant", reply)
-                        )
-                        conn.commit()
-                    except Exception as e:
-                        logger.error(f"Не удалось записать ответ ИИ: {e}")
-                
-                if conn:
-                    cur.close()
-                    conn.close()
+            # Начинаем перебор наших бесплатных моделей
+            for current_model in FREE_MODELS:
+                try:
+                    logger.info(f"Пробуем отправить запрос в модель: {current_model}")
+                    response = await client.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        json={
+                            "model": current_model, 
+                            "messages": messages_for_ai,
+                            "max_tokens": 400,
+                            "plugins": [{"id": "web"}]  # Подключаем официальный веб-поиск
+                        },
+                        timeout=30.0
+                    )
+                    
+                    # Если словили ошибку 402 (закончились токены/лимиты), переключаемся на следующую
+                    if response.status_code == 402:
+                        logger.warning(f"На модели {current_model} закончились токены (402). Переключаемся...")
+                        continue
+                        
+                    if response.status_code == 200:
+                        resp_json = response.json()
+                        # Дополнительная проверка на внутреннюю ошибку 402 в ответе
+                        if "error" in resp_json and resp_json["error"].get("code") == 402:
+                            logger.warning(f"Внутренняя ошибка 402 на {current_model}. Переключаемся...")
+                            continue
+                            
+                        reply = resp_json['choices'][0]['message']['content']
+                        break  # Успешно получили ответ, выходим из цикла перебора моделей
+                    else:
+                        # Если это любая другая ошибка (не 402), выводим её и не мучаем другие модели
+                        if conn:
+                            cur.close()
+                            conn.close()
+                        return {"text": f"Ошибка OpenRouter ({response.status_code}): {response.text}"}
+                        
+                except Exception as model_err:
+                    logger.error(f"Ошибка при запросе к модели {current_model}: {model_err}")
+                    # Если это была последняя модель, то цикл сам завершится и выдаст ошибку ниже
+                    continue
 
-                return {"text": reply}
-            else:
+            # Если перебрали все модели и ни одна не ответила успешно
+            if reply is None:
                 if conn:
                     cur.close()
                     conn.close()
-                return {"text": f"Ошибка OpenRouter: {response.text}"}
+                return {"text": "Ошибка: Все бесплатные модели сейчас перегружены или исчерпали лимиты. Попробуй позже."}
+                
+            # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ (если всё прошло успешно)
+            if mode != "public" and conn:
+                try:
+                    cur.execute(
+                        "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
+                        ("assistant", reply)
+                    )
+                    conn.commit()
+                except Exception as e:
+                    logger.error(f"Не удалось записать ответ ИИ: {e}")
+            
+            if conn:
+                cur.close()
+                conn.close()
+
+            return {"text": reply}
                 
     except Exception as e:
         return {"text": f"Ошибка бэкенда: {str(e)}"}
