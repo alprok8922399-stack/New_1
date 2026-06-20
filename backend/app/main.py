@@ -19,11 +19,11 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Актуальный список бесплатных моделей на 2026 год
-FREE_MODELS = [
-    "meta-llama/llama-3.1-8b-instruct:free",
-    "google/gemma-2-9b-it:free",
-    "mistralai/mistral-7b-instruct:free"
+# Черный список бесплатных моделей, которые плохо говорят по-русски или ломают контекст
+MODEL_BLACK_LIST = [
+    "openchat/openchat-7b:free",
+    "cognitivecomputations/dolphin-mixtral-8x7b:free",
+    "nousresearch/nous-capybara-7b:free"
 ]
 
 def get_db_connection():
@@ -159,13 +159,40 @@ async def chat_endpoint(request: Request):
             
         messages_for_ai.append({"role": "user", "content": current_content})
 
-        # 4. ЗАПРОС К OPENROUTER С АВТОМАТИЧЕСКИМ ПЕРЕБОРОМ МОДЕЛЕЙ
+        # 4. ДИНАМИЧЕСКИЙ ЗАПРОС К OPENROUTER С АВТОМАТИЧЕСКИМ ПОИСКОМ БЕСПЛАТНЫХ МОДЕЛЕЙ
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         reply = None
-        last_error_details = "Нет деталей ошибки"
+        last_error_details = "Не удалось получить список моделей"
         
         async with httpx.AsyncClient() as client:
-            for current_model in FREE_MODELS:
+            # Шаг А: Запрашиваем у OpenRouter список всех существующих на данный момент моделей
+            try:
+                models_response = await client.get("https://openrouter.ai/api/v1/models", timeout=10.0)
+                if models_response.status_code == 200:
+                    all_models = models_response.json().get("data", [])
+                    # Фильтруем только бесплатные модели и исключаем черный список
+                    free_models = [
+                        m["id"] for m in all_models 
+                        if m["id"].endswith(":free") and m["id"] not in MODEL_BLACK_LIST
+                    ]
+                else:
+                    free_models = []
+            except Exception as e:
+                logger.error(f"Не удалось загрузить список моделей: {e}")
+                free_models = []
+
+            # Если вдруг API моделей недоступно, используем базовый проверенный резерв
+            if not free_models:
+                free_models = [
+                    "meta-llama/llama-3.1-8b-instruct:free",
+                    "google/gemma-2-9b-it:free",
+                    "mistralai/mistral-7b-instruct:free"
+                ]
+
+            logger.info(f"Сформирован динамический список моделей для перебора: {free_models}")
+
+            # Шаг Б: Перебираем полученные модели по очереди
+            for current_model in free_models:
                 try:
                     logger.info(f"Пробуем отправить запрос в модель: {current_model}")
                     response = await client.post(
@@ -176,35 +203,32 @@ async def chat_endpoint(request: Request):
                             "messages": messages_for_ai,
                             "max_tokens": 400
                         },
-                        timeout=30.0
+                        timeout=7.0  # Короткий таймаут, чтобы долго не ждать зависшие модели
                     )
                     
                     if response.status_code != 200:
-                        last_error_details = f"Статус {response.status_code}: {response.text}"
-                        logger.warning(f"Модель {current_model} вернула ошибку со статусом {response.status_code}. Переключаемся...")
+                        last_error_details = f"Модель {current_model} вернула статус {response.status_code}"
                         continue
                         
                     resp_json = response.json()
                     
                     if "error" in resp_json:
-                        last_error_details = f"Внутренняя ошибка JSON: {resp_json['error']}"
-                        logger.warning(f"Внутренняя ошибка в ответе модели {current_model}. Переключаемся...")
+                        last_error_details = f"Внутренняя ошибка на {current_model}: {resp_json['error']}"
                         continue
                         
                     reply = resp_json['choices'][0]['message']['content']
-                    break
+                    break  # Нашли рабочую модель, выходим из цикла!
                         
                 except Exception as model_err:
-                    last_error_details = f"Исключение сети/таймаута: {str(model_err)}"
-                    logger.error(f"Сбой сети или таймаут на модели {current_model}: {model_err}")
+                    last_error_details = f"Сбой сети на {current_model}: {str(model_err)}"
                     continue
 
-            # Если перебрали ВСЕ модели и ни одна не вернула нормальный ответ
+            # Если перебрали абсолютно всё и глухо
             if reply is None:
                 if conn:
                     cur.close()
                     conn.close()
-                return {"text": f"Сбой перебора бесплатных моделей. Последняя ошибка: {last_error_details}"}
+                return {"text": f"Сбой автоперебора всех бесплатных моделей OpenRouter. Последняя ошибка: {last_error_details}"}
                 
             # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
             if mode != "public" and conn:
