@@ -51,6 +51,28 @@ def startup_event():
         except Exception as e:
             logger.error(f"Ошибка при создании таблицы: {e}")
 
+def format_links_to_containers(text: str) -> str:
+    """
+    Находит текстовые ссылки или Markdown-ссылки и упаковывает их
+    в красивый, выделенный контейнер-блок для интерфейса.
+    """
+    # 1. Сначала обрабатываем Markdown ссылки вида [Текст](https://...)
+    markdown_pattern = r'\[([^\]]+)\]\((https?://[^\s\)]+)\)'
+    text = re.sub(
+        markdown_pattern, 
+        r'<div class="link-container">📎 <a href="\2" target="_blank" class="custom-link">\1</a></div>', 
+        text
+    )
+    
+    # 2. Затем находим одиночные ссылки, которые не обернуты в теги, и оформляем их
+    raw_url_pattern = r'(?<!href=")(https?://[^\s<]+)'
+    text = re.sub(
+        raw_url_pattern, 
+        r'<div class="link-container">🔗 <a href="\1" target="_blank" class="custom-link">Перейти на сайт</a></div>', 
+        text
+    )
+    return text
+
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     try:
@@ -61,10 +83,14 @@ async def chat_endpoint(request: Request):
         client_history = data.get("history") or []
         client_time = data.get("clientTime") or "Неизвестно"
         
-        # Очищаем текст сообщения от системного мусора [Системное инфо...]
+        # Полностью вырезаем любые системные сообщения о дате/времени, чтобы ИИ их не повторял
         user_message = re.sub(r"^\[Системное инфо\..*?\]\s*", "", raw_user_message, flags=re.DOTALL)
-        user_message = re.sub(r"^\[Текущие дата и время.*?\]\s*", "", user_message, flags=re.DOTALL)
+        user_message = re.sub(r"\[Текущие дата и время.*?\]\s*", "", user_message, flags=re.DOTALL)
         user_message = user_message.strip()
+
+        # Если сообщение после очистки оказалось пустым (просто системный пинг времени), не мучаем ИИ
+        if not user_message and "Текущие дата и время" in raw_user_message:
+            return {"text": "Часы успешно синхронизированы."}
 
         # Автоматически вытаскиваем реальное имя гостя из скрытой строки фронтенда
         guest_name = "Пользователь"
@@ -73,18 +99,12 @@ async def chat_endpoint(request: Request):
             if match:
                 guest_name = match.group(1)
 
-        # Вытаскиваем точную дату из строки
         time_info = f"Текущие дата и время у пользователя (МСК): {client_time}.\n\n"
-        if "Текущие дата и время:" in raw_user_message:
-            time_match = re.search(r"Текущие дата и время:\s*([^\]\n]+)", raw_user_message)
-            if time_match:
-                time_info = f"Текущие дата и время у пользователя (МСК): {time_match.group(1)}.\n\n"
 
-        # Требование по ссылкам для системного промпта
         web_search_instruction = (
             "Если пользователь просит найти что-то на сайтах или зайти по ссылке — "
-            "используй свои внутренние знания, читай информацию и ОБЯЗАТЕЛЬНО в конце своего ответа "
-            "давай точные ссылки (URL) на сайты, о которых идет речь."
+            "используй свои инструменты поиска, читай информацию и ОБЯЗАТЕЛЬНО давай ссылки на источники. "
+            "Никогда не пиши вслух фразы вроде '[Текущие дата и время...]', это техническая информация."
         )
 
         # 1. НАСТРОЙКА СИСТЕМНЫХ ПРОМТОВ В ЗАВИСИМОСТИ ОТ РЕЖИМА
@@ -92,8 +112,7 @@ async def chat_endpoint(request: Request):
             system_prompt = (
                 f"{time_info}"
                 f"Ты — крутой, вежливый и отзывчивый ИИ-помощник. Твой стиль общения — живой, "
-                f"свободный, понятный и по-человечески теплый. Никакой лишней официальщины. "
-                f"Отвечай всегда только на русском языке, просто и емко. Не расписывай длинные простыни текста.\n"
+                f"свободный, понятный и по-человечески теплый. Никакой лишней официальщины.\n"
                 f"{web_search_instruction}\n"
                 f"ВАЖНО: Твоего собеседника зовут {guest_name}. Обращайся к нему по этому имени! "
                 f"Не используй имя Алексей, сейчас ты общаешься именно с пользователем по имени {guest_name}."
@@ -105,8 +124,6 @@ async def chat_endpoint(request: Request):
                 "свободный, с юмором и иронией, как в реальном разговоре. Никакой официальщины, "
                 "никаких фраз 'Чем могу быть полезен' или 'Как я могу помочь'. "
                 "Отвечай всегда только на русском языке, просто, емко и по-человечески. "
-                "Старайся писать коротко и по делу, не расписывай длинные простыни текста, "
-                "если только Алексей сам не попросит ответить детально или развернуто. "
                 f"{web_search_instruction}\n"
                 "Если Алексей просит шутку — шути смешно, жизненно, избегай избитых шаблонов."
             )
@@ -177,7 +194,6 @@ async def chat_endpoint(request: Request):
         
         gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
         
-        # Формируем тело запроса и активируем официальный инструмент Google Поиска
         payload = {
             "contents": gemini_contents,
             "tools": [{"google_search": {}}]
@@ -189,7 +205,7 @@ async def chat_endpoint(request: Request):
                     gemini_url,
                     headers={"Content-Type": "application/json"},
                     json=payload,
-                    timeout=20.0  # Увеличили таймаут, так как ИИ теперь тратит время на поиск в сети
+                    timeout=20.0
                 )
                 
                 if response.status_code == 200:
@@ -199,6 +215,8 @@ async def chat_endpoint(request: Request):
                         parts = candidates[0].get("content", {}).get("parts", [])
                         if parts:
                             reply = parts[0].get("text", "")
+                            # Форматируем ссылки в красивые контейнеры перед отправкой на экран
+                            reply = format_links_to_containers(reply)
                 else:
                     reply = f"Ошибка Gemini API (Статус {response.status_code}): {response.text}"
             except Exception as gemini_err:
