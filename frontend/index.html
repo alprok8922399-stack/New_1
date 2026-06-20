@@ -30,7 +30,7 @@
             width: 100%;
         }
 
-        /* Висячий отступ: первая строка у края, остальные с отступом */
+        /* Висячий отступ */
         .message.bot p { 
             padding-left: 20px; 
             text-indent: -20px; 
@@ -242,7 +242,11 @@
                     body: JSON.stringify({ text: textWithTime, image: imgToSend, mode: chatMode })
                 });
                 const data = await response.json();
-                appendMessage(data.text, false); 
+                
+                // ЭТА СТРОКА УДАЛЯЕТ СИСТЕМНОЕ ИНФО ИЗ ОТВЕТА БОТА
+                const cleanedText = data.text.replace(/\[Системное инфо:.*?\]\n?/g, '').trim();
+                
+                appendMessage(cleanedText, false); 
             } catch (e) { appendMessage("Ошибка соединения.", false); }
         });
     </script>
