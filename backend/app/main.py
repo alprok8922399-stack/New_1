@@ -19,9 +19,9 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Список бесплатных моделей для автоматического перебора при ошибке 402
+# Обновленный список бесплатных моделей (Llama 3 заменена на 3.1)
 FREE_MODELS = [
-    "meta-llama/llama-3-8b-instruct:free",
+    "meta-llama/llama-3.1-8b-instruct:free",
     "mistralai/mistral-7b-instruct:free",
     "microsoft/phi-3-mini-128k-instruct:free"
 ]
@@ -164,7 +164,6 @@ async def chat_endpoint(request: Request):
         reply = None
         
         async with httpx.AsyncClient() as client:
-            # Начинаем перебор наших бесплатных моделей
             for current_model in FREE_MODELS:
                 try:
                     logger.info(f"Пробуем отправить запрос в модель: {current_model}")
@@ -175,27 +174,26 @@ async def chat_endpoint(request: Request):
                             "model": current_model, 
                             "messages": messages_for_ai,
                             "max_tokens": 400,
-                            "plugins": [{"id": "web"}]  # Подключаем официальный веб-поиск
+                            "plugins": [{"id": "web"}]
                         },
                         timeout=30.0
                     )
                     
-                    # Если словили ошибку 402 (закончились токены/лимиты), переключаемся на следующую
-                    if response.status_code == 402:
-                        logger.warning(f"На модели {current_model} закончились токены (402). Переключаемся...")
+                    # Если модель стала платной (404) или кончились лимиты (402), переключаемся
+                    if response.status_code in [402, 404]:
+                        logger.warning(f"Модель {current_model} вернула статус {response.status_code}. Переключаемся...")
                         continue
                         
                     if response.status_code == 200:
                         resp_json = response.json()
-                        # Дополнительная проверка на внутреннюю ошибку 402 в ответе
-                        if "error" in resp_json and resp_json["error"].get("code") == 402:
-                            logger.warning(f"Внутренняя ошибка 402 на {current_model}. Переключаемся...")
+                        # Дополнительная проверка на внутренние коды ошибок 402 или 404
+                        if "error" in resp_json and resp_json["error"].get("code") in [402, 404]:
+                            logger.warning(f"Внутренняя ошибка {resp_json['error'].get('code')} на {current_model}. Переключаемся...")
                             continue
                             
                         reply = resp_json['choices'][0]['message']['content']
-                        break  # Успешно получили ответ, выходим из цикла перебора моделей
+                        break
                     else:
-                        # Если это любая другая ошибка (не 402), выводим её и не мучаем другие модели
                         if conn:
                             cur.close()
                             conn.close()
@@ -203,17 +201,14 @@ async def chat_endpoint(request: Request):
                         
                 except Exception as model_err:
                     logger.error(f"Ошибка при запросе к модели {current_model}: {model_err}")
-                    # Если это была последняя модель, то цикл сам завершится и выдаст ошибку ниже
                     continue
 
-            # Если перебрали все модели и ни одна не ответила успешно
             if reply is None:
                 if conn:
                     cur.close()
                     conn.close()
-                return {"text": "Ошибка: Все бесплатные модели сейчас перегружены или исчерпали лимиты. Попробуй позже."}
+                return {"text": "Ошибка: Все бесплатные модели сейчас недоступны или перегружены. Попробуй позже."}
                 
-            # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ (если всё прошло успешно)
             if mode != "public" and conn:
                 try:
                     cur.execute(
