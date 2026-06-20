@@ -16,7 +16,7 @@ function formatAiText(text) {
     rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     
     // 2. Превращаем одиночные звёздочки *текст* в красивый курсив
-    rawText = rawText.replace(/\*(.*?)\*\/g, '<em>$1</em>');
+    rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
     
     // 3. Вычищаем сиротливые одиночные звёздочки, если остались
     rawText = rawText.replace(/\*/g, '');
@@ -124,17 +124,11 @@ sendBtn.addEventListener('click', async () => {
     inputArea.value = '';
     inputArea.style.height = '40px'; // Возвращаем исходный размер полю ввода
 
-    // Получаем текущую дату и время на телефоне пользователя
-    const currentDateTime = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
-
     try {
         const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                text: text,
-                clientTime: currentDateTime // Передаем точное время на сервер
-            })
+            body: JSON.stringify({ text: text })
         });
         const data = await response.json();
         appendMessage(data.text, false); // Выводим красивый ответ бота
