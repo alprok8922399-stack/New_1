@@ -19,11 +19,11 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Черный список бесплатных моделей, которые плохо говорят по-русски или ломают контекст
-MODEL_BLACK_LIST = [
-    "openchat/openchat-7b:free",
-    "cognitivecomputations/dolphin-mixtral-8x7b:free",
-    "nousresearch/nous-capybara-7b:free"
+# Проверенный и стабильный список бесплатных моделей
+FREE_MODELS = [
+    "meta-llama/llama-3.1-8b-instruct:free",
+    "google/gemma-2-9b-it:free",
+    "mistralai/mistral-7b-instruct:free"
 ]
 
 def get_db_connection():
@@ -62,23 +62,30 @@ def startup_event():
 async def chat_endpoint(request: Request):
     try:
         data = await request.json()
-        user_message = data.get("text") or ""
+        raw_user_message = data.get("text") or ""
         image_base64 = data.get("image") or ""
         mode = data.get("mode") or "private"
         client_history = data.get("history") or []
         client_time = data.get("clientTime") or "Неизвестно"
         
+        # Очищаем текст сообщения для ИИ и для базы данных от системного мусора [Системное инфо...]
+        # Убираем всё, что находится внутри квадратных скобок в начале сообщения
+        user_message = re.sub(r"^\[Системное инфо\..*?\]\s*", "", raw_user_message, flags=re.DOTALL)
+        # Если очистка не сработала на старый формат, убираем его тоже
+        user_message = re.sub(r"^\[Текущие дата и время.*?\]\s*", "", user_message, flags=re.DOTALL)
+        user_message = user_message.strip()
+
         # Автоматически вытаскиваем реальное имя гостя из скрытой строки фронтенда
         guest_name = "Пользователь"
-        if "Имя собеседника:" in user_message:
-            match = re.search(r"Имя собеседника:\s*([^\s\]]+)", user_message)
+        if "Имя собеседника:" in raw_user_message:
+            match = re.search(r"Имя собеседника:\s*([^\s\]]+)", raw_user_message)
             if match:
                 guest_name = match.group(1)
 
-        # Вытаскиваем точную дату из строки, чтобы не дублировать
+        # Вытаскиваем точную дату из строки
         time_info = f"Текущие дата и время у пользователя (МСК): {client_time}.\n\n"
-        if "Текущие дата и время:" in user_message:
-            time_match = re.search(r"Текущие дата и время:\s*([^\]\n]+)", user_message)
+        if "Текущие дата и время:" in raw_user_message:
+            time_match = re.search(r"Текущие дата и время:\s*([^\]\n]+)", raw_user_message)
             if time_match:
                 time_info = f"Текущие дата и время у пользователя (МСК): {time_match.group(1)}.\n\n"
 
@@ -133,7 +140,9 @@ async def chat_endpoint(request: Request):
         
         if mode == "public":
             for msg in client_history[:-1]:
-                messages_for_ai.append({"role": msg.get("role"), "content": msg.get("content")})
+                # Очищаем и историю фронтенда от системных строк для ИИ
+                clean_content = re.sub(r"^\[Системное инфо\..*?\]\s*", "", msg.get("content") or "", flags=re.DOTALL).strip()
+                messages_for_ai.append({"role": msg.get("role"), "content": clean_content})
         else:
             history_messages = []
             if conn:
@@ -159,44 +168,15 @@ async def chat_endpoint(request: Request):
             
         messages_for_ai.append({"role": "user", "content": current_content})
 
-        # 4. ДИНАМИЧЕСКИЙ ЗАПРОС К OPENROUTER С АВТОМАТИЧЕСКИМ ПОИСКОМ БЕСПЛАТНЫХ МОДЕЛЕЙ
-        # ИСПРАВЛЕНО: берём именно OPENAI_API_KEY, как в настройках твоего Render
-        api_key = os.environ.get("OPENAI_API_KEY", "")
+        # 4. ЗАПРОС К OPENROUTER С АВТОМАТИЧЕСКИМ ПЕРЕБОРОМ НАШЕГО СПИСКА
+        api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
         reply = None
-        last_error_details = "Не удалось получить список моделей"
+        last_error_details = "Все модели вернули ошибку"
         
         async with httpx.AsyncClient() as client:
             headers = {"Authorization": f"Bearer {api_key}"}
             
-            # Шаг А: Запрашиваем у OpenRouter актуальный список всех моделей
-            try:
-                models_response = await client.get("https://openrouter.ai/api/v1/models", headers=headers, timeout=10.0)
-                if models_response.status_code == 200:
-                    all_models = models_response.json().get("data", [])
-                    free_models = [
-                        m["id"] for m in all_models 
-                        if m["id"].endswith(":free") and m["id"] not in MODEL_BLACK_LIST
-                    ]
-                else:
-                    free_models = []
-                    last_error_details = f"Ошибка загрузки моделей API (Статус {models_response.status_code}): {models_response.text}"
-            except Exception as e:
-                logger.error(f"Не удалось загрузить список моделей: {e}")
-                free_models = []
-                last_error_details = f"Исключение сети при загрузке моделей: {str(e)}"
-
-            # Резервный список на случай тотального сбоя загрузки
-            if not free_models:
-                free_models = [
-                    "meta-llama/llama-3.1-8b-instruct:free",
-                    "google/gemma-2-9b-it:free",
-                    "mistralai/mistral-7b-instruct:free"
-                ]
-
-            logger.info(f"Сформирован динамический список моделей для перебора: {free_models}")
-
-            # Шаг Б: Перебираем полученные модели по очереди
-            for current_model in free_models:
+            for current_model in FREE_MODELS:
                 try:
                     logger.info(f"Пробуем отправить запрос в модель: {current_model}")
                     response = await client.post(
@@ -207,7 +187,7 @@ async def chat_endpoint(request: Request):
                             "messages": messages_for_ai,
                             "max_tokens": 400
                         },
-                        timeout=7.0
+                        timeout=10.0
                     )
                     
                     if response.status_code != 200:
@@ -232,7 +212,7 @@ async def chat_endpoint(request: Request):
                 if conn:
                     cur.close()
                     conn.close()
-                return {"text": f"Сбой автоперебора всех бесплатных моделей OpenRouter. Последняя ошибка: {last_error_details}"}
+                return {"text": f"Сбой перебора бесплатных моделей. Последняя ошибка: {last_error_details}"}
                 
             # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
             if mode != "public" and conn:
