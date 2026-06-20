@@ -98,6 +98,30 @@
         .message p:last-child { margin-bottom: 0; }
         .message strong { color: #fff; font-weight: bold; }
 
+        /* КРАСИВЫЙ КОНТЕЙНЕР ДЛЯ ССЫЛОК */
+        .link-container {
+            background: #2c2c2e;
+            border: 1px solid #0a84ff;
+            border-radius: 12px;
+            padding: 10px 14px;
+            margin: 6px 0;
+            display: block;
+            width: 100%;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .custom-link {
+            color: #0a84ff !important;
+            text-decoration: none !important;
+            font-weight: 600;
+            font-size: 14px;
+            word-break: break-all;
+        }
+
+        .custom-link:active {
+            text-decoration: underline !important;
+        }
+
         .message-buttons { display: flex; gap: 6px; padding: 4px 6px 0 6px; width: 100%; }
         .message-buttons button { 
             background: none; 
@@ -159,8 +183,8 @@
     <script>
         // Константы для комнат
         const SECRET_CODE = 'alprok8922399';
-        let chatMode = 'public'; // По умолчанию гостевой режим
-        let userDisplayName = ''; // Имя для отображения
+        let chatMode = 'public'; 
+        let userDisplayName = ''; 
 
         const authScreen = document.getElementById('auth-screen');
         const chatScreen = document.getElementById('chat-screen');
@@ -175,19 +199,17 @@
             userDisplayName = enteredName;
 
             if (enteredName === SECRET_CODE) {
-                // Если введен твой код — режим приватный, качаем историю
                 chatMode = 'private';
                 chatHeaderTitle.textContent = 'Друг и помощник';
                 authScreen.style.display = 'none';
                 chatScreen.style.display = 'flex';
                 loadChatHistory();
             } else {
-                // Если любое другое имя — режим гостевой, историю с сервера НЕ качаем
                 chatMode = 'public';
                 chatHeaderTitle.textContent = `Чат для: ${enteredName}`;
                 authScreen.style.display = 'none';
                 chatScreen.style.display = 'flex';
-                messagesContainer.innerHTML = ""; // Пустой экран для гостя
+                messagesContainer.innerHTML = ""; 
             }
         }
 
@@ -196,7 +218,6 @@
             if (e.key === 'Enter') handleLogin();
         });
 
-        // Элементы чата
         const messagesContainer = document.getElementById('messages');
         const inputArea = document.getElementById('input');
         const sendBtn = document.getElementById('send-btn');
@@ -242,12 +263,16 @@
             const paragraphs = rawText.split('\n');
             return paragraphs.map(p => {
                 if (p.trim() === "") return '<div style="height: 8px;"></div>';
+                // Если строка содержит наш контейнер ссылки, выводим её как есть без тега <p>
+                if (p.includes('class="link-container"')) return p;
                 return `<p>${p}</p>`;
             }).join('');
         }
 
         function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).catch(err => {
+            // Очищаем текст от HTML тегов контейнера для красивого копирования
+            const cleanText = text.replace(/<[^>]*>/g, '');
+            navigator.clipboard.writeText(cleanText).catch(err => {
                 console.error('Не удалось скопировать: ', err);
             });
         }
@@ -361,10 +386,7 @@
             fileInput.value = "";
             previewContainer.classList.add('preview-hidden');
 
-            // Точное время телефона (МСК)
             const currentDateTime = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
-            
-            // Вшиваем скрытые системные инструкции: время, режим комнаты и имя гостя
             const textWithTime = `[Системное инфо: Текущие дата и время: ${currentDateTime}. Режим комнаты: ${chatMode}. Имя собеседника: ${userDisplayName}]\n${text}`;
 
             try {
@@ -374,7 +396,7 @@
                     body: JSON.stringify({ 
                         text: textWithTime, 
                         image: imgToSend,
-                        mode: chatMode // Отправляем режим комнаты на бэкенд
+                        mode: chatMode 
                     })
                 });
                 const data = await response.json();
