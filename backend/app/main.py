@@ -160,28 +160,32 @@ async def chat_endpoint(request: Request):
         messages_for_ai.append({"role": "user", "content": current_content})
 
         # 4. ДИНАМИЧЕСКИЙ ЗАПРОС К OPENROUTER С АВТОМАТИЧЕСКИМ ПОИСКОМ БЕСПЛАТНЫХ МОДЕЛЕЙ
-        api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        # ИСПРАВЛЕНО: берём именно OPENAI_API_KEY, как в настройках твоего Render
+        api_key = os.environ.get("OPENAI_API_KEY", "")
         reply = None
         last_error_details = "Не удалось получить список моделей"
         
         async with httpx.AsyncClient() as client:
-            # Шаг А: Запрашиваем у OpenRouter список всех существующих на данный момент моделей
+            headers = {"Authorization": f"Bearer {api_key}"}
+            
+            # Шаг А: Запрашиваем у OpenRouter актуальный список всех моделей
             try:
-                models_response = await client.get("https://openrouter.ai/api/v1/models", timeout=10.0)
+                models_response = await client.get("https://openrouter.ai/api/v1/models", headers=headers, timeout=10.0)
                 if models_response.status_code == 200:
                     all_models = models_response.json().get("data", [])
-                    # Фильтруем только бесплатные модели и исключаем черный список
                     free_models = [
                         m["id"] for m in all_models 
                         if m["id"].endswith(":free") and m["id"] not in MODEL_BLACK_LIST
                     ]
                 else:
                     free_models = []
+                    last_error_details = f"Ошибка загрузки моделей API (Статус {models_response.status_code}): {models_response.text}"
             except Exception as e:
                 logger.error(f"Не удалось загрузить список моделей: {e}")
                 free_models = []
+                last_error_details = f"Исключение сети при загрузке моделей: {str(e)}"
 
-            # Если вдруг API моделей недоступно, используем базовый проверенный резерв
+            # Резервный список на случай тотального сбоя загрузки
             if not free_models:
                 free_models = [
                     "meta-llama/llama-3.1-8b-instruct:free",
@@ -197,17 +201,17 @@ async def chat_endpoint(request: Request):
                     logger.info(f"Пробуем отправить запрос в модель: {current_model}")
                     response = await client.post(
                         "https://openrouter.ai/api/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {api_key}"},
+                        headers=headers,
                         json={
                             "model": current_model, 
                             "messages": messages_for_ai,
                             "max_tokens": 400
                         },
-                        timeout=7.0  # Короткий таймаут, чтобы долго не ждать зависшие модели
+                        timeout=7.0
                     )
                     
                     if response.status_code != 200:
-                        last_error_details = f"Модель {current_model} вернула статус {response.status_code}"
+                        last_error_details = f"Модель {current_model} вернула статус {response.status_code}: {response.text}"
                         continue
                         
                     resp_json = response.json()
@@ -217,7 +221,7 @@ async def chat_endpoint(request: Request):
                         continue
                         
                     reply = resp_json['choices'][0]['message']['content']
-                    break  # Нашли рабочую модель, выходим из цикла!
+                    break
                         
                 except Exception as model_err:
                     last_error_details = f"Сбой сети на {current_model}: {str(model_err)}"
