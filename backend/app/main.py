@@ -19,11 +19,11 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Список бесплатных моделей для автоматического перебора
+# Актуальный список бесплатных моделей на 2026 год
 FREE_MODELS = [
     "meta-llama/llama-3.1-8b-instruct:free",
-    "mistralai/mistral-7b-instruct:free",
-    "microsoft/phi-3-mini-128k-instruct:free"
+    "google/gemma-2-9b-it:free",
+    "mistralai/mistral-7b-instruct:free"
 ]
 
 def get_db_connection():
@@ -204,7 +204,6 @@ async def chat_endpoint(request: Request):
                 if conn:
                     cur.close()
                     conn.close()
-                # Выводим на экран настоящую техническую причину последней ошибки
                 return {"text": f"Сбой перебора бесплатных моделей. Последняя ошибка: {last_error_details}"}
                 
             # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
