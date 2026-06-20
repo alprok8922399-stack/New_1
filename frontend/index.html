@@ -20,7 +20,6 @@
         .messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 16px; }
         .message-wrapper { width: 100%; display: flex; flex-direction: column; }
         
-        /* Стили бота */
         .message.bot { 
             align-self: flex-start; 
             background: transparent !important; 
@@ -31,12 +30,11 @@
             width: 100%;
         }
 
-        /* Вот здесь жесткий висячий отступ */
+        /* Висячий отступ: первая строка у края, остальные с отступом */
         .message.bot p { 
-            padding-left: 30px !important; 
-            text-indent: -30px !important; 
+            padding-left: 20px; 
+            text-indent: -20px; 
             margin-bottom: 10px;
-            display: block;
         }
 
         .message.user { 
