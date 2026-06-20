@@ -55,25 +55,37 @@ def startup_event():
 async def chat_endpoint(request: Request):
     try:
         data = await request.json()
-        user_message = data.get("text") or ""
+        raw_user_message = data.get("text") or ""
         image_base64 = data.get("image") or ""
         mode = data.get("mode") or "private"
         client_history = data.get("history") or []
         client_time = data.get("clientTime") or "Неизвестно"
         
+        # Очищаем текст сообщения от системного мусора [Системное инфо...]
+        user_message = re.sub(r"^\[Системное инфо\..*?\]\s*", "", raw_user_message, flags=re.DOTALL)
+        user_message = re.sub(r"^\[Текущие дата и время.*?\]\s*", "", user_message, flags=re.DOTALL)
+        user_message = user_message.strip()
+
         # Автоматически вытаскиваем реальное имя гостя из скрытой строки фронтенда
         guest_name = "Пользователь"
-        if "Имя собеседника:" in user_message:
-            match = re.search(r"Имя собеседника:\s*([^\s\]]+)", user_message)
+        if "Имя собеседника:" in raw_user_message:
+            match = re.search(r"Имя собеседника:\s*([^\s\]]+)", raw_user_message)
             if match:
                 guest_name = match.group(1)
 
-        # Вытаскиваем точную дату из строки, чтобы не дублировать
+        # Вытаскиваем точную дату из строки
         time_info = f"Текущие дата и время у пользователя (МСК): {client_time}.\n\n"
-        if "Текущие дата и время:" in user_message:
-            time_match = re.search(r"Текущие дата и время:\s*([^\]\n]+)", user_message)
+        if "Текущие дата и время:" in raw_user_message:
+            time_match = re.search(r"Текущие дата и время:\s*([^\]\n]+)", raw_user_message)
             if time_match:
                 time_info = f"Текущие дата и время у пользователя (МСК): {time_match.group(1)}.\n\n"
+
+        # Требование по ссылкам для системного промпта
+        web_search_instruction = (
+            "Если пользователь просит найти что-то на сайтах или зайти по ссылке — "
+            "используй свои внутренние знания, читай информацию и ОБЯЗАТЕЛЬНО в конце своего ответа "
+            "давай точные ссылки (URL) на сайты, о которых идет речь."
+        )
 
         # 1. НАСТРОЙКА СИСТЕМНЫХ ПРОМТОВ В ЗАВИСИМОСТИ ОТ РЕЖИМА
         if mode == "public":
@@ -82,6 +94,7 @@ async def chat_endpoint(request: Request):
                 f"Ты — крутой, вежливый и отзывчивый ИИ-помощник. Твой стиль общения — живой, "
                 f"свободный, понятный и по-человечески теплый. Никакой лишней официальщины. "
                 f"Отвечай всегда только на русском языке, просто и емко. Не расписывай длинные простыни текста.\n"
+                f"{web_search_instruction}\n"
                 f"ВАЖНО: Твоего собеседника зовут {guest_name}. Обращайся к нему по этому имени! "
                 f"Не используй имя Алексей, сейчас ты общаешься именно с пользователем по имени {guest_name}."
             )
@@ -94,6 +107,7 @@ async def chat_endpoint(request: Request):
                 "Отвечай всегда только на русском языке, просто, емко и по-человечески. "
                 "Старайся писать коротко и по делу, не расписывай длинные простыни текста, "
                 "если только Алексей сам не попросит ответить детально или развернуто. "
+                f"{web_search_instruction}\n"
                 "Если Алексей просит шутку — шути смешно, жизненно, избегай избитых шаблонов."
             )
 
@@ -112,16 +126,16 @@ async def chat_endpoint(request: Request):
                 except Exception as e:
                     logger.error(f"Не удалось записать сообщение пользователя: {e}")
 
-        # 3. СБОР КОНТЕКСТА ИСТОРИИ
-        messages_for_ai = [{"role": "system", "content": system_prompt}]
+        # 3. СБОР КОНТЕКСТА И ИСТОРИИ ДЛЯ GOOGLE GEMINI
+        gemini_contents = [{"role": "user", "parts": [{"text": f"SYSTEM INSTRUCTION: {system_prompt}"}]}]
+        gemini_contents.append({"role": "model", "parts": [{"text": "Понял тебя. Инструкции приняты. Буду общаться строго по этим правилам."}]})
         
         if mode == "public":
-            # Для публичного чата берем только ту историю, которую прислал клиент (живет в памяти телефона)
             for msg in client_history[:-1]:
-                messages_for_ai.append({"role": msg.get("role"), "content": msg.get("content")})
+                clean_content = re.sub(r"^\[Системное инфо\..*?\]\s*", "", msg.get("content") or "", flags=re.DOTALL).strip()
+                g_role = "user" if msg.get("role") == "user" else "model"
+                gemini_contents.append({"role": g_role, "parts": [{"text": clean_content}]})
         else:
-            # Для Алексея достаем контекст из вечной базы PostgreSQL
-            history_messages = []
             if conn:
                 try:
                     cur.execute("""
@@ -133,57 +147,73 @@ async def chat_endpoint(request: Request):
                     """)
                     rows = cur.fetchall()
                     for row in rows[::-1]:
-                        history_messages.append({"role": row[0], "content": row[1]})
+                        g_role = "user" if row[0] == "user" else "model"
+                        gemini_contents.append({"role": g_role, "parts": [{"text": row[1]}]})
                 except Exception as e:
                     logger.error(f"Не удалось достать контекст для ИИ: {e}")
-            messages_for_ai.extend(history_messages)
 
-        # Формируем текущее сообщение (с поддержкой фото, если есть)
-        current_content = [{"type": "text", "text": user_message}]
-        if image_base64:
-            current_content.append({"type": "image_url", "image_url": {"url": image_base64}})
-            
-        messages_for_ai.append({"role": "user", "content": current_content})
+        # Добавляем текущее сообщение пользователя
+        user_parts = [{"text": user_message}]
+        
+        # Если есть фото
+        if image_base64 and "," in image_base64:
+            try:
+                mime_type, b64_data = image_base64.split(",", 1)
+                mime_type = mime_type.replace("data:", "").replace(";base64", "")
+                user_parts.append({
+                    "inline_data": {
+                        "mime_type": mime_type,
+                        "data": b64_data
+                    }
+                })
+            except Exception as img_err:
+                logger.error(f"Ошибка обработки фото для Gemini: {img_err}")
 
-        # 4. ЗАПРОС К OPENROUTER
-        api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        gemini_contents.append({"role": "user", "parts": user_parts})
+
+        # 4. ЗАПРОС НАПРЯМУЮ К GOOGLE GEMINI API ПО НОВОМУ КЛЮЧУ
+        gemini_key = os.environ.get("GEMINI_API_KEY", "")
+        reply = "Не удалось получить ответ от Google Gemini."
+        
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
         
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": "openrouter/auto", 
-                    "messages": messages_for_ai,
-                    "max_tokens": 400
-                },
-                timeout=30.0
-            )
-            
-            if response.status_code == 200:
-                reply = response.json()['choices'][0]['message']['content']
+            try:
+                response = await client.post(
+                    gemini_url,
+                    headers={"Content-Type": "application/json"},
+                    json={"contents": gemini_contents},
+                    timeout=15.0
+                )
                 
-                # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
-                if mode != "public" and conn:
-                    try:
-                        cur.execute(
-                            "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
-                            ("assistant", reply)
-                        )
-                        conn.commit()
-                    except Exception as e:
-                        logger.error(f"Не удалось записать ответ ИИ: {e}")
-                
-                if conn:
-                    cur.close()
-                    conn.close()
+                if response.status_code == 200:
+                    resp_json = response.json()
+                    candidates = resp_json.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts:
+                            reply = parts[0].get("text", "")
+                else:
+                    reply = f"Ошибка Gemini API (Статус {response.status_code}): {response.text}"
+            except Exception as gemini_err:
+                reply = f"Сбой сети при запросе к Gemini: {str(gemini_err)}"
 
-                return {"text": reply}
-            else:
-                if conn:
-                    cur.close()
-                    conn.close()
-                return {"text": f"Ошибка OpenRouter: {response.text}"}
+        # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
+        if mode != "public" and conn and not reply.startswith("Ошибка Gemini") and not reply.startswith("Сбой сети"):
+            try:
+                cur.execute(
+                    "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
+                    ("assistant", reply)
+                )
+                conn.commit()
+            except Exception as e:
+                logger.error(f"Не удалось записать ответ ИИ: {e}")
+        
+        if conn:
+            cur.close()
+            conn.close()
+
+        return {"text": reply}
                 
     except Exception as e:
         return {"text": f"Ошибка бэкенда: {str(e)}"}
