@@ -53,22 +53,21 @@ def startup_event():
 
 def format_links_to_containers(text: str) -> str:
     """
-    Находит текстовые ссылки или Markdown-ссылки и упаковывает их
-    в красивый, выделенный контейнер-блок для интерфейса.
+    Превращает ссылки в одну стильную, аккуратную и полностью кликабельную кнопку-карточку.
     """
-    # 1. Сначала обрабатываем Markdown ссылки вида [Текст](https://...)
+    # 1. Обрабатываем Markdown ссылки: [Текст](https://...)
     markdown_pattern = r'\[([^\]]+)\]\((https?://[^\s\)]+)\)'
     text = re.sub(
         markdown_pattern, 
-        r'<div class="link-container">📎 <a href="\2" target="_blank" class="custom-link">\1</a></div>', 
+        r'<a href="\2" target="_blank" class="custom-link-button">🔗 \1</a>', 
         text
     )
     
-    # 2. Затем находим одиночные ссылки, которые не обернуты в теги, и оформляем их
+    # 2. Обрабатываем одиночные ссылки, которые не обернуты в теги
     raw_url_pattern = r'(?<!href=")(https?://[^\s<]+)'
     text = re.sub(
         raw_url_pattern, 
-        r'<div class="link-container">🔗 <a href="\1" target="_blank" class="custom-link">Перейти на сайт</a></div>', 
+        r'<a href="\1" target="_blank" class="custom-link-button">🔗 Перейти на сайт</a>', 
         text
     )
     return text
@@ -245,6 +244,7 @@ async def chat_endpoint(request: Request):
 @app.get("/api/history")
 async def get_history():
     conn = get_db_connection()
+    if not ... # Хвост обрезан намеренно? Нет, тут всё закроется.
     if not conn:
         return []
     
