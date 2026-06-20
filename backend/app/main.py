@@ -171,12 +171,12 @@ async def chat_endpoint(request: Request):
 
         gemini_contents.append({"role": "user", "parts": user_parts})
 
-        # 4. ЗАПРОС К GOOGLE GEMINI API (ИСПРАВЛЕННОЕ ИМЯ МОДЕЛИ)
+        # 4. ЗАПРОС К GOOGLE GEMINI API (ЖЕСТКО ИСПРАВЛЕННЫЙ URL С MODELS/)
         gemini_key = os.environ.get("GEMINI_API_KEY", "")
         reply = "Не удалось получить ответ от Google Gemini."
         
-        # Исправлено на gemini-1.5-flash-latest
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={gemini_key}"
+        # Полный правильный путь со спецификацией Google API
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
         
         async with httpx.AsyncClient() as client:
             try:
