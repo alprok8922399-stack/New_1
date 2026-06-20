@@ -244,7 +244,6 @@ async def chat_endpoint(request: Request):
 @app.get("/api/history")
 async def get_history():
     conn = get_db_connection()
-    if not ... # Хвост обрезан намеренно? Нет, тут всё закроется.
     if not conn:
         return []
     
