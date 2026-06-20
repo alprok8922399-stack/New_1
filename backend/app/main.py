@@ -162,6 +162,7 @@ async def chat_endpoint(request: Request):
         # 4. ЗАПРОС К OPENROUTER С АВТОМАТИЧЕСКИМ ПЕРЕБОРОМ МОДЕЛЕЙ
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         reply = None
+        last_error_details = "Нет деталей ошибки"
         
         async with httpx.AsyncClient() as client:
             for current_model in FREE_MODELS:
@@ -174,28 +175,27 @@ async def chat_endpoint(request: Request):
                             "model": current_model, 
                             "messages": messages_for_ai,
                             "max_tokens": 400
-                            # Убрали плагин поиска, так как он заблокирован на бесплатных моделях
                         },
                         timeout=30.0
                     )
                     
-                    # Если статус НЕ 200 (любая ошибка), переключаемся дальше
                     if response.status_code != 200:
+                        last_error_details = f"Статус {response.status_code}: {response.text}"
                         logger.warning(f"Модель {current_model} вернула ошибку со статусом {response.status_code}. Переключаемся...")
                         continue
                         
                     resp_json = response.json()
                     
-                    # Проверяем, нет ли ошибки внутри успешного ответа
                     if "error" in resp_json:
+                        last_error_details = f"Внутренняя ошибка JSON: {resp_json['error']}"
                         logger.warning(f"Внутренняя ошибка в ответе модели {current_model}. Переключаемся...")
                         continue
                         
-                    # Если всё супер, забираем ответ
                     reply = resp_json['choices'][0]['message']['content']
                     break
                         
                 except Exception as model_err:
+                    last_error_details = f"Исключение сети/таймаута: {str(model_err)}"
                     logger.error(f"Сбой сети или таймаут на модели {current_model}: {model_err}")
                     continue
 
@@ -204,7 +204,8 @@ async def chat_endpoint(request: Request):
                 if conn:
                     cur.close()
                     conn.close()
-                return {"text": "Ошибка: Все бесплатные модели сейчас недоступны, перегружены или выдают сбои. Попробуй позже."}
+                # Выводим на экран настоящую техническую причину последней ошибки
+                return {"text": f"Сбой перебора бесплатных моделей. Последняя ошибка: {last_error_details}"}
                 
             # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
             if mode != "public" and conn:
