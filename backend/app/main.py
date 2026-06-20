@@ -171,20 +171,25 @@ async def chat_endpoint(request: Request):
 
         gemini_contents.append({"role": "user", "parts": user_parts})
 
-        # 4. ЗАПРОС К GOOGLE GEMINI API (ЖЕСТКО ИСПРАВЛЕНА МОДЕЛЬ НА GEMINI-2.5-FLASH)
+        # 4. ЗАПРОС К GOOGLE GEMINI API С ПОДКЛЮЧЕННЫМ ИНТЕРНЕТ-ПОИСКОМ
         gemini_key = os.environ.get("GEMINI_API_KEY", "")
         reply = "Не удалось получить ответ от Google Gemini."
         
-        # Изменено на gemini-2.5-flash
         gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
+        
+        # Формируем тело запроса и активируем официальный инструмент Google Поиска
+        payload = {
+            "contents": gemini_contents,
+            "tools": [{"google_search": {}}]
+        }
         
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(
                     gemini_url,
                     headers={"Content-Type": "application/json"},
-                    json={"contents": gemini_contents},
-                    timeout=15.0
+                    json=payload,
+                    timeout=20.0  # Увеличили таймаут, так как ИИ теперь тратит время на поиск в сети
                 )
                 
                 if response.status_code == 200:
