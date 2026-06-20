@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# ПОЛНОСТЬЮ ОБНОВЛЕННЫЙ СПИСОК БЕСПЛАТНЫХ МОДЕЛЕЙ
+# Новый список проверенных бесплатных моделей
 FREE_MODELS = [
     "meta-llama/llama-3.2-3b-instruct:free",
     "google/gemma-2-9b-it:free",
@@ -68,7 +68,7 @@ async def chat_endpoint(request: Request):
         client_history = data.get("history") or []
         client_time = data.get("clientTime") or "Неизвестно"
         
-        # Очищаем текст сообщения для ИИ и для базы данных от системного мусора [Системное инфо...]
+        # Очищаем текст сообщения от системного мусора [Системное инфо...]
         user_message = re.sub(r"^\[Системное инфо\..*?\]\s*", "", raw_user_message, flags=re.DOTALL)
         user_message = re.sub(r"^\[Текущие дата и время.*?\]\s*", "", user_message, flags=re.DOTALL)
         user_message = user_message.strip()
@@ -165,10 +165,10 @@ async def chat_endpoint(request: Request):
             
         messages_for_ai.append({"role": "user", "content": current_content})
 
-        # 4. ЗАПРОС К OPENROUTER С АВТОМАТИЧЕСКИМ ПЕРЕБОРОМ НАШЕГО СПИСКА
+        # 4. НАДЕЖНЫЙ ПЕРЕБОР МОДЕЛЕЙ БЕЗ ПАНИКИ НА ОШИБКИ
         api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
         reply = None
-        last_error_details = "Все модели вернули ошибку"
+        last_error_details = "Нет доступных моделей"
         
         async with httpx.AsyncClient() as client:
             headers = {"Authorization": f"Bearer {api_key}"}
@@ -184,24 +184,24 @@ async def chat_endpoint(request: Request):
                             "messages": messages_for_ai,
                             "max_tokens": 400
                         },
-                        timeout=10.0
+                        timeout=12.0
                     )
                     
+                    # Если модель выдает ошибку (например, 404), мы её просто логируем и идем дальше
                     if response.status_code != 200:
-                        last_error_details = f"Модель {current_model} вернула статус {response.status_code}: {response.text}"
+                        last_error_details = f"{current_model} вернула статус {response.status_code}"
                         continue
                         
                     resp_json = response.json()
-                    
                     if "error" in resp_json:
-                        last_error_details = f"Внутренняя ошибка на {current_model}: {resp_json['error']}"
+                        last_error_details = f"Внутренняя ошибка на {current_model}"
                         continue
                         
                     reply = resp_json['choices'][0]['message']['content']
-                    break
+                    break  # Нашли рабочую модель, выходим из цикла!
                         
                 except Exception as model_err:
-                    last_error_details = f"Сбой сети на {current_model}: {str(model_err)}"
+                    last_error_details = f"Сбой сети на {current_model}"
                     continue
 
             # Если перебрали абсолютно всё и глухо
@@ -209,7 +209,7 @@ async def chat_endpoint(request: Request):
                 if conn:
                     cur.close()
                     conn.close()
-                return {"text": f"Сбой перебора бесплатных моделей. Последняя ошибка: {last_error_details}"}
+                return {"text": f"Сбой перебора бесплатных моделей. Последняя попытка: {last_error_details}. Пожалуйста, попробуй чуть позже."}
                 
             # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
             if mode != "public" and conn:
