@@ -171,11 +171,12 @@ async def chat_endpoint(request: Request):
 
         gemini_contents.append({"role": "user", "parts": user_parts})
 
-        # 4. ЗАПРОС НАПРЯМУЮ К GOOGLE GEMINI API ПО НОВОМУ КЛЮЧУ
+        # 4. ЗАПРОС К GOOGLE GEMINI API (ИСПРАВЛЕННОЕ ИМЯ МОДЕЛИ)
         gemini_key = os.environ.get("GEMINI_API_KEY", "")
         reply = "Не удалось получить ответ от Google Gemini."
         
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+        # Исправлено на gemini-1.5-flash-latest
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={gemini_key}"
         
         async with httpx.AsyncClient() as client:
             try:
@@ -196,7 +197,7 @@ async def chat_endpoint(request: Request):
                 else:
                     reply = f"Ошибка Gemini API (Статус {response.status_code}): {response.text}"
             except Exception as gemini_err:
-                reply = f"Сбой сети при запросе к Gemini: {str(gemini_err)}"
+                reply = f"Сбой сети при JSON-запросе к Gemini: {str(gemini_err)}"
 
         # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
         if mode != "public" and conn and not reply.startswith("Ошибка Gemini") and not reply.startswith("Сбой сети"):
