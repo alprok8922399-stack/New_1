@@ -166,7 +166,8 @@ async def chat_endpoint(request: Request):
         messages_for_ai.append({"role": "user", "content": current_content})
 
         # 4. НАДЕЖНЫЙ ПЕРЕБОР МОДЕЛЕЙ БЕЗ ПАНИКИ НА ОШИБКИ
-        api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
+        # ЖЕСТКО: берем только OPENAI_API_KEY, игнорируя проблемный OPENROUTER_API_KEY
+        api_key = os.environ.get("OPENAI_API_KEY", "")
         reply = None
         last_error_details = "Нет доступных моделей"
         
@@ -187,7 +188,6 @@ async def chat_endpoint(request: Request):
                         timeout=12.0
                     )
                     
-                    # Если модель выдает ошибку (например, 404), мы её просто логируем и идем дальше
                     if response.status_code != 200:
                         last_error_details = f"{current_model} вернула статус {response.status_code}"
                         continue
@@ -198,7 +198,7 @@ async def chat_endpoint(request: Request):
                         continue
                         
                     reply = resp_json['choices'][0]['message']['content']
-                    break  # Нашли рабочую модель, выходим из цикла!
+                    break
                         
                 except Exception as model_err:
                     last_error_details = f"Сбой сети на {current_model}"
