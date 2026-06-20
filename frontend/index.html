@@ -20,11 +20,9 @@
         header { background: #000000; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #222; font-weight: bold; font-size: 18px; }
         .clear-btn { background: none; border: 1px solid #3a3a3c; color: #0a84ff; padding: 4px 8px; border-radius: 10px; font-size: 13px; cursor: pointer; }
 
-        /* Сообщения */
         .messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 16px; }
         .message-wrapper { width: 100%; display: flex; flex-direction: column; }
         
-        /* Сообщение бота - прозрачное и на всю ширину */
         .message.bot { 
             align-self: flex-start; 
             background: transparent !important; 
@@ -35,7 +33,13 @@
             word-wrap: break-word;
         }
 
-        /* Сообщение пользователя - возвращаем стиль пузырька */
+        /* ИСПРАВЛЕНИЕ: Висячий отступ для абзацев бота */
+        .message.bot p { 
+            padding-left: 25px; /* Сдвигаем весь абзац вправо */
+            text-indent: -25px; /* Возвращаем только первую строку назад */
+            margin-bottom: 10px;
+        }
+
         .message.user { 
             align-self: flex-end; 
             background: #2c2c2e; 
@@ -48,7 +52,6 @@
             word-wrap: break-word;
         }
 
-        .message p { margin-bottom: 10px; }
         .message strong { color: #fff; font-weight: 600; }
 
         /* Ссылки */
@@ -187,7 +190,6 @@
             if ((!text || text.trim() === "") && !imageUrl) return;
             const className = isUser ? 'message user' : 'message bot';
             
-            // Важно: здесь мы используем `text` напрямую, без системных инфо
             let finalHtml = isUser ? text.replace(/\n/g, '<br>') : formatAiText(text);
             
             const wrapper = document.createElement('div');
@@ -229,7 +231,6 @@
             const text = inputArea.value.trim();
             if (!text && !selectedImageBase64) return;
             
-            // Отображаем сообщение БЕЗ системной информации
             appendMessage(text || "Фото", true, selectedImageBase64); 
             const imgToSend = selectedImageBase64;
             
@@ -245,7 +246,6 @@
             fileInput.value = "";
             previewContainer.style.display = 'none';
 
-            // Формируем текст с системной инфо только для отправки на сервер
             const textWithTime = `[Системное инфо: ${new Date().toLocaleString()} ${chatMode} ${userDisplayName}]\n${text}`;
             
             try {
