@@ -19,11 +19,11 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Проверенный и стабильный список бесплатных моделей
+# ПОЛНОСТЬЮ ОБНОВЛЕННЫЙ СПИСОК БЕСПЛАТНЫХ МОДЕЛЕЙ
 FREE_MODELS = [
-    "meta-llama/llama-3.1-8b-instruct:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
     "google/gemma-2-9b-it:free",
-    "mistralai/mistral-7b-instruct:free"
+    "qwen/qwen-2.5-7b-instruct:free"
 ]
 
 def get_db_connection():
@@ -69,9 +69,7 @@ async def chat_endpoint(request: Request):
         client_time = data.get("clientTime") or "Неизвестно"
         
         # Очищаем текст сообщения для ИИ и для базы данных от системного мусора [Системное инфо...]
-        # Убираем всё, что находится внутри квадратных скобок в начале сообщения
         user_message = re.sub(r"^\[Системное инфо\..*?\]\s*", "", raw_user_message, flags=re.DOTALL)
-        # Если очистка не сработала на старый формат, убираем его тоже
         user_message = re.sub(r"^\[Текущие дата и время.*?\]\s*", "", user_message, flags=re.DOTALL)
         user_message = user_message.strip()
 
@@ -140,7 +138,6 @@ async def chat_endpoint(request: Request):
         
         if mode == "public":
             for msg in client_history[:-1]:
-                # Очищаем и историю фронтенда от системных строк для ИИ
                 clean_content = re.sub(r"^\[Системное инфо\..*?\]\s*", "", msg.get("content") or "", flags=re.DOTALL).strip()
                 messages_for_ai.append({"role": msg.get("role"), "content": clean_content})
         else:
