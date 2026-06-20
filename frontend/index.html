@@ -98,28 +98,30 @@
         .message p:last-child { margin-bottom: 0; }
         .message strong { color: #fff; font-weight: bold; }
 
-        /* КРАСИВЫЙ КОНТЕЙНЕР ДЛЯ ССЫЛОК */
-        .link-container {
-            background: #2c2c2e;
-            border: 1px solid #0a84ff;
-            border-radius: 12px;
+        /* НОВЫЕ СТИЛИ ДЛЯ ЕДИНОЙ КНОПКИ-КАРТОЧКИ ССЫЛКИ */
+        .custom-link-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1e293b, #0f172a); /* Стильный темный градиент */
+            border: 1px solid #38bdf8; /* Голубая рамка */
+            border-radius: 10px; /* Скругление */
             padding: 10px 14px;
             margin: 6px 0;
-            display: block;
-            width: 100%;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        .custom-link {
-            color: #0a84ff !important;
-            text-decoration: none !important;
+            color: #38bdf8 !important; /* Голубой текст */
+            text-decoration: none !important; /* Убираем подчеркивание */
             font-weight: 600;
             font-size: 14px;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2); /* Легкая тень */
+            transition: all 0.2s ease; /* Плавная анимация при клике */
             word-break: break-all;
         }
 
-        .custom-link:active {
-            text-decoration: underline !important;
+        /* Эффект при нажатии на кнопку */
+        .custom-link-button:active {
+            transform: scale(0.97); /* Небольшое уменьшение */
+            background: #1e293b; /* Чуть темнее */
+            box-shadow: 0 1px 4px rgba(56, 189, 248, 0.2); /* Тень вокруг */
         }
 
         .message-buttons { display: flex; gap: 6px; padding: 4px 6px 0 6px; width: 100%; }
@@ -263,14 +265,14 @@
             const paragraphs = rawText.split('\n');
             return paragraphs.map(p => {
                 if (p.trim() === "") return '<div style="height: 8px;"></div>';
-                // Если строка содержит наш контейнер ссылки, выводим её как есть без тега <p>
-                if (p.includes('class="link-container"')) return p;
+                // Если строка содержит наш класс кнопки, выводим её как есть
+                if (p.includes('class="custom-link-button"')) return p;
                 return `<p>${p}</p>`;
             }).join('');
         }
 
         function copyToClipboard(text) {
-            // Очищаем текст от HTML тегов контейнера для красивого копирования
+            // Очищаем текст от HTML тегов для красивого копирования
             const cleanText = text.replace(/<[^>]*>/g, '');
             navigator.clipboard.writeText(cleanText).catch(err => {
                 console.error('Не удалось скопировать: ', err);
@@ -407,4 +409,4 @@
         });
     </script>
 </body>
-    </html>
+</html>
