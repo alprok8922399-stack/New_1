@@ -32,24 +32,24 @@ async def chat_endpoint(request: Request):
     data = await request.json()
     raw_user_message = data.get("text") or ""
     mode = data.get("mode") or "private"
+    user_name = data.get("user") or "Гость"
     user_message = re.sub(r"^\[Системное инфо\..*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
     
-    # Запись пользователя в БД
+    # Запись пользователя в БД с именем
     conn = get_db_connection()
     if conn and mode != "public":
         cur = conn.cursor()
-        cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", user_message))
+        # ВНИМАНИЕ: Если таблица не менялась, этот код может вызвать ошибку.
+        # Если будет ошибка, просто замени имя колонки content на комбинацию с именем.
+        cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", f"[{user_name}]: {user_message}"))
         conn.commit()
         cur.close()
 
-    # Настройка промпта с учетом режима
     system_instruction = (
-        "Ты — близкий друг и ИИ-помощник. Стиль общения: живой, с юмором, без официальщины. "
-        "Если тебя просят рассказать анекдот — рассказывай смешные, жизненные и короткие истории. "
-        "Избегай шаблонных фраз типа 'Конечно, вот ваш анекдот'."
+        f"Ты — близкий друг и ИИ-помощник. Пользователя зовут {user_name}. "
+        "Стиль общения: живой, с юмором, без официальщины."
     )
 
-    # Запрос к Groq
     groq_key = os.environ.get("GROG_KEY")
     groq_url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
@@ -62,7 +62,6 @@ async def chat_endpoint(request: Request):
         response = await client.post(groq_url, headers=headers, json=payload, timeout=20.0)
         reply = response.json()['choices'][0]['message']['content'] if response.status_code == 200 else "Ошибка Groq"
 
-    # Запись ответа в БД
     if conn and mode != "public":
         cur = conn.cursor()
         cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", reply))
@@ -73,10 +72,11 @@ async def chat_endpoint(request: Request):
     return {"text": reply}
 
 @app.get("/api/history")
-async def get_history():
+async def get_history(user: str = "Гость"):
     conn = get_db_connection()
     if not conn: return []
     cur = conn.cursor()
+    # Берем последние 15 записей
     cur.execute("SELECT id, role, content FROM chat_messages ORDER BY id DESC LIMIT 15")
     rows = cur.fetchall()
     cur.close()
