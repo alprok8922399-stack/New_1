@@ -121,6 +121,7 @@
         function formatAiText(text) {
             let rawText = text || "";
             
+            // Обработка блоков кода
             rawText = rawText.replace(/```([\s\S]*?)```/g, (match, p1) => {
                 return `<div class="code-block-wrapper">
                             <button class="copy-code-btn" onclick="copyCode(this)">Копировать</button>
@@ -241,12 +242,7 @@
             const textWithTime = `[Системное инфо: Текущие дата и время: ${currentDateTime}. Режим комнаты: ${chatMode}. Имя собеседника: ${userDisplayName}]\n${text}`;
 
             appendMessage(textWithTime, true, selectedImageBase64); 
-            
-            // Очистка Base64 для отправки (убираем префикс)
-            let imageForServer = "";
-            if (selectedImageBase64) {
-                imageForServer = selectedImageBase64.split(',')[1];
-            }
+            const imgToSend = selectedImageBase64;
             
             if (currentEditingMessageId !== null) {
                 try {
@@ -273,7 +269,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         text: textWithTime, 
-                        image_data: imageForServer, 
+                        image: imgToSend,
                         mode: chatMode 
                     })
                 });
@@ -285,4 +281,4 @@
         });
     </script>
 </body>
-</html>
+    </html>
