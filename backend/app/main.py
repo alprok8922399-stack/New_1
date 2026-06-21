@@ -26,7 +26,7 @@ def get_db_connection():
         logger.error(f"БД ошибка: {e}")
         return None
 
-async def ask_llm(messages, mode):
+async def ask_llm(messages):
     groq_key = os.environ.get("GROG_KEY")
     try:
         async with httpx.AsyncClient() as client:
@@ -46,15 +46,41 @@ async def chat_endpoint(request: Request):
     raw_text = data.get("text") or ""
     mode = data.get("mode") or "public"
     user_name = data.get("user") or "Гость"
-    # Принимаем текущую дату и время, присланные с телефона
     client_time = data.get("client_time") or "Неизвестно"
     
-    # Добавляем точную дату и время устройства в системную инструкцию
-    system_prompt = f"Ты — друг и помощник. Пользователя зовут {user_name}. Текущие дата и время на устройстве пользователя: {client_time}."
-    messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": raw_text}]
+    # Собираем историю для передачи боту
+    history_messages = []
     
-    reply = await ask_llm(messages, mode)
+    # Если режим приватный, подтягиваем последние 9 сообщений из базы (чтобы вместе с новым было 10)
+    if mode == "private":
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            cur.execute("SELECT role, content FROM chat_messages ORDER BY id DESC LIMIT 9")
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+            # Разворачиваем, чтобы хронология была правильной (от старых к новым)
+            for r in rows[::-1]:
+                history_messages.append({"role": r[0], "role" if r[0]=='user' else 'assistant': r[0], "content": r[1]})
 
+    # Добавляем системную инструкцию в самое начало
+    system_prompt = f"Ты — друг и помощник. Пользователя зовут {user_name}. Текущие дата и время на устройстве пользователя: {client_time}."
+    
+    # Формируем итоговый пакет для ИИ: Системник -> История из БД -> Новое сообщение
+    full_messages = [{"role": "system", "content": system_prompt}]
+    
+    for msg in history_messages:
+        # Приводим к строгому формату user/assistant
+        role = "user" if msg["role"] == "user" else "assistant"
+        full_messages.append({"role": role, "content": msg["content"]})
+        
+    full_messages.append({"role": "user", "content": raw_text})
+    
+    # Отправляем боту ВСЮ цепочку разговора
+    reply = await ask_llm(full_messages)
+
+    # Сохраняем новую реплику в базу ТОЛЬКО если приватный режим
     if mode == "private":
         conn = get_db_connection()
         if conn:
