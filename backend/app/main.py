@@ -27,18 +27,23 @@ def get_db_connection():
         return None
 
 async def ask_llm(messages):
-    groq_key = os.environ.get("GROG_KEY")
+    # Берем GROG_KEY (как у тебя в настройках), если пусто — пробуем стандартный GROQ_API_KEY на всякий случай
+    groq_key = os.environ.get("GROG_KEY") or os.environ.get("GROQ_API_KEY")
     try:
         async with httpx.AsyncClient() as client:
+            # Увеличили таймаут до 30.0 секунд, чтобы большие блоки кода успевали сгенерироваться!
             resp = await client.post("https://api.groq.com/openai/v1/chat/completions", 
                                      headers={"Authorization": f"Bearer {groq_key}"},
-                                     json={"model": "llama-3.3-70b-versatile", "messages": messages}, timeout=10.0)
+                                     json={"model": "llama-3.3-70b-versatile", "messages": messages}, 
+                                     timeout=30.0)
             if resp.status_code == 200:
                 return resp.json()['choices'][0]['message']['content']
-    except Exception:
-        pass
+            else:
+                logger.error(f"Ошибка Groq API: статус {resp.status_code}, ответ: {resp.text}")
+    except Exception as e:
+        logger.error(f"Ошибка при запросе к Groq: {e}")
 
-    return "Извини, я сейчас не могу ответить (API не настроены или недоступны)."
+    return "Извини, я сейчас не могу ответить (API не настроены, превышен лимит или сервер Groq перегружен)."
 
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
@@ -100,5 +105,4 @@ async def get_history(mode: str = "public"):
 
 @app.get("/api/clear")
 async def clear_chat():
-    # Теперь эта функция просто возвращает статус, ничего не удаляя из базы данных
     return {"status": "visual_clear_only"}
