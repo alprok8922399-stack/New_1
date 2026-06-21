@@ -50,25 +50,19 @@ async def chat_endpoint(request: Request):
     
     history_messages = []
     
-    # Если режим приватный, достаем историю правильно
     if mode == "private":
         conn = get_db_connection()
         if conn:
             cur = conn.cursor()
-            # Берем последние 9 записей, чтобы вместе с новым сообщением было 10
             cur.execute("SELECT role, content FROM chat_messages ORDER BY id DESC LIMIT 9")
             rows = cur.fetchall()
             cur.close()
             conn.close()
             
-            # Разворачиваем историю от старых к новым и складываем в массив
             for r in rows[::-1]:
                 history_messages.append({"role": r[0], "content": r[1]})
 
-    # Формируем системный промпт
-    system_prompt = f"Ты — друг и помощник. Пользователя зовут {user_name}. Текущие дата и время на устройстве пользователя: {client_time}."
-    
-    # Собираем все сообщения воедино: Системник -> История -> Новое сообщение
+    system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время на устройстве пользователя: {client_time}."
     full_messages = [{"role": "system", "content": system_prompt}]
     
     for msg in history_messages:
@@ -76,10 +70,8 @@ async def chat_endpoint(request: Request):
         
     full_messages.append({"role": "user", "content": raw_text})
     
-    # Отправляем ИИ
     reply = await ask_llm(full_messages)
 
-    # Сохраняем текущий диалог в базу, если это приватный режим
     if mode == "private":
         conn = get_db_connection()
         if conn:
@@ -108,11 +100,5 @@ async def get_history(mode: str = "public"):
 
 @app.get("/api/clear")
 async def clear_chat():
-    conn = get_db_connection()
-    if conn:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM chat_messages")
-        conn.commit()
-        cur.close()
-        conn.close()
-    return {"status": "cleared"}
+    # Теперь эта функция просто возвращает статус, ничего не удаляя из базы данных
+    return {"status": "visual_clear_only"}
