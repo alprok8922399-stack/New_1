@@ -172,11 +172,10 @@
             const enteredName = usernameInput.value.trim();
             if (!enteredName) return;
 
-            userDisplayName = enteredName;
-
             if (enteredName === SECRET_CODE) {
-                // Если введен твой код — режим приватный, качаем историю
+                // Если введен твой код — режим приватный, качаем историю и жестко пишем имя Алексей
                 chatMode = 'private';
+                userDisplayName = 'Алексей';
                 chatHeaderTitle.textContent = 'Друг и помощник';
                 authScreen.style.display = 'none';
                 chatScreen.style.display = 'flex';
@@ -184,6 +183,7 @@
             } else {
                 // Если любое другое имя — режим гостевой, историю с сервера НЕ качаем
                 chatMode = 'public';
+                userDisplayName = enteredName;
                 chatHeaderTitle.textContent = `Чат для: ${enteredName}`;
                 authScreen.style.display = 'none';
                 chatScreen.style.display = 'flex';
@@ -293,96 +293,3 @@
                         <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     </button>
                 `;
-            }
-            wrapper.appendChild(buttonsDiv);
-
-            const copyBtn = buttonsDiv.querySelector('.btn-copy');
-            if (copyBtn) {
-                copyBtn.addEventListener('click', () => copyToClipboard(text || "Фото"));
-            }
-
-            const editBtn = buttonsDiv.querySelector('.btn-edit');
-            if (editBtn) {
-                editBtn.addEventListener('click', () => {
-                    inputArea.value = text;
-                    inputArea.focus();
-                    inputArea.style.height = 'auto';
-                    inputArea.style.height = (inputArea.scrollHeight) + 'px';
-                    
-                    currentEditingMessageId = messageId; 
-                });
-            }
-            
-            messagesContainer.appendChild(wrapper);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        async function loadChatHistory() {
-            try {
-                const response = await fetch("https://new-1-5155.onrender.com/api/history");
-                const history = await response.json();
-                messagesContainer.innerHTML = ""; 
-                history.forEach(msg => {
-                    const textContent = msg.content || msg.text || "";
-                    appendMessage(textContent, msg.role === 'user', "", msg.id);
-                });
-            } catch (e) {
-                console.error("Ошибка загрузки истории:", e);
-            }
-        }
-
-        clearBtn.addEventListener('click', () => {
-            messagesContainer.innerHTML = "";
-        });
-
-        sendBtn.addEventListener('click', async () => {
-            const text = inputArea.value.trim();
-            if (!text && !selectedImageBase64) return;
-            
-            appendMessage(text || "Фото", true, selectedImageBase64); 
-            const imgToSend = selectedImageBase64;
-            
-            if (currentEditingMessageId !== null) {
-                try {
-                    await fetch(`https://new-1-5155.onrender.com/api/delete/${currentEditingMessageId}`, {
-                        method: 'DELETE'
-                    });
-                    const oldWrapper = document.querySelector(`[data-id="${currentEditingMessageId}"]`);
-                    if (oldWrapper) oldWrapper.remove();
-                } catch (e) {
-                    console.error("Не удалось удалить старое сообщение:", e);
-                }
-                currentEditingMessageId = null; 
-            }
-            
-            inputArea.value = '';
-            inputArea.style.height = '40px'; 
-            selectedImageBase64 = "";
-            fileInput.value = "";
-            previewContainer.classList.add('preview-hidden');
-
-            // Точное время телефона (МСК)
-            const currentDateTime = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
-            
-            // Вшиваем скрытые системные инструкции: время, режим комнаты и имя гостя
-            const textWithTime = `[Системное инфо: Текущие дата и время: ${currentDateTime}. Режим комнаты: ${chatMode}. Имя собеседника: ${userDisplayName}]\n${text}`;
-
-            try {
-                const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        text: textWithTime, 
-                        image: imgToSend,
-                        mode: chatMode // Отправляем режим комнаты на бэкенд
-                    })
-                });
-                const data = await response.json();
-                appendMessage(data.text, false); 
-            } catch (e) {
-                appendMessage("Ошибка соединения. Сервер на Render спит или обновляется.", false);
-            }
-        });
-    </script>
-</body>
-</html>
