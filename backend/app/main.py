@@ -27,6 +27,18 @@ def get_db_connection():
         logger.error(f"БД ошибка: {e}")
         return None
 
+# Очистка всей базы данных
+@app.get("/api/clear_all")
+async def clear_all():
+    conn = get_db_connection()
+    if conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM chat_messages")
+        conn.commit()
+        cur.close()
+        conn.close()
+    return {"status": "cleared"}
+
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     data = await request.json()
@@ -70,7 +82,6 @@ async def get_history():
     conn = get_db_connection()
     if not conn: return []
     cur = conn.cursor()
-    # Забираем последние 15 записей без условий
     cur.execute("SELECT id, role, content FROM chat_messages ORDER BY id DESC LIMIT 15")
     rows = cur.fetchall()
     cur.close()
