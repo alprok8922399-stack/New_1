@@ -42,13 +42,20 @@ async def chat_endpoint(request: Request):
         conn.commit()
         cur.close()
 
+    # Настройка промпта с учетом режима
+    system_instruction = (
+        "Ты — близкий друг и ИИ-помощник. Стиль общения: живой, с юмором, без официальщины. "
+        "Если тебя просят рассказать анекдот — рассказывай смешные, жизненные и короткие истории. "
+        "Избегай шаблонных фраз типа 'Конечно, вот ваш анекдот'."
+    )
+
     # Запрос к Groq
     groq_key = os.environ.get("GROG_KEY")
     groq_url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
     payload = {
         "model": "llama-3.3-70b-versatile",
-        "messages": [{"role": "system", "content": "Ты — крутой помощник. Отвечай кратко, на русском."}, {"role": "user", "content": user_message}]
+        "messages": [{"role": "system", "content": system_instruction}, {"role": "user", "content": user_message}]
     }
 
     async with httpx.AsyncClient() as client:
