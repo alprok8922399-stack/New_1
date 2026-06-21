@@ -50,13 +50,10 @@ async def chat_endpoint(request: Request):
 
     user_message = re.sub(r"^\[Системное инфо.*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
     
+    # Ключи и настройки
     groq_key = os.environ.get("GROQ_KEY") or os.environ.get("GROG_KEY")
-    groq_url = "https://api.groq.com/openai/v1/chat/completions"
-    
-    headers = {
-        "Authorization": f"Bearer {groq_key}",
-        "Content-Type": "application/json"
-    }
+    gemini_key = os.environ.get("GEMINI_KEY")
+    or_key = os.environ.get("OPENROUTER_KEY")
     
     # История из БД
     history_messages = []
@@ -75,7 +72,6 @@ async def chat_endpoint(request: Request):
     
     full_messages = [{"role": "system", "content": system_prompt}]
     
-    # Добавляем приветствие, если истории нет
     if not history_messages and mode == "private":
         greeter = Greeting(user_name)
         full_messages.append({"role": "assistant", "content": greeter.get_greeting()})
@@ -83,23 +79,50 @@ async def chat_endpoint(request: Request):
     for msg in history_messages:
         full_messages.append({"role": msg["role"], "content": msg["content"]})
     
-    # ОТПРАВЛЯЕМ ПРОСТОЙ ТЕКСТ (стабильно)
     full_messages.append({"role": "user", "content": user_message})
     
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": full_messages
-    }
-
+    reply = "Ошибка: все сервисы недоступны"
+    
     async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(groq_url, headers=headers, json=payload, timeout=30.0)
-            if response.status_code == 200:
-                reply = response.json()['choices'][0]['message']['content']
-            else:
-                reply = f"Ошибка Groq: {response.status_code}"
-        except Exception as e:
-            reply = f"Ошибка: {str(e)}"
+        # 1. Попытка Groq
+        if groq_key:
+            try:
+                response = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                    json={"model": "llama-3.3-70b-versatile", "messages": full_messages},
+                    timeout=30.0
+                )
+                if response.status_code == 200:
+                    reply = response.json()['choices'][0]['message']['content']
+            except: pass
+
+        # 2. Попытка Gemini (если Groq не ответил)
+        if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
+            try:
+                # Используем OpenAI-совместимый эндпоинт для Gemini
+                response = await client.post(
+                    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                    headers={"Authorization": f"Bearer {gemini_key}", "Content-Type": "application/json"},
+                    json={"model": "gemini-1.5-flash", "messages": full_messages},
+                    timeout=30.0
+                )
+                if response.status_code == 200:
+                    reply = response.json()['choices'][0]['message']['content']
+            except: pass
+
+        # 3. Попытка OpenRouter (если Gemini не ответил)
+        if (reply.startswith("Ошибка") or "Ошибка" in reply) and or_key:
+            try:
+                response = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {or_key}", "Content-Type": "application/json"},
+                    json={"model": "meta-llama/llama-3.3-70b-instruct", "messages": full_messages},
+                    timeout=30.0
+                )
+                if response.status_code == 200:
+                    reply = response.json()['choices'][0]['message']['content']
+            except: pass
             
     # Сохраняем в БД
     if mode == "private" and not reply.startswith("Ошибка"):
