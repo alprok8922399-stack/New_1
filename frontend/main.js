@@ -2,7 +2,6 @@ const messagesContainer = document.getElementById('messages');
 const inputArea = document.getElementById('input');
 const sendBtn = document.getElementById('send-btn');
 
-// --- Добавляем стиль для часов ---
 const style = document.createElement('style');
 style.innerHTML = `
     .hourglass {
@@ -25,7 +24,6 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-// Расширение поля ввода
 if (inputArea) {
     inputArea.addEventListener('input', function() {
         this.style.height = 'auto';
@@ -33,16 +31,13 @@ if (inputArea) {
     });
 }
 
-// Форматирование текста ИИ
 function formatAiText(text) {
     let rawText = text || "";
-    // Обработка кода
     const codeBlockPattern = new RegExp('\\`\\`\\`(?:[a-zA-Z0-9_-]+)?\\n([\\s\\S]*?)\\`\\`\\`', 'g');
     rawText = rawText.replace(codeBlockPattern, (match, codeContent) => {
         const cleanCode = codeContent.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").trim();
         return `<div style="background-color: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 14px; white-space: pre-wrap; margin: 10px 0; border: 1px solid #333;">${cleanCode}</div>`;
     });
-    // Стиль
     rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
     rawText = rawText.replace(/\*/g, '');
@@ -55,7 +50,6 @@ function formatAiText(text) {
     }).join('');
 }
 
-// Добавление сообщения в чат
 function appendMessage(text, isUser, isLoader = false) {
     const className = isUser ? 'message user' : 'message bot';
     const content = isLoader ? '<div class="hourglass"></div>' : (isUser ? text.replace(/\n/g, '<br>') : formatAiText(text));
@@ -71,7 +65,6 @@ function appendMessage(text, isUser, isLoader = false) {
     return messageElement;
 }
 
-// Отправка
 if (sendBtn) {
     sendBtn.addEventListener('click', async () => {
         const text = inputArea.value.trim();
@@ -81,17 +74,16 @@ if (sendBtn) {
         inputArea.value = '';
         inputArea.style.height = '40px';
 
-        // Показываем часы
         const loader = appendMessage('', false, true);
 
         try {
-            const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
+            const response = await fetch("[https://new-1-5155.onrender.com/api/chat](https://new-1-5155.onrender.com/api/chat)", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: text })
             });
             const data = await response.json();
-            loader.remove(); // Убираем часы
+            loader.remove();
             appendMessage(data.text, false);
         } catch (e) {
             loader.remove();
@@ -100,10 +92,9 @@ if (sendBtn) {
     });
 }
 
-// Загрузка истории
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        const response = await fetch("https://new-1-5155.onrender.com/api/history");
+        const response = await fetch("[https://new-1-5155.onrender.com/api/history](https://new-1-5155.onrender.com/api/history)");
         const history = await response.json();
         if (messagesContainer) {
             messagesContainer.innerHTML = ""; 
