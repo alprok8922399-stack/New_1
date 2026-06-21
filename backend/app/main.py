@@ -27,11 +27,10 @@ def get_db_connection():
         return None
 
 async def ask_llm(messages):
-    # Берем GROG_KEY (как у тебя в настройках), если пусто — пробуем стандартный GROQ_API_KEY на всякий случай
-    groq_key = os.environ.get("GROG_KEY") or os.environ.get("GROQ_API_KEY")
+    # Исправлено: теперь точно подхватит ключ, как бы он ни был записан в Render (GROQ_KEY или GROG_KEY)
+    groq_key = os.environ.get("GROQ_KEY") or os.environ.get("GROG_KEY") or os.environ.get("GROQ_API_KEY")
     try:
         async with httpx.AsyncClient() as client:
-            # Увеличили таймаут до 30.0 секунд, чтобы большие блоки кода успевали сгенерироваться!
             resp = await client.post("https://api.groq.com/openai/v1/chat/completions", 
                                      headers={"Authorization": f"Bearer {groq_key}"},
                                      json={"model": "llama-3.3-70b-versatile", "messages": messages}, 
