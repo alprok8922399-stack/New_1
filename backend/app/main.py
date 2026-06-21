@@ -34,10 +34,23 @@ async def chat_endpoint(request: Request):
     raw_user_message = data.get("text") or ""
     mode = data.get("mode") or "private"
     
-    user_message = re.sub(r"^\[Системное инфо\..*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
+    # Извлекаем системную инфу (время, имя), если она есть
+    client_time = "Неизвестно"
+    user_name = "Алексей"
+    
+    time_match = re.search(r"Текущие дата и время:\s*([^.]+)", raw_user_message)
+    if time_match:
+        client_time = time_match.group(1).strip()
+        
+    name_match = re.search(r"Имя собеседника:\s*([^\]]+)", raw_user_message)
+    if name_match:
+        user_name = name_match.group(1).strip()
+
+    # Чистим текст сообщения от системных тегов для отправки пользователю
+    user_message = re.sub(r"^\[Системное инфо.*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
     
     # Конфигурация Groq
-    groq_key = os.environ.get("GROG_KEY")
+    groq_key = os.environ.get("GROQ_KEY") or os.environ.get("GROG_KEY")
     groq_url = "https://api.groq.com/openai/v1/chat/completions"
     
     headers = {
@@ -45,13 +58,31 @@ async def chat_endpoint(request: Request):
         "Content-Type": "application/json"
     }
     
-    # Формируем запрос для Groq (используем модель llama-3.3-70b-versatile)
+    # Собираем историю из БД, если режим приватный
+    history_messages = []
+    if mode == "private":
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            cur.execute("SELECT role, content FROM chat_messages ORDER BY id DESC LIMIT 9")
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+            for r in rows[::-1]:
+                history_messages.append({"role": r[0], "content": r[1]})
+
+    # Формируем системный промт с актуальным именем и временем
+    system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время на устройстве пользователя: {client_time}. Отвечай кратко, по-человечески, с юмором, на русском языке."
+    
+    full_messages = [{"role": "system", "content": system_prompt}]
+    for msg in history_messages:
+        full_messages.append({"role": msg["role"], "content": msg["content"]})
+    full_messages.append({"role": "user", "content": user_message})
+    
+    # Формируем запрос для Groq
     payload = {
         "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "system", "content": "Ты — крутой помощник Алексея. Отвечай кратко, по-человечески, с юмором, на русском языке."},
-            {"role": "user", "content": user_message}
-        ]
+        "messages": full_messages
     }
 
     async with httpx.AsyncClient() as client:
@@ -64,12 +95,37 @@ async def chat_endpoint(request: Request):
         except Exception as e:
             reply = f"Ошибка подключения: {str(e)}"
             
+    # Сохраняем новые сообщения в БД, если режим приватный
+    if mode == "private" and not reply.startswith("Ошибка"):
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", user_message))
+            cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", reply))
+            conn.commit()
+            cur.close()
+            conn.close()
+            
     return {"text": reply}
 
 @app.get("/api/history")
 async def get_history():
-    return [] # История пока отключена для простоты
+    conn = get_db_connection()
+    if not conn: return []
+    cur = conn.cursor()
+    cur.execute("SELECT id, role, content FROM chat_messages ORDER BY id DESC LIMIT 10")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [{"id": r[0], "role": r[1], "content": r[2]} for r in rows[::-1]]
 
 @app.delete("/api/delete/{msg_id}")
 async def delete_message(msg_id: int):
+    conn = get_db_connection()
+    if not conn: return {"status": "error"}
+    cur = conn.cursor()
+    cur.execute("DELETE FROM chat_messages WHERE id = %s", (msg_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
     return {"status": "success"}
