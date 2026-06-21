@@ -194,11 +194,6 @@
         const inputArea = document.getElementById('input');
         const sendBtn = document.getElementById('send-btn');
         const clearBtn = document.getElementById('clear-btn');
-        const attachBtn = document.getElementById('attach-btn');
-        const fileInput = document.getElementById('file-input');
-        const previewContainer = document.getElementById('image-preview-container');
-        const imagePreview = document.getElementById('image-preview');
-        const cancelImageBtn = document.getElementById('cancel-image-btn');
 
         clearBtn.addEventListener('click', () => { messagesContainer.innerHTML = ""; });
 
@@ -206,19 +201,13 @@
             const enteredName = usernameInput.value.trim();
             if (!enteredName) return;
             userDisplayName = enteredName;
-            if (enteredName === SECRET_CODE) {
-                chatMode = 'private';
-                chatHeaderTitle.textContent = 'Друг и помощник';
-                authScreen.style.display = 'none';
-                chatScreen.style.display = 'flex';
-                loadChatHistory();
-            } else {
-                chatMode = 'public';
-                chatHeaderTitle.textContent = `Чат для: ${enteredName}`;
-                authScreen.style.display = 'none';
-                chatScreen.style.display = 'flex';
-                loadChatHistory();
-            }
+            
+            chatMode = (enteredName === SECRET_CODE) ? 'private' : 'public';
+            chatHeaderTitle.textContent = (enteredName === SECRET_CODE) ? 'Друг и помощник' : `Чат для: ${enteredName}`;
+            
+            authScreen.style.display = 'none';
+            chatScreen.style.display = 'flex';
+            loadChatHistory(enteredName);
         }
 
         loginBtn.addEventListener('click', handleLogin);
@@ -244,8 +233,8 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        async function loadChatHistory() {
-            const response = await fetch("https://new-1-5155.onrender.com/api/history");
+        async function loadChatHistory(name) {
+            const response = await fetch(`https://new-1-5155.onrender.com/api/history?user=${encodeURIComponent(name)}`);
             const history = await response.json();
             messagesContainer.innerHTML = ""; 
             history.forEach(msg => appendMessage(msg.content, msg.role === 'user'));
@@ -259,7 +248,7 @@
             const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: text, mode: chatMode })
+                body: JSON.stringify({ text: text, mode: chatMode, user: userDisplayName })
             });
             const data = await response.json();
             appendMessage(data.text, false); 
