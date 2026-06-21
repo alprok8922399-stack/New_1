@@ -34,12 +34,11 @@ async def chat_endpoint(request: Request):
     user_name = data.get("user") or "Гость"
     mode = data.get("mode") or "public"
     
-    # Запись в БД: сохраняем сообщение с префиксом имени, чтобы потом найти его
     conn = get_db_connection()
     if conn and mode != "public":
         cur = conn.cursor()
         cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", 
-                    ("user", f"[{user_name}]: {raw_user_message}"))
+                    ("user", raw_user_message))
         conn.commit()
         cur.close()
 
@@ -67,17 +66,16 @@ async def chat_endpoint(request: Request):
     return {"text": reply}
 
 @app.get("/api/history")
-async def get_history(user: str = "Гость"):
+async def get_history():
     conn = get_db_connection()
     if not conn: return []
     cur = conn.cursor()
-    # Ищем сообщения, которые начинаются с [Имя пользователя] или являются ответами бота
-    query = "SELECT id, role, content FROM chat_messages WHERE content LIKE %s OR role = 'assistant' ORDER BY id DESC LIMIT 20"
-    cur.execute(query, (f"[{user}%",))
+    # Забираем последние 15 записей без условий
+    cur.execute("SELECT id, role, content FROM chat_messages ORDER BY id DESC LIMIT 15")
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return [{"id": r[0], "role": r[1], "content": r[2].replace(f"[{user}]: ", "") if r[1] == 'user' else r[2]} for r in rows[::-1]]
+    return [{"id": r[0], "role": r[1], "content": r[2]} for r in rows[::-1]]
 
 @app.delete("/api/delete/{msg_id}")
 async def delete_message(msg_id: int):
