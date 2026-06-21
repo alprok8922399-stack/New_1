@@ -200,7 +200,6 @@
         const imagePreview = document.getElementById('image-preview');
         const cancelImageBtn = document.getElementById('cancel-image-btn');
 
-        // ИСПРАВЛЕНИЕ: Кнопка очистки
         clearBtn.addEventListener('click', () => { messagesContainer.innerHTML = ""; });
 
         function handleLogin() {
@@ -218,6 +217,7 @@
                 chatHeaderTitle.textContent = `Чат для: ${enteredName}`;
                 authScreen.style.display = 'none';
                 chatScreen.style.display = 'flex';
+                loadChatHistory();
             }
         }
 
