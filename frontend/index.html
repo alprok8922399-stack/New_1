@@ -26,12 +26,12 @@
         .bot-text { white-space: pre-wrap; }
 
         /* Кнопки действий под сообщениями */
-        .msg-actions { display: flex; gap: 12px; font-size: 12px; margin-top: 4px; padding: 0 5px; }
+        .msg-actions { display: flex; gap: 12px; font-size: 12px; margin-top: 4px; padding: 0 5px; width: auto; }
         .msg-actions.user { align-self: flex-end; }
         .msg-actions.bot { align-self: flex-start; }
         .action-btn { color: #0a84ff; cursor: pointer; background: none; border: none; font-size: 12px; outline: none; padding: 2px 0; }
         
-        /* Исправленные стили контейнеров для кода */
+        /* Стили контейнеров для кода */
         .code-container {
             background: #000000;
             border: 1px solid #333;
@@ -62,10 +62,11 @@
             z-index: 5;
         }
         
-        .input-area { padding: 10px; background: #000000; border-top: 1px solid #222; }
-        .input-row { display: flex; align-items: flex-end; gap: 8px; }
+        /* Фиксированная область ввода */
+        .input-area { padding: 10px; background: #000000; border-top: 1px solid #222; width: 100%; }
+        .input-row { display: flex; align-items: flex-end; gap: 8px; width: 100%; }
         textarea { flex: 1; background: #1c1c1e; border: 1px solid #333; border-radius: 18px; color: #fff; padding: 10px 15px; outline: none; resize: none; min-height: 40px; font-size: 16px; }
-        #send-btn { background: none; border: none; color: #0a84ff; font-size: 22px; cursor: pointer; padding: 5px; }
+        #send-btn { background: none; border: none; color: #0a84ff; font-size: 22px; cursor: pointer; padding: 5px; min-width: 35px; }
     </style>
 </head>
 <body>
