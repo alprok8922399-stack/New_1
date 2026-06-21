@@ -190,6 +190,13 @@
         const usernameInput = document.getElementById('username-input');
         const loginBtn = document.getElementById('login-btn');
         const chatHeaderTitle = document.getElementById('chat-header-title');
+        const messagesContainer = document.getElementById('messages');
+        const inputArea = document.getElementById('input');
+        const sendBtn = document.getElementById('send-btn');
+        const clearBtn = document.getElementById('clear-btn');
+
+        // ИСПРАВЛЕНИЕ: Очистка чата
+        clearBtn.addEventListener('click', () => { messagesContainer.innerHTML = ""; });
 
         function handleLogin() {
             const enteredName = usernameInput.value.trim();
@@ -210,13 +217,9 @@
         }
 
         loginBtn.addEventListener('click', handleLogin);
-        const messagesContainer = document.getElementById('messages');
-        const inputArea = document.getElementById('input');
-        const sendBtn = document.getElementById('send-btn');
 
         function formatAiText(text) {
             let rawText = text || "";
-            // Обработка кода в блоки
             rawText = rawText.replace(/```([\s\S]*?)```/g, (match, p1) => {
                 const cleanCode = p1.trim();
                 return `<div class="code-block"><button class="copy-code-btn" onclick="copyToClipboard(\`${cleanCode.replace(/`/g, '\\`')}\`)">Копировать</button><pre><code>${cleanCode}</code></pre></div>`;
@@ -226,11 +229,9 @@
             return rawText.split('\n').map(p => p.trim() === "" ? '<div style="height: 8px;"></div>' : `<p>${p}</p>`).join('');
         }
 
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text);
-        }
+        function copyToClipboard(text) { navigator.clipboard.writeText(text); }
 
-        function appendMessage(text, isUser, imageUrl = "") {
+        function appendMessage(text, isUser) {
             const div = document.createElement('div');
             div.className = 'message-wrapper';
             div.innerHTML = `<div class="message ${isUser ? 'user' : 'bot'}">${isUser ? text : formatAiText(text)}</div>`;
