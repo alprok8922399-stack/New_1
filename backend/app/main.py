@@ -48,39 +48,38 @@ async def chat_endpoint(request: Request):
     user_name = data.get("user") or "Гость"
     client_time = data.get("client_time") or "Неизвестно"
     
-    # Собираем историю для передачи боту
     history_messages = []
     
-    # Если режим приватный, подтягиваем последние 9 сообщений из базы (чтобы вместе с новым было 10)
+    # Если режим приватный, достаем историю правильно
     if mode == "private":
         conn = get_db_connection()
         if conn:
             cur = conn.cursor()
+            # Берем последние 9 записей, чтобы вместе с новым сообщением было 10
             cur.execute("SELECT role, content FROM chat_messages ORDER BY id DESC LIMIT 9")
             rows = cur.fetchall()
             cur.close()
             conn.close()
-            # Разворачиваем, чтобы хронология была правильной (от старых к новым)
+            
+            # Разворачиваем историю от старых к новым и складываем в массив
             for r in rows[::-1]:
-                history_messages.append({"role": r[0], "role" if r[0]=='user' else 'assistant': r[0], "content": r[1]})
+                history_messages.append({"role": r[0], "content": r[1]})
 
-    # Добавляем системную инструкцию в самое начало
+    # Формируем системный промпт
     system_prompt = f"Ты — друг и помощник. Пользователя зовут {user_name}. Текущие дата и время на устройстве пользователя: {client_time}."
     
-    # Формируем итоговый пакет для ИИ: Системник -> История из БД -> Новое сообщение
+    # Собираем все сообщения воедино: Системник -> История -> Новое сообщение
     full_messages = [{"role": "system", "content": system_prompt}]
     
     for msg in history_messages:
-        # Приводим к строгому формату user/assistant
-        role = "user" if msg["role"] == "user" else "assistant"
-        full_messages.append({"role": role, "content": msg["content"]})
+        full_messages.append({"role": msg["role"], "content": msg["content"]})
         
     full_messages.append({"role": "user", "content": raw_text})
     
-    # Отправляем боту ВСЮ цепочку разговора
+    # Отправляем ИИ
     reply = await ask_llm(full_messages)
 
-    # Сохраняем новую реплику в базу ТОЛЬКО если приватный режим
+    # Сохраняем текущий диалог в базу, если это приватный режим
     if mode == "private":
         conn = get_db_connection()
         if conn:
