@@ -50,10 +50,10 @@ async def chat_endpoint(request: Request):
 
     user_message = re.sub(r"^\[Системное инфо.*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
     
-    # Ключи и настройки
+    # Ключи из твоих настроек
     groq_key = os.environ.get("GROQ_KEY") or os.environ.get("GROG_KEY")
-    gemini_key = os.environ.get("GEMINI_KEY")
-    or_key = os.environ.get("OPENROUTER_KEY")
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    or_key = os.environ.get("OPENROUTER_API_KEY")
     
     # История из БД
     history_messages = []
@@ -100,7 +100,6 @@ async def chat_endpoint(request: Request):
         # 2. Попытка Gemini (если Groq не ответил)
         if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
             try:
-                # Используем OpenAI-совместимый эндпоинт для Gemini
                 response = await client.post(
                     "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                     headers={"Authorization": f"Bearer {gemini_key}", "Content-Type": "application/json"},
