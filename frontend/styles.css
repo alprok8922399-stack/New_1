@@ -266,15 +266,14 @@ textarea {
     width: 20px; 
     height: 20px; 
     font-size: 12px; 
-    display: center; 
+    display: flex; 
     justify-content: center; 
     align-items: center; 
 }
 
 /* Оформление блока кода */
 .code-block-wrapper {
-    background-color: #000000;
-    border: 1px solid #333;
+    background-color: #1e1e1e;
     color: #d4d4d4;
     padding: 10px;
     border-radius: 8px;
@@ -293,7 +292,7 @@ textarea {
     position: absolute;
     top: 5px;
     right: 5px;
-    background: #333;
+    background: #444;
     color: white;
     border: none;
     padding: 4px 8px;
@@ -303,5 +302,5 @@ textarea {
 }
 
 .copy-code-btn:hover {
-    background: #555;
-    }
+    background: #666;
+}
