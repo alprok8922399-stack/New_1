@@ -73,14 +73,14 @@
             const inputVal = document.getElementById('username-input').value.trim();
             if (inputVal === SECRET_CODE) {
                 chatMode = 'private';
-                userDisplayName = 'Алексей'; // В приватном режиме ты всегда Алексей
+                userDisplayName = 'Алексей';
                 headerTitle.textContent = 'Друг и помощник';
-                clearBtn.style.display = 'block'; // Показываем кнопку очистки
+                clearBtn.style.display = 'block';
             } else {
                 chatMode = 'public';
-                userDisplayName = inputVal || 'Гость'; // В публичном режиме имя берется из ввода
+                userDisplayName = inputVal || 'Гость';
                 headerTitle.textContent = 'Публичный чат';
-                clearBtn.style.display = 'none'; // Скрываем кнопку очистки для паблика
+                clearBtn.style.display = 'none';
             }
             authScreen.style.display = 'none';
             chatScreen.style.display = 'flex';
@@ -108,10 +108,20 @@
             if (!text) return;
             appendMessage(text, true);
             inputArea.value = '';
+
+            // Получаем точное время с телефона прямо в момент отправки
+            const now = new Date();
+            const timeString = now.toLocaleString('ru-RU');
+
             const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: text, mode: chatMode, user: userDisplayName })
+                body: JSON.stringify({ 
+                    text: text, 
+                    mode: chatMode, 
+                    user: userDisplayName,
+                    client_time: timeString // Передаем скрытно на сервер
+                })
             });
             const data = await response.json();
             appendMessage(data.text, false); 
