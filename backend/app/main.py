@@ -27,7 +27,6 @@ def get_db_connection():
         return None
 
 async def ask_llm(messages, mode):
-    # 1. Попытка Groq
     groq_key = os.environ.get("GROG_KEY")
     try:
         async with httpx.AsyncClient() as client:
@@ -39,7 +38,6 @@ async def ask_llm(messages, mode):
     except Exception:
         pass
 
-    # 2. Попытка Gemini и 3. OpenRouter будут здесь
     return "Извини, я сейчас не могу ответить (API не настроены или недоступны)."
 
 @app.post("/api/chat")
@@ -47,15 +45,16 @@ async def chat_endpoint(request: Request):
     data = await request.json()
     raw_text = data.get("text") or ""
     mode = data.get("mode") or "public"
-    # Берем имя, которое прислал фронтенд (Алексей для привата, или то, что ввели для паблика)
     user_name = data.get("user") or "Гость"
+    # Принимаем текущую дату и время, присланные с телефона
+    client_time = data.get("client_time") or "Неизвестно"
     
-    # Передаем правильное имя в системную инструкцию
-    messages = [{"role": "system", "content": f"Ты — друг и помощник. Пользователя зовут {user_name}."}, {"role": "user", "content": raw_text}]
+    # Добавляем точную дату и время устройства в системную инструкцию
+    system_prompt = f"Ты — друг и помощник. Пользователя зовут {user_name}. Текущие дата и время на устройстве пользователя: {client_time}."
+    messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": raw_text}]
     
     reply = await ask_llm(messages, mode)
 
-    # Сохраняем в базу ТОЛЬКО если приватный режим
     if mode == "private":
         conn = get_db_connection()
         if conn:
