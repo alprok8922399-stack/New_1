@@ -51,135 +51,6 @@ def startup_event():
         except Exception as e:
             logger.error(f"Ошибка при создании таблицы: {e}")
 
-@app.get("/")
-def read_root():
-    """
-    Заглушка для корня, чтобы Render не выдавал ошибку 404 и видел, что сервис работает.
-    """
-    return {"status": "healthy", "message": "Backend is running"}
-
-def format_links_to_containers(text: str) -> str:
-    """
-    Превращает ссылки в одну стильную, аккуратную и полностью кликабельную кнопку-карточку.
-    """
-    # 1. Обрабатываем Markdown ссылки: [Текст](https://...)
-    markdown_pattern = r'\[([^\]]+)\]\((https?://[^\s\)]+)\)'
-    text = re.sub(
-        markdown_pattern, 
-        r'<a href="\2" target="_blank" class="custom-link-button">🔗 \1</a>', 
-        text
-    )
-    
-    # 2. Обрабатываем одиночные ссылки, которые не обернуты в теги
-    raw_url_pattern = r'(?<!href=")(https?://[^\s<]+)'
-    text = re.sub(
-        raw_url_pattern, 
-        r'<a href="\1" target="_blank" class="custom-link-button">🔗 Перейти на сайт</a>', 
-        text
-    )
-    return text
-
-async def get_openrouter_free_models(client: httpx.AsyncClient) -> list:
-    """
-    Получает список всех доступных бесплатных моделей с OpenRouter динамически.
-    """
-    try:
-        response = await client.get("https://openrouter.ai/api/v1/models", timeout=10.0)
-        if response.status_code == 200:
-            models_data = response.json().get("data", [])
-            free_models = []
-            for m in models_data:
-                pricing = m.get("pricing", {})
-                prompt_cost = float(pricing.get("prompt", 1))
-                completion_cost = float(pricing.get("completion", 1))
-                if prompt_cost == 0.0 and completion_cost == 0.0:
-                    free_models.append(m.get("id"))
-            return free_models
-    except Exception as e:
-        logger.error(f"Не удалось получить список бесплатных моделей OpenRouter: {e}")
-    return []
-
-def convert_gemini_to_openai_history(gemini_contents: list) -> list:
-    """
-    Конвертирует структуру истории Gemini в стандартный формат OpenAI/OpenRouter.
-    """
-    openai_messages = []
-    for item in gemini_contents:
-        g_role = item.get("role")
-        role = "user"
-        if g_role == "model":
-            role = "assistant"
-            
-        parts = item.get("parts", [])
-        text_content = ""
-        for part in parts:
-            if "text" in part:
-                text_content += part["text"]
-        
-        if "SYSTEM INSTRUCTION:" in text_content:
-            text_content = text_content.replace("SYSTEM INSTRUCTION: ", "")
-            role = "system"
-            
-        if text_content:
-            openai_messages.append({"role": role, "content": text_content})
-            
-    return openai_messages
-
-async def try_openrouter_fallback(client: httpx.AsyncClient, openai_messages: list, openrouter_key: str) -> str:
-    """
-    Логика резервного перебора моделей через OpenRouter.
-    """
-    if not openrouter_key:
-        return "Ошибка: Доступ к Gemini ограничен, а API-ключ OpenRouter (OPENROUTER_API_KEY) не настроен."
-
-    models_to_try = ["cohere/north-mini-code:free"]
-    
-    api_free_models = await get_openrouter_free_models(client)
-    for model_id in api_free_models:
-        if model_id not in models_to_try:
-            models_to_try.append(model_id)
-
-    if len(models_to_try) == 1:
-        models_to_try.extend([
-            "google/gemini-2.5-flash:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "deepseek/deepseek-chat:free"
-        ])
-
-    logger.info(f"Запуск резервного переключения OpenRouter. Очередь моделей: {models_to_try}")
-
-    for model in models_to_try:
-        try:
-            logger.info(f"Пробуем резервную модель OpenRouter: {model}")
-            or_payload = {
-                "model": model,
-                "messages": openai_messages
-            }
-            or_response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {openrouter_key}",
-                    "Content-Type": "application/json"
-                },
-                json=or_payload,
-                timeout=25.0
-            )
-            
-            if or_response.status_code == 200:
-                or_json = or_response.json()
-                choices = or_json.get("choices", [])
-                if choices:
-                    reply_text = choices[0].get("message", {}).get("content", "")
-                    if reply_text:
-                        logger.info(f"Успешно получен ответ от резервной модели {model}")
-                        return format_links_to_containers(reply_text)
-            else:
-                logger.warning(f"Модель {model} вернула статус {or_response.status_code}")
-        except Exception as e:
-            logger.error(f"Ошибка при запросе к модели {model} через OpenRouter: {e}")
-            
-    return "Доступ к Gemini ограничен, и ни одна из бесплатных моделей OpenRouter не смогла ответить."
-
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     try:
@@ -190,41 +61,40 @@ async def chat_endpoint(request: Request):
         client_history = data.get("history") or []
         client_time = data.get("clientTime") or "Неизвестно"
         
-        user_message = re.sub(r"^\[Системное инфо[:\.].*?\]\s*", "", raw_user_message, flags=re.DOTALL)
-        user_message = re.sub(r"\[Текущие дата и время.*?\]\s*", "", user_message, flags=re.DOTALL)
+        # Очищаем текст сообщения от системного мусора [Системное инфо...]
+        user_message = re.sub(r"^\[Системное инфо\..*?\]\s*", "", raw_user_message, flags=re.DOTALL)
+        user_message = re.sub(r"^\[Текущие дата и время.*?\]\s*", "", user_message, flags=re.DOTALL)
         user_message = user_message.strip()
 
-        if not user_message and ("Текущие дата и время" in raw_user_message or "Системное инфо" in raw_user_message):
-            return {"text": "Часы успешно синхронизированы."}
-
+        # Автоматически вытаскиваем реальное имя гостя из скрытой строки фронтенда
         guest_name = "Пользователь"
         if "Имя собеседника:" in raw_user_message:
             match = re.search(r"Имя собеседника:\s*([^\s\]]+)", raw_user_message)
             if match:
                 guest_name = match.group(1)
 
+        # Вытаскиваем точную дату из строки
         time_info = f"Текущие дата и время у пользователя (МСК): {client_time}.\n\n"
+        if "Текущие дата и время:" in raw_user_message:
+            time_match = re.search(r"Текущие дата и время:\s*([^\]\n]+)", raw_user_message)
+            if time_match:
+                time_info = f"Текущие дата и время у пользователя (МСК): {time_match.group(1)}.\n\n"
 
+        # Требование по ссылкам для системного промпта
         web_search_instruction = (
             "Если пользователь просит найти что-то на сайтах или зайти по ссылке — "
-            "используй свои инструменты поиска, читай информацию и ОБЯЗАТЕЛЬНО давай ссылки на источники. "
-            "Никогда не пиши вслух фразы вроде '[Текущие дата и время...]', это техническая информация."
+            "используй свои внутренние знания, читай информацию и ОБЯЗАТЕЛЬНО в конце своего ответа "
+            "давай точные ссылки (URL) на сайты, о которых идет речь."
         )
 
-        programming_instruction = (
-            "ТЫ ТАКЖЕ ЯВЛЯЕШЬСЯ КРУТЫМ ПРЕПОДАВАТЕЛЕМ И ЭКСПЕРТОМ ПО ПРОГРАММИРОВАНИЮ (Школа с уклоном в IT). "
-            "If the user asks to write code, always wrap code in standard Markdown triple backticks block with language specified like ```python ... ```. "
-            "Пиши только чистый, рабочий и современный код с подробными комментариями прямо внутри строк. "
-            "Объясняй логику простых вещей простыми словами, без заумной терминологии."
-        )
-
+        # 1. НАСТРОЙКА СИСТЕМНЫХ ПРОМТОВ В ЗАВИСИМОСТИ ОТ РЕЖИМА
         if mode == "public":
             system_prompt = (
                 f"{time_info}"
                 f"Ты — крутой, вежливый и отзывчивый ИИ-помощник. Твой стиль общения — живой, "
-                f"свободный, понятный и по-человечески теплый. Никакой лишней официальщины.\n"
+                f"свободный, понятный и по-человечески теплый. Никакой лишней официальщины. "
+                f"Отвечай всегда только на русском языке, просто и емко. Не расписывай длинные простыни текста.\n"
                 f"{web_search_instruction}\n"
-                f"{programming_instruction}\n"
                 f"ВАЖНО: Твоего собеседника зовут {guest_name}. Обращайся к нему по этому имени! "
                 f"Не используй имя Алексей, сейчас ты общаешься именно с пользователем по имени {guest_name}."
             )
@@ -235,11 +105,13 @@ async def chat_endpoint(request: Request):
                 "свободный, с юмором и иронией, как в реальном разговоре. Никакой официальщины, "
                 "никаких фраз 'Чем могу быть полезен' или 'Как я могу помочь'. "
                 "Отвечай всегда только на русском языке, просто, емко и по-человечески. "
+                "Старайся писать коротко и по делу, не расписывай длинные простыни текста, "
+                "если только Алексей сам не попросит ответить детально или развернуто. "
                 f"{web_search_instruction}\n"
-                f"{programming_instruction}\n"
                 "Если Алексей просит шутку — шути смешно, жизненно, избегай избитых шаблонов."
             )
 
+        # 2. ЗАПИСЬ В БД ТОЛЬКО ДЛЯ ЛИЧНОГО РЕЖИМА АЛЕКСЕЯ
         conn = None
         if mode != "public":
             conn = get_db_connection()
@@ -254,12 +126,13 @@ async def chat_endpoint(request: Request):
                 except Exception as e:
                     logger.error(f"Не удалось записать сообщение пользователя: {e}")
 
+        # 3. СБОР КОНТЕКСТА И ИСТОРИИ ДЛЯ GOOGLE GEMINI
         gemini_contents = [{"role": "user", "parts": [{"text": f"SYSTEM INSTRUCTION: {system_prompt}"}]}]
         gemini_contents.append({"role": "model", "parts": [{"text": "Понял тебя. Инструкции приняты. Буду общаться строго по этим правилам."}]})
         
         if mode == "public":
             for msg in client_history[:-1]:
-                clean_content = re.sub(r"^\[Системное инфо[:\.].*?\]\s*", "", msg.get("content") or "", flags=re.DOTALL).strip()
+                clean_content = re.sub(r"^\[Системное инфо\..*?\]\s*", "", msg.get("content") or "", flags=re.DOTALL).strip()
                 g_role = "user" if msg.get("role") == "user" else "model"
                 gemini_contents.append({"role": g_role, "parts": [{"text": clean_content}]})
         else:
@@ -279,8 +152,10 @@ async def chat_endpoint(request: Request):
                 except Exception as e:
                     logger.error(f"Не удалось достать контекст для ИИ: {e}")
 
+        # Добавляем текущее сообщение пользователя
         user_parts = [{"text": user_message}]
         
+        # Если есть фото
         if image_base64 and "," in image_base64:
             try:
                 mime_type, b64_data = image_base64.split(",", 1)
@@ -296,27 +171,20 @@ async def chat_endpoint(request: Request):
 
         gemini_contents.append({"role": "user", "parts": user_parts})
 
+        # 4. ЗАПРОС К GOOGLE GEMINI API (ЖЕСТКО ИСПРАВЛЕНА МОДЕЛЬ НА GEMINI-2.5-FLASH)
         gemini_key = os.environ.get("GEMINI_API_KEY", "")
-        openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
+        reply = "Не удалось получить ответ от Google Gemini."
         
-        reply = ""
-        gemini_success = False
-        
+        # Изменено на gemini-2.5-flash
         gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
-        
-        payload = {
-            "contents": gemini_contents,
-            "tools": [{"google_search": {}}]
-        }
         
         async with httpx.AsyncClient() as client:
             try:
-                logger.info("Отправка основного запроса в Gemini API...")
                 response = await client.post(
                     gemini_url,
                     headers={"Content-Type": "application/json"},
-                    json=payload,
-                    timeout=20.0
+                    json={"contents": gemini_contents},
+                    timeout=15.0
                 )
                 
                 if response.status_code == 200:
@@ -326,18 +194,13 @@ async def chat_endpoint(request: Request):
                         parts = candidates[0].get("content", {}).get("parts", [])
                         if parts:
                             reply = parts[0].get("text", "")
-                            reply = format_links_to_containers(reply)
-                            gemini_success = True
                 else:
-                    logger.error(f"Gemini вернул статус {response.status_code}. Переключаемся на резерв.")
+                    reply = f"Ошибка Gemini API (Статус {response.status_code}): {response.text}"
             except Exception as gemini_err:
-                logger.error(f"Сбой сети при запросе к Gemini: {gemini_err}. Переключаемся на резерв.")
+                reply = f"Сбой сети при JSON-запросе к Gemini: {str(gemini_err)}"
 
-            if not gemini_success:
-                openai_messages = convert_gemini_to_openai_history(gemini_contents)
-                reply = await try_openrouter_fallback(client, openai_messages, openrouter_key)
-
-        if mode != "public" and conn and reply and not reply.startswith("Ошибка:") and "не смогла ответить" not in reply:
+        # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
+        if mode != "public" and conn and not reply.startswith("Ошибка Gemini") and not reply.startswith("Сбой сети"):
             try:
                 cur.execute(
                     "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
