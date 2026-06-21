@@ -39,8 +39,7 @@ async def ask_llm(messages, mode):
     except Exception:
         pass
 
-    # 2. Попытка Gemini (здесь нужно будет добавить твой ключ)
-    # 3. Попытка OpenRouter (здесь нужно будет добавить твой ключ)
+    # 2. Попытка Gemini и 3. OpenRouter будут здесь
     return "Извини, я сейчас не могу ответить (API не настроены или недоступны)."
 
 @app.post("/api/chat")
@@ -48,9 +47,10 @@ async def chat_endpoint(request: Request):
     data = await request.json()
     raw_text = data.get("text") or ""
     mode = data.get("mode") or "public"
-    user_name = "Алексей"
+    # Берем имя, которое прислал фронтенд (Алексей для привата, или то, что ввели для паблика)
+    user_name = data.get("user") or "Гость"
     
-    # Системная инструкция
+    # Передаем правильное имя в системную инструкцию
     messages = [{"role": "system", "content": f"Ты — друг и помощник. Пользователя зовут {user_name}."}, {"role": "user", "content": raw_text}]
     
     reply = await ask_llm(messages, mode)
@@ -70,14 +70,12 @@ async def chat_endpoint(request: Request):
 
 @app.get("/api/history")
 async def get_history(mode: str = "public"):
-    # Если публичный режим — истории нет
     if mode == "public":
         return []
     
     conn = get_db_connection()
     if not conn: return []
     cur = conn.cursor()
-    # Берем последние 10 записей
     cur.execute("SELECT id, role, content FROM chat_messages ORDER BY id DESC LIMIT 10")
     rows = cur.fetchall()
     cur.close()
