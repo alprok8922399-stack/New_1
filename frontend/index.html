@@ -64,7 +64,7 @@
             background: #000000; 
             padding: 12px 15px; 
             display: flex;
-            justify-between: space-between;
+            justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid #222; 
             font-weight: bold; 
@@ -136,7 +136,23 @@
         .input-area { padding: 10px; background: #000000; border-top: 1px solid #222; display: flex; flex-direction: column; gap: 5px; }
         .input-row { display: flex; align-items: flex-end; gap: 8px; }
         
-        textarea { flex: 1; background: #1c1c1e; border: 1px solid #333; border-radius: 18px; color: #fff; padding: 10px 15px; outline: none; resize: none; min-height: 40px; max-height: 120px; line-height: 1.4; font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        /* Исправленное мягкое и компактное поле ввода */
+        textarea { 
+            flex: 1; 
+            background: #1c1c1e; 
+            border: 1px solid #333; 
+            border-radius: 20px; 
+            color: #fff; 
+            padding: 10px 16px; 
+            outline: none; 
+            resize: none; 
+            min-height: 40px; 
+            max-height: 120px; 
+            line-height: 1.35; 
+            font-size: 15px; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            letter-spacing: -0.1px;
+        }
         .input-row button { background: none; border: none; color: #0a84ff; font-size: 22px; cursor: pointer; padding: 5px; }
         #attach-btn { color: #8e8e93; }
 
@@ -257,7 +273,6 @@
         function formatAiText(text) {
             let rawText = text || "";
             
-            // Замена блоков кода ``` на отформатированный блок
             const codeBlockPattern = /\`\`\`(?:[a-zA-Z0-9_-]+)?\n([\s\S]*?)\`\`\`/g;
             rawText = rawText.replace(codeBlockPattern, (match, codeContent) => {
                 const cleanCode = codeContent.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").trim();
@@ -357,7 +372,7 @@
 
         async function loadChatHistory() {
             try {
-                const response = await fetch("[https://new-1-5155.onrender.com/api/history](https://new-1-5155.onrender.com/api/history)");
+                const response = await fetch("https://new-1-5155.onrender.com/api/history", { cache: 'no-store' });
                 const history = await response.json();
                 messagesContainer.innerHTML = ""; 
                 history.forEach(msg => {
@@ -421,9 +436,10 @@
             const historyArray = getClientHistoryArray();
 
             try {
-                const response = await fetch("[https://new-1-5155.onrender.com/api/chat](https://new-1-5155.onrender.com/api/chat)", {
+                const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    cache: 'no-store',
                     body: JSON.stringify({ 
                         text: textWithTime, 
                         image: imgToSend,
