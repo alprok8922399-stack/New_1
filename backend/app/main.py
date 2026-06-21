@@ -106,6 +106,15 @@ async def chat_endpoint(request: Request):
             "Никогда не пиши вслух фразы вроде '[Текущие дата и время...]', это техническая информация."
         )
 
+        programming_instruction = (
+            "ТЫ ТАКЖЕ ЯВЛЯЕШЬСЯ КРУТЫМ ПРЕПОДАВАТЕЛЕМ И ЭКСПЕРТОМ ПО ПРОГРАММИРОВАНИЮ (Школа с уклоном в IT). "
+            "Если пользователь просит написать код, помочь с программированием или объяснить тему: "
+            "1. Пиши только чистый, рабочий и современный код. "
+            "2. Обязательно вставляй подробные, понятные комментарии к коду прямо внутри строк, чтобы новичок мог легко разобраться. "
+            "3. Объясняй логику простых вещей простыми словами, без заумной терминологии. "
+            "4. Всегда проверяй код на потенциальные ошибки перед выдачей."
+        )
+
         # 1. НАСТРОЙКА СИСТЕМНЫХ ПРОМТОВ В ЗАВИСИМОСТИ ОТ РЕЖИМА
         if mode == "public":
             system_prompt = (
@@ -113,6 +122,7 @@ async def chat_endpoint(request: Request):
                 f"Ты — крутой, вежливый и отзывчивый ИИ-помощник. Твой стиль общения — живой, "
                 f"свободный, понятный и по-человечески теплый. Никакой лишней официальщины.\n"
                 f"{web_search_instruction}\n"
+                f"{programming_instruction}\n"
                 f"ВАЖНО: Твоего собеседника зовут {guest_name}. Обращайся к нему по этому имени! "
                 f"Не используй имя Алексей, сейчас ты общаешься именно с пользователем по имени {guest_name}."
             )
@@ -124,6 +134,7 @@ async def chat_endpoint(request: Request):
                 "никаких фраз 'Чем могу быть полезен' или 'Как я могу помочь'. "
                 "Отвечай всегда только на русском языке, просто, емко и по-человечески. "
                 f"{web_search_instruction}\n"
+                f"{programming_instruction}\n"
                 "Если Алексей просит шутку — шути смешно, жизненно, избегай избитых шаблонов."
             )
 
@@ -272,18 +283,4 @@ async def get_history():
         logger.error(f"Ошибка при получении истории: {e}")
         return []
 
-@app.delete("/api/delete/{msg_id}")
-async def delete_message(msg_id: int):
-    conn = get_db_connection()
-    if not conn:
-        return {"status": "error", "message": "Нет подключения к БД"}
-    try:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM chat_messages WHERE id = %s", (msg_id,))
-        conn.commit()
-        cur.close()
-        conn.close()
-        return {"status": "success", "message": f"Сообщение {msg_id} удалено"}
-    except Exception as e:
-        logger.error(f"Ошибка при удалении сообщения {msg_id}: {e}")
-        return {"status": "error", "message": str(e)}
+@app.delete("/api/delete
