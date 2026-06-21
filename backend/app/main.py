@@ -6,7 +6,6 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -33,43 +32,57 @@ async def chat_endpoint(request: Request):
     data = await request.json()
     raw_user_message = data.get("text") or ""
     mode = data.get("mode") or "private"
-    
     user_message = re.sub(r"^\[Системное инфо\..*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
     
-    # Конфигурация Groq
+    # Запись пользователя в БД
+    conn = get_db_connection()
+    if conn and mode != "public":
+        cur = conn.cursor()
+        cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", user_message))
+        conn.commit()
+        cur.close()
+
+    # Запрос к Groq
     groq_key = os.environ.get("GROG_KEY")
     groq_url = "https://api.groq.com/openai/v1/chat/completions"
-    
-    headers = {
-        "Authorization": f"Bearer {groq_key}",
-        "Content-Type": "application/json"
-    }
-    
-    # Формируем запрос для Groq (используем модель llama-3.3-70b-versatile)
+    headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
     payload = {
         "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "system", "content": "Ты — крутой помощник Алексея. Отвечай кратко, по-человечески, с юмором, на русском языке."},
-            {"role": "user", "content": user_message}
-        ]
+        "messages": [{"role": "system", "content": "Ты — крутой помощник. Отвечай кратко, на русском."}, {"role": "user", "content": user_message}]
     }
 
     async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(groq_url, headers=headers, json=payload, timeout=20.0)
-            if response.status_code == 200:
-                reply = response.json()['choices'][0]['message']['content']
-            else:
-                reply = f"Ошибка Groq: {response.status_code} - {response.text}"
-        except Exception as e:
-            reply = f"Ошибка подключения: {str(e)}"
+        response = await client.post(groq_url, headers=headers, json=payload, timeout=20.0)
+        reply = response.json()['choices'][0]['message']['content'] if response.status_code == 200 else "Ошибка Groq"
+
+    # Запись ответа в БД
+    if conn and mode != "public":
+        cur = conn.cursor()
+        cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", reply))
+        conn.commit()
+        cur.close()
+        conn.close()
             
     return {"text": reply}
 
 @app.get("/api/history")
 async def get_history():
-    return [] # История пока отключена для простоты
+    conn = get_db_connection()
+    if not conn: return []
+    cur = conn.cursor()
+    cur.execute("SELECT id, role, content FROM chat_messages ORDER BY id DESC LIMIT 15")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [{"id": r[0], "role": r[1], "content": r[2]} for r in rows[::-1]]
 
 @app.delete("/api/delete/{msg_id}")
 async def delete_message(msg_id: int):
+    conn = get_db_connection()
+    if conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM chat_messages WHERE id = %s", (msg_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
     return {"status": "success"}
