@@ -40,6 +40,7 @@ def get_db_connection():
 async def chat_endpoint(request: Request):
     data = await request.json()
     raw_user_message = data.get("text") or ""
+    image_data = data.get("image_data") # Получаем данные картинки, если есть
     mode = data.get("mode") or "private"
     
     # Извлечение системной инфы
@@ -79,7 +80,15 @@ async def chat_endpoint(request: Request):
     for msg in history_messages:
         full_messages.append({"role": msg["role"], "content": msg["content"]})
     
-    full_messages.append({"role": "user", "content": user_message})
+    # Формируем сообщение пользователя (текст + картинка, если есть)
+    user_content = user_message
+    if image_data:
+        user_content = [
+            {"type": "text", "text": user_message},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+        ]
+        
+    full_messages.append({"role": "user", "content": user_content})
     
     reply = "Ошибка: все сервисы недоступны"
     
