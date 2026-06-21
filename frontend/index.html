@@ -52,7 +52,7 @@
     <script>
         const SECRET_CODE = 'alprok8922399';
         let chatMode = 'public'; 
-        let userDisplayName = 'Алексей';
+        let userDisplayName = 'Гость';
 
         const authScreen = document.getElementById('auth-screen');
         const chatScreen = document.getElementById('chat-screen');
@@ -63,7 +63,9 @@
         const headerTitle = document.getElementById('chat-header-title');
 
         clearBtn.addEventListener('click', async () => {
-            await fetch("https://new-1-5155.onrender.com/api/clear");
+            if (chatMode === 'private') {
+                await fetch("https://new-1-5155.onrender.com/api/clear");
+            }
             messagesContainer.innerHTML = "";
         });
 
@@ -71,10 +73,14 @@
             const inputVal = document.getElementById('username-input').value.trim();
             if (inputVal === SECRET_CODE) {
                 chatMode = 'private';
+                userDisplayName = 'Алексей'; // В приватном режиме ты всегда Алексей
                 headerTitle.textContent = 'Друг и помощник';
+                clearBtn.style.display = 'block'; // Показываем кнопку очистки
             } else {
                 chatMode = 'public';
+                userDisplayName = inputVal || 'Гость'; // В публичном режиме имя берется из ввода
                 headerTitle.textContent = 'Публичный чат';
+                clearBtn.style.display = 'none'; // Скрываем кнопку очистки для паблика
             }
             authScreen.style.display = 'none';
             chatScreen.style.display = 'flex';
