@@ -109,10 +109,10 @@ async def chat_endpoint(request: Request):
         programming_instruction = (
             "ТЫ ТАКЖЕ ЯВЛЯЕШЬСЯ КРУТЫМ ПРЕПОДАВАТЕЛЕМ И ЭКСПЕРТОМ ПО ПРОГРАММИРОВАНИЮ (Школа с уклоном в IT). "
             "Если пользователь просит написать код, помочь с программированием или объяснить тему: "
-            "1. Пиши только чистый, рабочий и современный код. "
-            "2. Обязательно вставляй подробные, понятные комментарии к коду прямо внутри строк, чтобы новичок мог легко разобраться. "
-            "3. Объясняй логику простых вещей простыми словами, без заумной терминологии. "
-            "4. Всегда проверяй код на потенциальные ошибки перед выдачей."
+            "1. ОБЯЗАТЕЛЬНО всегда выводи сам код! Никогда не забывай его прикрепить. "
+            "2. Код всегда оборачивай в стандартные блоки Markdown с тремя обратными кавычками и указанием языка (например, ```python ... ```). "
+            "3. Пиши только чистый, рабочий и современный код с подробными комментариями прямо внутри строк. "
+            "4. Объясняй логику простых вещей простыми словами, без заумной терминологии."
         )
 
         # 1. НАСТРОЙКА СИСТЕМНЫХ ПРОМТОВ В ЗАВИСИМОСТИ ОТ РЕЖИМА
@@ -202,7 +202,7 @@ async def chat_endpoint(request: Request):
         gemini_key = os.environ.get("GEMINI_API_KEY", "")
         reply = "Не удалось получить ответ от Google Gemini."
         
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
+        gemini_url = f"[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=){gemini_key}"
         
         payload = {
             "contents": gemini_contents,
