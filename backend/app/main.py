@@ -72,6 +72,116 @@ def format_links_to_containers(text: str) -> str:
     )
     return text
 
+async def get_openrouter_free_models(client: httpx.AsyncClient) -> list:
+    """
+    Получает список всех доступных бесплатных моделей с OpenRouter динамически.
+    """
+    try:
+        response = await client.get("https://openrouter.ai/api/v1/models", timeout=10.0)
+        if response.status_code == 200:
+            models_data = response.json().get("data", [])
+            free_models = []
+            for m in models_data:
+                # Проверяем, что стоимость за токены равна нулю
+                pricing = m.get("pricing", {})
+                prompt_cost = float(pricing.get("prompt", 1))
+                completion_cost = float(pricing.get("completion", 1))
+                if prompt_cost == 0.0 and completion_cost == 0.0:
+                    free_models.append(m.get("id"))
+            return free_models
+    except Exception as e:
+        logger.error(f"Не удалось получить список бесплатных моделей OpenRouter: {e}")
+    return []
+
+def convert_gemini_to_openai_history(gemini_contents: list) -> list:
+    """
+    Конвертирует структуру истории Gemini в стандартный формат OpenAI/OpenRouter.
+    """
+    openai_messages = []
+    for item in gemini_contents:
+        g_role = item.get("role")
+        # Конвертируем роли под стандарт OpenRouter
+        role = "user"
+        if g_role == "model":
+            role = "assistant"
+            
+        parts = item.get("parts", [])
+        text_content = ""
+        for part in parts:
+            if "text" in part:
+                text_content += part["text"]
+        
+        # Если это первая системная инструкция, которую мы зашивали в историю Gemini
+        if "SYSTEM INSTRUCTION:" in text_content:
+            text_content = text_content.replace("SYSTEM INSTRUCTION: ", "")
+            role = "system"
+            
+        if text_content:
+            openai_messages.append({"role": role, "content": text_content})
+            
+    return openai_messages
+
+async def try_openrouter_fallback(client: httpx.AsyncClient, openai_messages: list, openrouter_key: str) -> str:
+    """
+    Логика резервного перебора моделей через OpenRouter.
+    Сначала пробует cohere/north-mini-code:free, затем все остальные бесплатные.
+    """
+    if not openrouter_key:
+        return "Ошибка: Доступ к Gemini ограничен, а API-ключ OpenRouter (OPENROUTER_API_KEY) не настроен."
+
+    # Составляем приоритетный список моделей. Первая — CohereLabs
+    models_to_try = ["cohere/north-mini-code:free"]
+    
+    # Подгружаем остальные бесплатные модели с сайта OpenRouter
+    api_free_models = await get_openrouter_free_models(client)
+    for model_id in api_free_models:
+        if model_id not in models_to_try:
+            models_to_try.append(model_id)
+
+    # Если вдруг список пуст, добавим популярные бесплатные модели вручную как запасной вариант
+    if len(models_to_try) == 1:
+        models_to_try.extend([
+            "google/gemini-2.5-flash:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "deepseek/deepseek-chat:free"
+        ])
+
+    logger.info(f"Запуск резервного переключения OpenRouter. Очередь моделей: {models_to_try}")
+
+    # Перебираем модели по очереди, пока одна из них не ответит
+    for model in models_to_try:
+        try:
+            logger.info(f"Пробуем резервную модель OpenRouter: {model}")
+            or_payload = {
+                "model": model,
+                "messages": openai_messages
+            }
+            or_response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {openrouter_key}",
+                    "Content-Type": "application/json"
+                },
+                json=or_payload,
+                timeout=25.0
+            )
+            
+            if or_response.status_code == 200:
+                or_json = or_response.json()
+                choices = or_json.get("choices", [])
+                if choices:
+                    reply_text = choices[0].get("message", {}).get("content", "")
+                    if reply_text:
+                        logger.info(f"Успешно получен ответ от резервной модели {model}")
+                        # Добавляем пометку в лог или к тексту, если нужно, но возвращаем чистый ответ
+                        return format_links_to_containers(reply_text)
+            else:
+                logger.warning(f"Модель {model} вернула статус {or_response.status_code}")
+        except Exception as e:
+            logger.error(f"Ошибка при запросе к модели {model} через OpenRouter: {e}")
+            
+    return "Доступ к Gemini ограничен, и ни одна из бесплатных моделей OpenRouter не смогла ответить."
+
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     try:
@@ -82,12 +192,12 @@ async def chat_endpoint(request: Request):
         client_history = data.get("history") or []
         client_time = data.get("clientTime") or "Неизвестно"
         
-        # Полностью вырезаем любые системные сообщения о дате/времени (и с точкой, и с двоеточием)
+        # Полностью вырезаем любые системные сообщения о дате/времени
         user_message = re.sub(r"^\[Системное инфо[:\.].*?\]\s*", "", raw_user_message, flags=re.DOTALL)
         user_message = re.sub(r"\[Текущие дата и время.*?\]\s*", "", user_message, flags=re.DOTALL)
         user_message = user_message.strip()
 
-        # Если сообщение после очистки оказалось пустым (просто системный пинг времени), не мучаем ИИ
+        # Если сообщение после очистки оказалось пустым, не мучаем ИИ
         if not user_message and ("Текущие дата и время" in raw_user_message or "Системное инфо" in raw_user_message):
             return {"text": "Часы успешно синхронизированы."}
 
@@ -200,7 +310,10 @@ async def chat_endpoint(request: Request):
 
         # 4. ЗАПРОС К GOOGLE GEMINI API С ПОДКЛЮЧЕННЫМ ИНТЕРНЕТ-ПОИСКОМ
         gemini_key = os.environ.get("GEMINI_API_KEY", "")
-        reply = "Не удалось получить ответ от Google Gemini."
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
+        
+        reply = ""
+        gemini_success = False
         
         gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
         
@@ -211,6 +324,7 @@ async def chat_endpoint(request: Request):
         
         async with httpx.AsyncClient() as client:
             try:
+                logger.info("Отправка основного запроса в Gemini API...")
                 response = await client.post(
                     gemini_url,
                     headers={"Content-Type": "application/json"},
@@ -225,15 +339,22 @@ async def chat_endpoint(request: Request):
                         parts = candidates[0].get("content", {}).get("parts", [])
                         if parts:
                             reply = parts[0].get("text", "")
-                            # Форматируем ссылки в красивые контейнеры перед отправкой на экран
                             reply = format_links_to_containers(reply)
+                            gemini_success = True
                 else:
-                    reply = f"Ошибка Gemini API (Статус {response.status_code}): {response.text}"
+                    logger.error(f"Gemini вернул статус {response.status_code}. Переключаемся на резерв.")
             except Exception as gemini_err:
-                reply = f"Сбой сети при JSON-запросе к Gemini: {str(gemini_err)}"
+                logger.error(f"Сбой сети при запросе к Gemini: {gemini_err}. Переключаемся на резерв.")
 
-        # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
-        if mode != "public" and conn and not reply.startswith("Ошибка Gemini") and not reply.startswith("Сбой сети"):
+            # РЕЗЕРВНЫЙ ВАРЬЯНТ (FALLBACK) НА OPENROUTER
+            if not gemini_success:
+                # Конвертируем текущую собранную историю под требования OpenRouter
+                openai_messages = convert_gemini_to_openai_history(gemini_contents)
+                # Вызываем перебор бесплатных моделей
+                reply = await try_openrouter_fallback(client, openai_messages, openrouter_key)
+
+        # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ (если ответ не пустой и не техническая критическая ошибка)
+        if mode != "public" and conn and reply and not reply.startswith("Ошибка:") and "не смогла ответить" not in reply:
             try:
                 cur.execute(
                     "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
