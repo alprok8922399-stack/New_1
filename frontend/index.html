@@ -90,15 +90,36 @@
         .messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 16px; }
         .message-wrapper { display: flex; flex-direction: column; width: 100%; }
         
-        .message { max-width: 90%; padding: 12px 16px; border-radius: 18px; font-size: 15px; word-wrap: break-word; font-family: inherit; }
-        .message.bot { background: #1c1c1e; align-self: flex-start; border-bottom-left-radius: 4px; color: #f3f4f6; }
-        .message.user { background: #2c2c2e; align-self: flex-end; border-bottom-right-radius: 4px; color: #fff; }
+        /* Общие стили сообщений */
+        .message { padding: 12px 16px; border-radius: 18px; font-size: 15px; word-wrap: break-word; font-family: inherit; }
+        
+        /* Стили для ИИ: прозрачный блок, на всю ширину экрана */
+        .message.bot { 
+            background: transparent; 
+            align-self: flex-start; 
+            max-width: 100%; 
+            padding: 4px 0; /* Убираем боковые отступы, чтобы текст не был зажат */
+            border-radius: 0; 
+            color: #f3f4f6; 
+        }
+        
+        /* Стили для пользователя: оставляем аккуратный пузырь */
+        .message.user { 
+            background: #2c2c2e; 
+            align-self: flex-end; 
+            max-width: 85%;
+            border-bottom-right-radius: 4px; 
+            color: #fff; 
+        }
         
         .message p { margin-bottom: 10px; line-height: 1.45; }
         .message p:last-child { margin-bottom: 0; }
         .message strong { color: #fff; font-weight: bold; }
 
         .message-buttons { display: flex; gap: 6px; padding: 4px 6px 0 6px; width: 100%; }
+        /* Для кнопок бота убираем левый отступ, чтобы они шли вровень с текстом */
+        .message-buttons.bot-btns { padding-left: 0; }
+        
         .message-buttons button { 
             background: none; 
             border: 1px solid #000000; 
@@ -234,16 +255,42 @@
             previewContainer.classList.add('preview-hidden');
         });
 
+        // Новая умная функция обработки текста и кода от ИИ
         function formatAiText(text) {
             let rawText = text || "";
-            rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
-            
-            const paragraphs = rawText.split('\n');
-            return paragraphs.map(p => {
-                if (p.trim() === "") return '<div style="height: 8px;"></div>';
-                return `<p>${p}</p>`;
-            }).join('');
+            // Экранируем HTML для безопасности
+            rawText = rawText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+            // Ищем блоки кода (черные окна)
+            const segments = rawText.split(/```/g);
+            if (segments.length > 1) {
+                for (let i = 1; i < segments.length; i += 2) {
+                    // Убираем название языка программирования в первой строчке (если есть)
+                    let codeLines = segments[i].replace(/^[a-zA-Z0-9_-]+\n/, ""); 
+                    // Оборачиваем в черное окно
+                    segments[i] = `<pre style="background: #000000; color: #e3e3e3; padding: 16px; border-radius: 12px; font-family: monospace; font-size: 14px; white-space: pre-wrap; margin: 12px 0; border: 1px solid #333; overflow-x: auto; width: 100%;"><code>${codeLines.trim()}</code></pre>`;
+                }
+            }
+
+            let formattedText = "";
+            for (let i = 0; i < segments.length; i++) {
+                if (i % 2 === 0) {
+                    // Обычный текст
+                    let txt = segments[i];
+                    txt = txt.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                    txt = txt.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                    
+                    const paragraphs = txt.split('\n');
+                    formattedText += paragraphs.map(p => {
+                        if (p.trim() === "") return '<div style="height: 8px;"></div>';
+                        return `<p style="margin-bottom: 8px; line-height: 1.5;">${p}</p>`;
+                    }).join('');
+                } else {
+                    // Блок кода
+                    formattedText += segments[i];
+                }
+            }
+            return formattedText;
         }
 
         function copyToClipboard(text) {
@@ -256,7 +303,8 @@
             if ((!text || text.trim() === "") && !imageUrl) return;
 
             const className = isUser ? 'message user' : 'message bot';
-            let finalHtml = isUser ? text.replace(/\n/g, '<br>') : formatAiText(text);
+            // Если пишет пользователь - просто заменяем переносы. Если ИИ - прогоняем через умный форматтер
+            let finalHtml = isUser ? text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, '<br>') : formatAiText(text);
             
             if (imageUrl) {
                 finalHtml = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">` + finalHtml;
@@ -274,7 +322,7 @@
             wrapper.appendChild(messageDiv);
             
             const buttonsDiv = document.createElement('div');
-            buttonsDiv.className = 'message-buttons';
+            buttonsDiv.className = isUser ? 'message-buttons user-btns' : 'message-buttons bot-btns';
             
             if (isUser) {
                 buttonsDiv.style.justifyContent = 'flex-end';
@@ -283,106 +331,4 @@
                         <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"/></svg>
                     </button>
                     <button class="btn-copy" title="Копировать">
-                        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    </button>
-                `;
-            } else {
-                buttonsDiv.style.justifyContent = 'flex-start';
-                buttonsDiv.innerHTML = `
-                    <button class="btn-copy" title="Копировать">
-                        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    </button>
-                `;
-            }
-            wrapper.appendChild(buttonsDiv);
-
-            const copyBtn = buttonsDiv.querySelector('.btn-copy');
-            if (copyBtn) {
-                copyBtn.addEventListener('click', () => copyToClipboard(text || "Фото"));
-            }
-
-            const editBtn = buttonsDiv.querySelector('.btn-edit');
-            if (editBtn) {
-                editBtn.addEventListener('click', () => {
-                    inputArea.value = text;
-                    inputArea.focus();
-                    inputArea.style.height = 'auto';
-                    inputArea.style.height = (inputArea.scrollHeight) + 'px';
-                    
-                    currentEditingMessageId = messageId; 
-                });
-            }
-            
-            messagesContainer.appendChild(wrapper);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        async function loadChatHistory() {
-            try {
-                const response = await fetch("https://new-1-5155.onrender.com/api/history");
-                const history = await response.json();
-                messagesContainer.innerHTML = ""; 
-                history.forEach(msg => {
-                    const textContent = msg.content || msg.text || "";
-                    appendMessage(textContent, msg.role === 'user', "", msg.id);
-                });
-            } catch (e) {
-                console.error("Ошибка загрузки истории:", e);
-            }
-        }
-
-        clearBtn.addEventListener('click', () => {
-            messagesContainer.innerHTML = "";
-        });
-
-        sendBtn.addEventListener('click', async () => {
-            const text = inputArea.value.trim();
-            if (!text && !selectedImageBase64) return;
-            
-            appendMessage(text || "Фото", true, selectedImageBase64); 
-            const imgToSend = selectedImageBase64;
-            
-            if (currentEditingMessageId !== null) {
-                try {
-                    await fetch(`https://new-1-5155.onrender.com/api/delete/${currentEditingMessageId}`, {
-                        method: 'DELETE'
-                    });
-                    const oldWrapper = document.querySelector(`[data-id="${currentEditingMessageId}"]`);
-                    if (oldWrapper) oldWrapper.remove();
-                } catch (e) {
-                    console.error("Не удалось удалить старое сообщение:", e);
-                }
-                currentEditingMessageId = null; 
-            }
-            
-            inputArea.value = '';
-            inputArea.style.height = '40px'; 
-            selectedImageBase64 = "";
-            fileInput.value = "";
-            previewContainer.classList.add('preview-hidden');
-
-            // Точное время телефона (МСК)
-            const currentDateTime = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
-            
-            // Вшиваем скрытые системные инструкции: время, режим комнаты и имя гостя
-            const textWithTime = `[Системное инфо: Текущие дата и время: ${currentDateTime}. Режим комнаты: ${chatMode}. Имя собеседника: ${userDisplayName}]\n${text}`;
-
-            try {
-                const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        text: textWithTime, 
-                        image: imgToSend,
-                        mode: chatMode // Отправляем режим комнаты на бэкенд
-                    })
-                });
-                const data = await response.json();
-                appendMessage(data.text, false); 
-            } catch (e) {
-                appendMessage("Ошибка соединения. Сервер на Render спит или обновляется.", false);
-            }
-        });
-    </script>
-</body>
-</html>
+                        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13"
