@@ -6,10 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 app = FastAPI()
-
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 def get_db_connection():
@@ -25,37 +22,35 @@ async def chat_endpoint(request: Request):
     image_data = data.get("image_data")
     mode = data.get("mode", "private")
     
-    # Ключи
     groq_key = os.environ.get("GROQ_KEY")
-    gemini_key = os.environ.get("GEMINI_API_KEY")
+    or_key = os.environ.get("OPENROUTER_API_KEY")
 
-    reply = "Ошибка: не заданы API ключи"
+    reply = "Ошибка: ключи не настроены"
 
     async with httpx.AsyncClient() as client:
-        # ЛОГИКА С КАРТИНКОЙ -> Gemini
-        if image_data and gemini_key:
+        # ЕСЛИ ЕСТЬ КАРТИНКА -> OpenRouter (Vision)
+        if image_data and or_key:
             try:
                 payload = {
-                    "model": "gemini-1.5-flash",
+                    "model": "google/gemini-2.0-flash-exp",
                     "messages": [{"role": "user", "content": [
                         {"type": "text", "text": user_text},
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
                     ]}]
                 }
-                # Используем официальный эндпоинт Google
                 response = await client.post(
-                    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                    headers={"Authorization": f"Bearer {gemini_key}", "Content-Type": "application/json"},
-                    json=payload, timeout=40.0
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {or_key}", "Content-Type": "application/json"},
+                    json=payload, timeout=60.0
                 )
                 if response.status_code == 200:
                     reply = response.json()['choices'][0]['message']['content']
                 else:
-                    reply = f"Ошибка Gemini ({response.status_code})"
+                    reply = f"Ошибка OpenRouter: {response.status_code}"
             except Exception as e:
-                reply = f"Исключение Gemini: {str(e)}"
+                reply = f"Исключение OpenRouter: {str(e)}"
 
-        # ЛОГИКА БЕЗ КАРТИНКИ -> Groq
+        # ЕСЛИ ТОЛЬКО ТЕКСТ -> Groq (Быстро)
         elif groq_key:
             try:
                 payload = {
@@ -70,11 +65,11 @@ async def chat_endpoint(request: Request):
                 if response.status_code == 200:
                     reply = response.json()['choices'][0]['message']['content']
                 else:
-                    reply = f"Ошибка Groq ({response.status_code})"
+                    reply = f"Ошибка Groq: {response.status_code}"
             except Exception as e:
                 reply = f"Исключение Groq: {str(e)}"
 
-    # Сохранение (только если успешно)
+    # Сохранение в базу
     if not reply.startswith("Ошибка") and not reply.startswith("Исключение") and mode == "private":
         conn = get_db_connection()
         if conn:
@@ -87,6 +82,7 @@ async def chat_endpoint(request: Request):
             
     return {"text": reply}
 
+# (Функции history и delete оставь прежними)
 @app.get("/api/history")
 async def get_history():
     conn = get_db_connection()
