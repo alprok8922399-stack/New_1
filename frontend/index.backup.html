@@ -172,11 +172,10 @@
             const enteredName = usernameInput.value.trim();
             if (!enteredName) return;
 
-            userDisplayName = enteredName;
-
             if (enteredName === SECRET_CODE) {
-                // Если введен твой код — режим приватный, качаем историю
+                // Если введен твой код — режим приватный, качаем историю и жестко пишем имя Алексей
                 chatMode = 'private';
+                userDisplayName = 'Алексей';
                 chatHeaderTitle.textContent = 'Друг и помощник';
                 authScreen.style.display = 'none';
                 chatScreen.style.display = 'flex';
@@ -184,6 +183,7 @@
             } else {
                 // Если любое другое имя — режим гостевой, историю с сервера НЕ качаем
                 chatMode = 'public';
+                userDisplayName = enteredName;
                 chatHeaderTitle.textContent = `Чат для: ${enteredName}`;
                 authScreen.style.display = 'none';
                 chatScreen.style.display = 'flex';
