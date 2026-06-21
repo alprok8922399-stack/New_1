@@ -6,6 +6,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 
+# Класс для приветствия
+class Greeting:
+    def __init__(self, name):
+        self.name = name
+
+    def get_greeting(self):
+        return f"Привет, {self.name}! Как у тебя дела сегодня?"
+
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -66,6 +74,12 @@ async def chat_endpoint(request: Request):
     system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. Отвечай кратко, с юмором, на русском."
     
     full_messages = [{"role": "system", "content": system_prompt}]
+    
+    # Добавляем приветствие, если истории нет
+    if not history_messages and mode == "private":
+        greeter = Greeting(user_name)
+        full_messages.append({"role": "assistant", "content": greeter.get_greeting()})
+    
     for msg in history_messages:
         full_messages.append({"role": msg["role"], "content": msg["content"]})
     
