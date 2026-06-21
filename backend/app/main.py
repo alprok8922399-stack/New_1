@@ -2,6 +2,7 @@ import os
 import httpx
 import logging
 import re
+import base64
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
@@ -32,24 +33,17 @@ def get_db_connection():
 async def chat_endpoint(request: Request):
     data = await request.json()
     raw_user_message = data.get("text") or ""
+    image_data = data.get("image") or "" 
     mode = data.get("mode") or "private"
     
-    # Извлекаем системную инфу (время, имя), если она есть
-    client_time = "Неизвестно"
-    user_name = "Алексей"
-    
+    # Извлечение системной инфы
     time_match = re.search(r"Текущие дата и время:\s*([^.]+)", raw_user_message)
-    if time_match:
-        client_time = time_match.group(1).strip()
-        
+    client_time = time_match.group(1).strip() if time_match else "Неизвестно"
     name_match = re.search(r"Имя собеседника:\s*([^\]]+)", raw_user_message)
-    if name_match:
-        user_name = name_match.group(1).strip()
+    user_name = name_match.group(1).strip() if name_match else "Алексей"
 
-    # Чистим текст сообщения от системных тегов для отправки пользователю
     user_message = re.sub(r"^\[Системное инфо.*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
     
-    # Конфигурация Groq
     groq_key = os.environ.get("GROQ_KEY") or os.environ.get("GROG_KEY")
     groq_url = "https://api.groq.com/openai/v1/chat/completions"
     
@@ -58,7 +52,14 @@ async def chat_endpoint(request: Request):
         "Content-Type": "application/json"
     }
     
-    # Собираем историю из БД, если режим приватный
+    # Подготовка контента для модели (текст + картинка)
+    message_content = [{"type": "text", "text": user_message}]
+    if image_data:
+        # Убираем префикс base64, если он есть
+        clean_image = image_data.split(",")[-1]
+        message_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{clean_image}"}})
+
+    # История из БД
     history_messages = []
     if mode == "private":
         conn = get_db_connection()
@@ -71,36 +72,34 @@ async def chat_endpoint(request: Request):
             for r in rows[::-1]:
                 history_messages.append({"role": r[0], "content": r[1]})
 
-    # Формируем системный промт с актуальным именем и временем
-    system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время на устройстве пользователя: {client_time}. Отвечай кратко, по-человечески, с юмором, на русском языке."
+    system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. Если прислано фото, проанализируй его. Отвечай кратко, с юмором, на русском."
     
     full_messages = [{"role": "system", "content": system_prompt}]
     for msg in history_messages:
         full_messages.append({"role": msg["role"], "content": msg["content"]})
-    full_messages.append({"role": "user", "content": user_message})
+    full_messages.append({"role": "user", "content": message_content})
     
-    # Формируем запрос для Groq
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.2-90b-vision-preview", # Используем модель с поддержкой зрения
         "messages": full_messages
     }
 
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.post(groq_url, headers=headers, json=payload, timeout=20.0)
+            response = await client.post(groq_url, headers=headers, json=payload, timeout=30.0)
             if response.status_code == 200:
                 reply = response.json()['choices'][0]['message']['content']
             else:
-                reply = f"Ошибка Groq: {response.status_code} - {response.text}"
+                reply = f"Ошибка Groq: {response.status_code}"
         except Exception as e:
-            reply = f"Ошибка подключения: {str(e)}"
+            reply = f"Ошибка: {str(e)}"
             
-    # Сохраняем новые сообщения в БД, если режим приватный
+    # Сохраняем в БД только текстовую часть для истории
     if mode == "private" and not reply.startswith("Ошибка"):
         conn = get_db_connection()
         if conn:
             cur = conn.cursor()
-            cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", user_message))
+            cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", user_message + (" [Отправлено фото]" if image_data else "")))
             cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", reply))
             conn.commit()
             cur.close()
