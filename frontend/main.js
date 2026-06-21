@@ -4,22 +4,8 @@ const sendBtn = document.getElementById('send-btn');
 
 const style = document.createElement('style');
 style.innerHTML = `
-    .hourglass {
-        display: inline-block;
-        width: 20px;
-        height: 20px;
-        border: 2px solid #888;
-        border-radius: 4px;
-        position: relative;
-        animation: rotate 2s linear infinite;
-    }
-    .hourglass::before {
-        content: '';
-        position: absolute;
-        top: 2px; left: 2px; right: 2px; bottom: 2px;
-        border: 1px solid #888;
-        clip-path: polygon(0 0, 100% 0, 50% 50%, 100% 100%, 0 100%, 50% 50%);
-    }
+    .hourglass { display: inline-block; width: 20px; height: 20px; border: 2px solid #888; border-radius: 4px; position: relative; animation: rotate 2s linear infinite; }
+    .hourglass::before { content: ''; position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px; border: 1px solid #888; clip-path: polygon(0 0, 100% 0, 50% 50%, 100% 100%, 0 100%, 50% 50%); }
     @keyframes rotate { 100% { transform: rotate(180deg); } }
 `;
 document.head.appendChild(style);
@@ -41,7 +27,6 @@ function formatAiText(text) {
     rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
     rawText = rawText.replace(/\*/g, '');
-    
     return rawText.split('\n').map(p => {
         if (p.trim() === '---') return '<hr style="border: 0; border-top: 1px solid #333;">';
         if (p.trim() === "") return '<div style="height: 10px;"></div>';
@@ -53,11 +38,9 @@ function formatAiText(text) {
 function appendMessage(text, isUser, isLoader = false) {
     const className = isUser ? 'message user' : 'message bot';
     const content = isLoader ? '<div class="hourglass"></div>' : (isUser ? text.replace(/\n/g, '<br>') : formatAiText(text));
-    
     const messageElement = document.createElement('div');
     messageElement.className = className;
     messageElement.innerHTML = `<div class="message-text">${content}</div>`;
-    
     if (messagesContainer) {
         messagesContainer.appendChild(messageElement);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -69,15 +52,12 @@ if (sendBtn) {
     sendBtn.addEventListener('click', async () => {
         const text = inputArea.value.trim();
         if (!text) return;
-        
         appendMessage(text, true);
         inputArea.value = '';
         inputArea.style.height = '40px';
-
         const loader = appendMessage('', false, true);
-
         try {
-            const response = await fetch("[https://new-1-5155.onrender.com/api/chat](https://new-1-5155.onrender.com/api/chat)", {
+            const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: text })
@@ -94,7 +74,7 @@ if (sendBtn) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        const response = await fetch("[https://new-1-5155.onrender.com/api/history](https://new-1-5155.onrender.com/api/history)");
+        const response = await fetch("https://new-1-5155.onrender.com/api/history");
         const history = await response.json();
         if (messagesContainer) {
             messagesContainer.innerHTML = ""; 
