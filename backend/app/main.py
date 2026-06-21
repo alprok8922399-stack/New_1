@@ -283,4 +283,18 @@ async def get_history():
         logger.error(f"Ошибка при получении истории: {e}")
         return []
 
-@app.delete("/api/delete
+@app.delete("/api/delete/{msg_id}")
+async def delete_message(msg_id: int):
+    conn = get_db_connection()
+    if not conn:
+        return {"status": "error", "message": "Нет подключения к БД"}
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM chat_messages WHERE id = %s", (msg_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "success", "message": f"Сообщение {msg_id} удалено"}
+    except Exception as e:
+        logger.error(f"Ошибка при удалении сообщения {msg_id}: {e}")
+        return {"status": "error", "message": str(e)}
