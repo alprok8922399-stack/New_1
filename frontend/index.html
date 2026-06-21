@@ -31,8 +31,8 @@
 <body>
     <div class="auth-container" id="auth-screen">
         <div class="auth-box">
-            <h2>Введите код доступа</h2>
-            <input type="text" id="username-input" placeholder="Код или Имя..." autofocus>
+            <h2>Введите ваше имя</h2>
+            <input type="text" id="username-input" placeholder="Как вас зовут?" autofocus>
             <button id="login-btn">Войти</button>
         </div>
     </div>
@@ -62,10 +62,8 @@
         const clearBtn = document.getElementById('clear-btn');
         const headerTitle = document.getElementById('chat-header-title');
 
-        clearBtn.addEventListener('click', async () => {
-            if (chatMode === 'private') {
-                await fetch("https://new-1-5155.onrender.com/api/clear");
-            }
+        // Теперь кнопка просто чистит экран смартфона, не трогая базу данных сервера
+        clearBtn.addEventListener('click', () => {
             messagesContainer.innerHTML = "";
         });
 
@@ -109,7 +107,6 @@
             appendMessage(text, true);
             inputArea.value = '';
 
-            // Получаем точное время с телефона прямо в момент отправки
             const now = new Date();
             const timeString = now.toLocaleString('ru-RU');
 
@@ -120,7 +117,7 @@
                     text: text, 
                     mode: chatMode, 
                     user: userDisplayName,
-                    client_time: timeString // Передаем скрытно на сервер
+                    client_time: timeString
                 })
             });
             const data = await response.json();
