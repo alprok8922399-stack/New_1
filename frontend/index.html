@@ -38,10 +38,9 @@
     </div>
 
     <script>
-        // Константы для комнат
         const SECRET_CODE = 'alprok8922399';
-        let chatMode = 'public'; // По умолчанию гостевой режим
-        let userDisplayName = ''; // Имя для отображения
+        let chatMode = 'public'; 
+        let userDisplayName = ''; 
 
         const authScreen = document.getElementById('auth-screen');
         const chatScreen = document.getElementById('chat-screen');
@@ -54,7 +53,6 @@
             if (!enteredName) return;
 
             if (enteredName === SECRET_CODE) {
-                // Если введен твой код — режим приватный, качаем историю и жестко пишем имя Алексей
                 chatMode = 'private';
                 userDisplayName = 'Алексей';
                 chatHeaderTitle.textContent = 'Друг и помощник';
@@ -62,13 +60,12 @@
                 chatScreen.style.display = 'flex';
                 loadChatHistory();
             } else {
-                // Если любое другое имя — режим гостевой, историю с сервера НЕ качаем
                 chatMode = 'public';
                 userDisplayName = enteredName;
                 chatHeaderTitle.textContent = `Чат для: ${enteredName}`;
                 authScreen.style.display = 'none';
                 chatScreen.style.display = 'flex';
-                messagesContainer.innerHTML = ""; // Пустой экран для гостя
+                messagesContainer.innerHTML = ""; 
             }
         }
 
@@ -77,7 +74,6 @@
             if (e.key === 'Enter') handleLogin();
         });
 
-        // Элементы чата
         const messagesContainer = document.getElementById('messages');
         const inputArea = document.getElementById('input');
         const sendBtn = document.getElementById('send-btn');
@@ -115,14 +111,31 @@
             previewContainer.classList.add('preview-hidden');
         });
 
+        function copyCode(btn) {
+            const code = btn.nextElementSibling.innerText;
+            navigator.clipboard.writeText(code);
+            btn.textContent = 'Скопировано!';
+            setTimeout(() => btn.textContent = 'Копировать', 2000);
+        }
+
         function formatAiText(text) {
             let rawText = text || "";
+            
+            // Обработка блоков кода
+            rawText = rawText.replace(/```([\s\S]*?)```/g, (match, p1) => {
+                return `<div class="code-block-wrapper">
+                            <button class="copy-code-btn" onclick="copyCode(this)">Копировать</button>
+                            <pre><code>${p1.trim()}</code></pre>
+                        </div>`;
+            });
+
             rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
             
             const paragraphs = rawText.split('\n');
             return paragraphs.map(p => {
                 if (p.trim() === "") return '<div style="height: 8px;"></div>';
+                if (p.startsWith('<div class="code-block-wrapper">')) return p;
                 return `<p>${p}</p>`;
             }).join('');
         }
@@ -136,7 +149,6 @@
         function appendMessage(text, isUser, imageUrl = "", messageId = null) {
             if ((!text || text.trim() === "") && !imageUrl) return;
 
-            // Вырезаем системную инфу перед показом на экране
             let cleanText = text;
             if (isUser) {
                 cleanText = cleanText.replace(/^\[Системное инфо.*?\]\s*/s, "");
@@ -226,10 +238,7 @@
             const text = inputArea.value.trim();
             if (!text && !selectedImageBase64) return;
             
-            // Точное время телефона (МСК)
             const currentDateTime = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
-            
-            // Вшиваем скрытые системные инструкции: время, режим комнаты и имя гостя
             const textWithTime = `[Системное инфо: Текущие дата и время: ${currentDateTime}. Режим комнаты: ${chatMode}. Имя собеседника: ${userDisplayName}]\n${text}`;
 
             appendMessage(textWithTime, true, selectedImageBase64); 
@@ -261,15 +270,15 @@
                     body: JSON.stringify({ 
                         text: textWithTime, 
                         image: imgToSend,
-                        mode: chatMode // Отправляем режим комнаты на бэкенд
+                        mode: chatMode 
                     })
                 });
                 const data = await response.json();
                 appendMessage(data.text, false); 
             } catch (e) {
-                appendMessage("Ошибка соединения. Сервер на Render спит или обновляется.", false);
+                appendMessage("Ошибка соединения.", false);
             }
         });
     </script>
 </body>
-</html>
+    </html>
