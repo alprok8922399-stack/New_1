@@ -1,7 +1,6 @@
 import os
 import httpx
 import logging
-import re
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
@@ -27,9 +26,66 @@ def get_db_connection():
         logger.error(f"БД ошибка: {e}")
         return None
 
-# Очистка всей базы данных
-@app.get("/api/clear_all")
-async def clear_all():
+async def ask_llm(messages, mode):
+    # 1. Попытка Groq
+    groq_key = os.environ.get("GROG_KEY")
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post("https://api.groq.com/openai/v1/chat/completions", 
+                                     headers={"Authorization": f"Bearer {groq_key}"},
+                                     json={"model": "llama-3.3-70b-versatile", "messages": messages}, timeout=10.0)
+            if resp.status_code == 200:
+                return resp.json()['choices'][0]['message']['content']
+    except Exception:
+        pass
+
+    # 2. Попытка Gemini (здесь нужно будет добавить твой ключ)
+    # 3. Попытка OpenRouter (здесь нужно будет добавить твой ключ)
+    return "Извини, я сейчас не могу ответить (API не настроены или недоступны)."
+
+@app.post("/api/chat")
+async def chat_endpoint(request: Request):
+    data = await request.json()
+    raw_text = data.get("text") or ""
+    mode = data.get("mode") or "public"
+    user_name = "Алексей"
+    
+    # Системная инструкция
+    messages = [{"role": "system", "content": f"Ты — друг и помощник. Пользователя зовут {user_name}."}, {"role": "user", "content": raw_text}]
+    
+    reply = await ask_llm(messages, mode)
+
+    # Сохраняем в базу ТОЛЬКО если приватный режим
+    if mode == "private":
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", raw_text))
+            cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", reply))
+            conn.commit()
+            cur.close()
+            conn.close()
+            
+    return {"text": reply}
+
+@app.get("/api/history")
+async def get_history(mode: str = "public"):
+    # Если публичный режим — истории нет
+    if mode == "public":
+        return []
+    
+    conn = get_db_connection()
+    if not conn: return []
+    cur = conn.cursor()
+    # Берем последние 10 записей
+    cur.execute("SELECT id, role, content FROM chat_messages ORDER BY id DESC LIMIT 10")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [{"id": r[0], "role": r[1], "content": r[2]} for r in rows[::-1]]
+
+@app.get("/api/clear")
+async def clear_chat():
     conn = get_db_connection()
     if conn:
         cur = conn.cursor()
@@ -38,63 +94,3 @@ async def clear_all():
         cur.close()
         conn.close()
     return {"status": "cleared"}
-
-@app.post("/api/chat")
-async def chat_endpoint(request: Request):
-    data = await request.json()
-    raw_user_message = data.get("text") or ""
-    user_name = data.get("user") or "Гость"
-    mode = data.get("mode") or "public"
-    
-    conn = get_db_connection()
-    if conn and mode != "public":
-        cur = conn.cursor()
-        cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", 
-                    ("user", raw_user_message))
-        conn.commit()
-        cur.close()
-
-    system_instruction = f"Ты — друг. Пользователя зовут {user_name}."
-
-    groq_key = os.environ.get("GROG_KEY")
-    groq_url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [{"role": "system", "content": system_instruction}, {"role": "user", "content": raw_user_message}]
-    }
-
-    async with httpx.AsyncClient() as client:
-        response = await client.post(groq_url, headers=headers, json=payload, timeout=20.0)
-        reply = response.json()['choices'][0]['message']['content'] if response.status_code == 200 else "Ошибка"
-
-    if conn and mode != "public":
-        cur = conn.cursor()
-        cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", reply))
-        conn.commit()
-        cur.close()
-        conn.close()
-            
-    return {"text": reply}
-
-@app.get("/api/history")
-async def get_history():
-    conn = get_db_connection()
-    if not conn: return []
-    cur = conn.cursor()
-    cur.execute("SELECT id, role, content FROM chat_messages ORDER BY id DESC LIMIT 15")
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    return [{"id": r[0], "role": r[1], "content": r[2]} for r in rows[::-1]]
-
-@app.delete("/api/delete/{msg_id}")
-async def delete_message(msg_id: int):
-    conn = get_db_connection()
-    if conn:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM chat_messages WHERE id = %s", (msg_id,))
-        conn.commit()
-        cur.close()
-        conn.close()
-    return {"status": "success"}
