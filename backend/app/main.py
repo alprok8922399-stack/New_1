@@ -82,13 +82,13 @@ async def chat_endpoint(request: Request):
         client_history = data.get("history") or []
         client_time = data.get("clientTime") or "Неизвестно"
         
-        # Полностью вырезаем любые системные сообщения о дате/времени, чтобы ИИ их не повторял
-        user_message = re.sub(r"^\[Системное инфо\..*?\]\s*", "", raw_user_message, flags=re.DOTALL)
+        # Полностью вырезаем любые системные сообщения о дате/времени (и с точкой, и с двоеточием)
+        user_message = re.sub(r"^\[Системное инфо[:\.].*?\]\s*", "", raw_user_message, flags=re.DOTALL)
         user_message = re.sub(r"\[Текущие дата и время.*?\]\s*", "", user_message, flags=re.DOTALL)
         user_message = user_message.strip()
 
         # Если сообщение после очистки оказалось пустым (просто системный пинг времени), не мучаем ИИ
-        if not user_message and "Текущие дата и время" in raw_user_message:
+        if not user_message and ("Текущие дата и время" in raw_user_message or "Системное инфо" in raw_user_message):
             return {"text": "Часы успешно синхронизированы."}
 
         # Автоматически вытаскиваем реальное имя гостя из скрытой строки фронтенда
@@ -159,7 +159,7 @@ async def chat_endpoint(request: Request):
         
         if mode == "public":
             for msg in client_history[:-1]:
-                clean_content = re.sub(r"^\[Системное инфо\..*?\]\s*", "", msg.get("content") or "", flags=re.DOTALL).strip()
+                clean_content = re.sub(r"^\[Системное инфо[:\.].*?\]\s*", "", msg.get("content") or "", flags=re.DOTALL).strip()
                 g_role = "user" if msg.get("role") == "user" else "model"
                 gemini_contents.append({"role": g_role, "parts": [{"text": clean_content}]})
         else:
@@ -202,7 +202,7 @@ async def chat_endpoint(request: Request):
         gemini_key = os.environ.get("GEMINI_API_KEY", "")
         reply = "Не удалось получить ответ от Google Gemini."
         
-        gemini_url = f"[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=){gemini_key}"
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
         
         payload = {
             "contents": gemini_contents,
