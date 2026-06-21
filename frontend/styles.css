@@ -270,3 +270,37 @@ textarea {
     justify-content: center; 
     align-items: center; 
 }
+
+/* Оформление блока кода */
+.code-block-wrapper {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    padding: 10px;
+    border-radius: 8px;
+    margin: 10px 0;
+    position: relative;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.code-block-wrapper pre {
+    margin: 0;
+    overflow-x: auto;
+    white-space: pre-wrap;
+}
+
+.copy-code-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: #444;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.copy-code-btn:hover {
+    background: #666;
+}
