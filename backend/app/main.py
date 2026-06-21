@@ -43,7 +43,7 @@ async def chat_endpoint(request: Request):
     mode = data.get("mode") or "private"
     
     # Извлечение системной инфы
-    time_match = re.search(r"Текущие дата и время:\s*([^.]+)", raw_user_message)
+    time_match = re.search(r"Текущие дата и время:\s*([^\]]+)", raw_user_message)
     client_time = time_match.group(1).strip() if time_match else "Неизвестно"
     name_match = re.search(r"Имя собеседника:\s*([^\]]+)", raw_user_message)
     user_name = name_match.group(1).strip() if name_match else "Алексей"
