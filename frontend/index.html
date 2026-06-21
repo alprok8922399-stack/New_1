@@ -255,8 +255,14 @@
         function appendMessage(text, isUser, imageUrl = "", messageId = null) {
             if ((!text || text.trim() === "") && !imageUrl) return;
 
+            // Вырезаем системную инфу перед показом на экране
+            let cleanText = text;
+            if (isUser) {
+                cleanText = cleanText.replace(/^\[Системное инфо.*?\]\s*/s, "");
+            }
+
             const className = isUser ? 'message user' : 'message bot';
-            let finalHtml = isUser ? text.replace(/\n/g, '<br>') : formatAiText(text);
+            let finalHtml = isUser ? cleanText.replace(/\n/g, '<br>') : formatAiText(cleanText);
             
             if (imageUrl) {
                 finalHtml = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">` + finalHtml;
@@ -298,13 +304,13 @@
 
             const copyBtn = buttonsDiv.querySelector('.btn-copy');
             if (copyBtn) {
-                copyBtn.addEventListener('click', () => copyToClipboard(text || "Фото"));
+                copyBtn.addEventListener('click', () => copyToClipboard(cleanText || "Фото"));
             }
 
             const editBtn = buttonsDiv.querySelector('.btn-edit');
             if (editBtn) {
                 editBtn.addEventListener('click', () => {
-                    inputArea.value = text;
+                    inputArea.value = cleanText;
                     inputArea.focus();
                     inputArea.style.height = 'auto';
                     inputArea.style.height = (inputArea.scrollHeight) + 'px';
@@ -339,7 +345,13 @@
             const text = inputArea.value.trim();
             if (!text && !selectedImageBase64) return;
             
-            appendMessage(text || "Фото", true, selectedImageBase64); 
+            // Точное время телефона (МСК)
+            const currentDateTime = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
+            
+            // Вшиваем скрытые системные инструкции: время, режим комнаты и имя гостя
+            const textWithTime = `[Системное инфо: Текущие дата и время: ${currentDateTime}. Режим комнаты: ${chatMode}. Имя собеседника: ${userDisplayName}]\n${text}`;
+
+            appendMessage(textWithTime, true, selectedImageBase64); 
             const imgToSend = selectedImageBase64;
             
             if (currentEditingMessageId !== null) {
@@ -360,12 +372,6 @@
             selectedImageBase64 = "";
             fileInput.value = "";
             previewContainer.classList.add('preview-hidden');
-
-            // Точное время телефона (МСК)
-            const currentDateTime = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
-            
-            // Вшиваем скрытые системные инструкции: время, режим комнаты и имя гостя
-            const textWithTime = `[Системное инфо: Текущие дата и время: ${currentDateTime}. Режим комнаты: ${chatMode}. Имя собеседника: ${userDisplayName}]\n${text}`;
 
             try {
                 const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
