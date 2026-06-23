@@ -3,7 +3,7 @@ import httpx
 import logging
 import re
 import json
-import urllib.parse  # Для безопасного кодирования текста в ссылку
+import urllib.parse
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
@@ -49,7 +49,7 @@ def startup_event():
             conn.close()
             logger.info("Таблица chat_memory проверена.")
         except Exception as e:
-            logger.error(f"Ошибка初始化 таблицы памяти: {e}")
+            logger.error(f"Ошибка инициализации таблицы памяти: {e}")
 
 def save_memory_fact(key, value):
     conn = get_db_connection()
@@ -106,14 +106,13 @@ async def chat_endpoint(request: Request):
     or_key = os.environ.get("OPENROUTER_API_KEY")
     
     # ----------------------------------------------------
-    # АВТОПЕРЕХВАТ ГЕНЕРАЦИИ — БЕСПЛАТНЫЙ ВАРИАНТ (БЕЗ OPENROUTER)
+    # АВТОПЕРЕХВАТ ГЕНЕРАЦИИ С ЗАПИСЬЮ В ИСТОРИЮ БД
     # ----------------------------------------------------
     image_triggers = [r"\bнарисуй\b", r"\bсгенерируй\b", r"\bсоздай картинку\b", r"\bизобрази\b", r"\bнарисуй мне\b"]
     is_image_request = any(re.search(trigger, user_message, re.IGNORECASE) for trigger in image_triggers)
 
     if is_image_request:
         try:
-            # Очищаем промпт от триггер-слов для лучшего качества генерации
             clean_prompt = user_message
             for trigger in image_triggers:
                 clean_prompt = re.sub(trigger, "", clean_prompt, flags=re.IGNORECASE).strip()
@@ -121,15 +120,24 @@ async def chat_endpoint(request: Request):
             if not clean_prompt:
                 clean_prompt = "cool cyber raccoon"
 
-            # Кодируем текст в формат ссылки (чтобы пробелы и русские буквы не ломали URL)
             encoded_prompt = urllib.parse.quote(clean_prompt)
-            
-            # Генерируем прямую стабильную ссылку через бесплатный шлюз Pollinations (модель Flux)
             img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true&private=true"
             
             reply = f"Вот твой рисунок по запросу «{user_message}»:\n\n<img src='{img_url}' style='max-width: 100%; border-radius: 12px; margin-top: 8px;' />"
             
-            # Поскольку запрос бесплатный и мгновенный, зажжём индикатор Gemini (или напишем "Генератор")
+            # ТЕПЕРЬ СОХРАНЯЕМ ФАКТ РИСОВАНИЯ В ИСТОРИЮ БД, ЧТОБЫ БОТ ПОМНИЛ!
+            if mode == "private":
+                conn = get_db_connection()
+                if conn:
+                    cur = conn.cursor()
+                    # Сохраняем текстовое описание, чтобы языковая модель знала, что картинка была создана
+                    db_assistant_text = f"Я успешно сгенерировал и показал тебе картинку по твоему запросу: «{user_message}»."
+                    cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", user_message))
+                    cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", db_assistant_text))
+                    conn.commit()
+                    cur.close()
+                    conn.close()
+                    
             return {"text": reply, "model_used": "gemini"}
             
         except Exception as e:
