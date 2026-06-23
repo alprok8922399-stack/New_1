@@ -86,11 +86,10 @@ def get_all_memory_context():
         logger.error(f"Ошибка чтения памяти: {e}")
         return ""
 
-# УЛУЧШЕННАЯ ФУНКЦИЯ НЕВИДИМОГО ТЕКСТОВОГО ПЕРЕВОДА ПЕРЕД РИСОВАНИЕМ
+# ФУНКЦИЯ НЕВИДИМОГО ТЕКСТОВОГО ПЕРЕВОДА НА АНГЛИЙСКИЙ
 async def translate_text_simple(text):
     async with httpx.AsyncClient() as client:
         try:
-            # Используем Google Translate (бесплатный шлюз) для перевода на английский
             url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=ru&tl=en&dt=t&q={urllib.parse.quote(text)}"
             response = await client.get(url, timeout=5.0)
             if response.status_code == 200:
@@ -99,7 +98,7 @@ async def translate_text_simple(text):
                 return translated
         except Exception as e:
             logger.error(f"Ошибка перевода: {e}")
-    return text # Если упало, возвращаем оригинал
+    return text
 
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
@@ -121,39 +120,37 @@ async def chat_endpoint(request: Request):
     or_key = os.environ.get("OPENROUTER_API_KEY")
     
     # ----------------------------------------------------
-    # ИСПРАВЛЕННЫЙ АВТОПЕРЕХВАТ ГЕНЕРАЦИИ (С АВТО-ПЕРЕВОДОМ НА АНГЛИЙСКИЙ)
+    # АВТОПЕРЕХВАТ ГЕНЕРАЦИИ С ДЕЙСТВИТЕЛЬНЫМ СХРАНЕНИЕМ В БД
     # ----------------------------------------------------
     image_triggers = [r"\bнарисуй\b", r"\bсгенерируй\b", r"\bсоздай картинку\b", r"\bизобрази\b", r"\bрисунок\b"]
     is_image_request = any(re.search(trigger, user_message, re.IGNORECASE) for trigger in image_triggers)
 
     if is_image_request:
         try:
-            # Очищаем промпт от триггер-слов
             clean_prompt = user_message
             for trigger in image_triggers:
                 clean_prompt = re.sub(trigger, "", clean_prompt, flags=re.IGNORECASE).strip()
             
             if not clean_prompt:
-                clean_prompt = "cool dynamic marketing binary tree scheme graph structure"
+                clean_prompt = "beautiful funny cyber raccoon"
             else:
-                # НЕВИДИМЫЙ ПЕРЕВОД ПЕРЕД РИСОВАНИЕМ (для Pollinations это критично!)
-                clean_prompt = await translate_text_simple(f"detailed scientific chart: {clean_prompt}")
+                # Переводим чистый текст без лишнего мусора
+                clean_prompt = await translate_text_simple(clean_prompt)
 
             encoded_prompt = urllib.parse.quote(clean_prompt)
-            # Используем Flux для схем и сложных структур
+            # Стабильный Flux для генерации качественных картинок
             img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true&private=true&model=flux"
             
-            # Правильно формируем ответ с Markdown-ссылкой, чтобы фронтенд его распарсил!
             reply = f"Вот твой рисунок по запросу «{user_message}»:\n\n<img src='{img_url}' style='max-width: 100%; border-radius: 12px; margin-top: 8px;' />"
             
-            # СОХРАНЯЕМ ФАКТ РИСОВАНИЯ И ИЗОБРАЖЕНИЕ В ИСТОРИЮ БД
+            # ТЕПЕРЬ ИСТОРИЯ ЗАПИСЫВАЕТСЯ НАМЕРТВО
             if mode == "private":
                 conn = get_db_connection()
                 if conn:
                     cur = conn.cursor()
-                    # Сохраняем текстовое подтверждение с Markdown-ссылкой в историю, чтобы ИИ видел картинку
+                    db_history_text = f"Я успешно сгенерировал и показал тебе картинку по твоему запросу: «{user_message}»."
                     cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", user_message))
-                    cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", reply))
+                    cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", db_history_text))
                     conn.commit()
                     cur.close()
                     conn.close()
