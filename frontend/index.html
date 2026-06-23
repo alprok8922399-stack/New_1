@@ -18,7 +18,19 @@
 
     <div class="chat-container" id="chat-screen">
         <header>
-            <div class="header-title" id="chat-header-title">Друг и помощник</div>
+            <div class="header-left">
+                <div class="header-title" id="chat-header-title">Друг и помощник</div>
+                <div class="model-selector-wrapper" id="model-selector-trigger">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span id="active-model-name">Модель: Авто</span>
+                    <div class="model-dropdown" id="model-dropdown">
+                        <div class="dropdown-item active" data-model="auto">🤖 Авто (Каскад)</div>
+                        <div class="dropdown-item" data-model="gemini">✨ Gemini 2.5</div>
+                        <div class="dropdown-item" data-model="openrouter">🚀 OpenRouter</div>
+                        <div class="dropdown-item" data-model="groq">⚡ Groq (Llama)</div>
+                    </div>
+                </div>
+            </div>
             <button class="clear-btn" id="clear-btn">Очистить</button>
         </header>
         <div class="messages" id="messages"></div>
@@ -41,12 +53,57 @@
         const SECRET_CODE = 'alprok8922399';
         let chatMode = 'public'; 
         let userDisplayName = ''; 
+        let selectedModel = 'auto'; // Выбранная модель по умолчанию
 
         const authScreen = document.getElementById('auth-screen');
         const chatScreen = document.getElementById('chat-screen');
         const usernameInput = document.getElementById('username-input');
         const loginBtn = document.getElementById('login-btn');
         const chatHeaderTitle = document.getElementById('chat-header-title');
+
+        // Логика меню переключения моделей
+        const modelTrigger = document.getElementById('model-selector-trigger');
+        const modelDropdown = document.getElementById('model-dropdown');
+        const activeModelName = document.getElementById('active-model-name');
+        const statusDot = document.getElementById('status-dot');
+
+        modelTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            modelDropdown.classList.toggle('show');
+        });
+
+        document.addEventListener('click', () => {
+            modelDropdown.classList.remove('show');
+        });
+
+        document.querySelectorAll('.dropdown-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+                selectedModel = this.getAttribute('data-model');
+                
+                let visibleName = "Авто";
+                if(selectedModel === 'gemini') visibleName = "Gemini 2.5";
+                if(selectedModel === 'openrouter') visibleName = "OpenRouter";
+                if(selectedModel === 'groq') visibleName = "Groq (Llama)";
+                
+                activeModelName.textContent = `Модель: ${visibleName}`;
+                statusDot.className = "status-dot manual"; // Оранжевый/синий при ручном переключении
+            });
+        });
+
+        function updateStatusDot(backendModel) {
+            statusDot.className = "status-dot"; // Сброс классов
+            if (backendModel === 'gemini') {
+                statusDot.classList.add('gemini');
+            } else if (backendModel === 'openrouter') {
+                statusDot.classList.add('openrouter');
+            } else if (backendModel === 'groq') {
+                statusDot.classList.add('groq');
+            } else {
+                statusDot.classList.add('error');
+            }
+        }
 
         function handleLogin() {
             const enteredName = usernameInput.value.trim();
@@ -121,7 +178,6 @@
         function formatAiText(text) {
             let rawText = text || "";
             
-            // Обработка блоков кода
             rawText = rawText.replace(/```([\s\S]*?)```/g, (match, p1) => {
                 return `<div class="code-block-wrapper">
                             <button class="copy-code-btn" onclick="copyCode(this)">Копировать</button>
@@ -207,7 +263,6 @@
                     inputArea.focus();
                     inputArea.style.height = 'auto';
                     inputArea.style.height = (inputArea.scrollHeight) + 'px';
-                    
                     currentEditingMessageId = messageId; 
                 });
             }
@@ -270,13 +325,18 @@
                     body: JSON.stringify({ 
                         text: textWithTime, 
                         image: imgToSend,
-                        mode: chatMode 
+                        mode: chatMode,
+                        model: selectedModel // Отправляем ручной выбор на бэкенд!
                     })
                 });
                 const data = await response.json();
                 appendMessage(data.text, false); 
+                
+                // Красим индикатор в цвет той модели, которая реально ответила
+                updateStatusDot(data.model_used);
             } catch (e) {
                 appendMessage("Ошибка соединения.", false);
+                statusDot.className = "status-dot error";
             }
         });
     </script>
