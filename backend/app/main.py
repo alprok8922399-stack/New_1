@@ -19,6 +19,9 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# СЕКРЕТНЫЙ КЛЮЧ АДМИНА
+ADMIN_KEY = os.environ.get("ADMIN_SECRET_KEY")
+
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
     if not db_url: return None
@@ -28,13 +31,72 @@ def get_db_connection():
         logger.error(f"БД ошибка: {e}")
         return None
 
+# АВТОМАТИЧЕСКОЕ СОЗДАНИЕ ТАБЛИЦЫ ДЛЯ ПАМЯТИ ПРИ СТАРТЕ
+@app.on_event("startup")
+def startup_event():
+    conn = get_db_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chat_memory (
+                    id SERIAL PRIMARY KEY,
+                    key VARCHAR(100) UNIQUE NOT NULL,
+                    value TEXT NOT NULL
+                );
+            """)
+            conn.commit()
+            cur.close()
+            conn.close()
+            logger.info("Таблица chat_memory успешно проверена/создана.")
+        except Exception as e:
+            logger.error(f"Ошибка инициализации таблицы памяти: {e}")
+
+# ФУНКЦИЯ ЗАПИСИ ФАКТА В ПАМЯТЬ
+def save_memory_fact(key, value):
+    conn = get_db_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT id FROM chat_memory WHERE key = %s", (key,))
+            row = cur.fetchone()
+            if row:
+                cur.execute("UPDATE chat_memory SET value = %s WHERE id = %s", (value, row[0]))
+            else:
+                cur.execute("INSERT INTO chat_memory (key, value) VALUES (%s, %s)", (key, value))
+            conn.commit()
+            cur.close()
+            conn.close()
+            logger.info(f"Умная память: записано [{key}: {value}]")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка записи в память: {e}")
+    return False
+
+# ФУНКЦИЯ ЧТЕНИЯ ВСЕЙ ПАМЯТИ
+def get_all_memory_context():
+    conn = get_db_connection()
+    if not conn: return ""
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT key, value FROM chat_memory")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        if not rows: return ""
+        context = "\n".join([f"- {r[0]}: {r[1]}" for r in rows])
+        return f"\n\nВАЖНАЯ ИНФОРМАЦИЯ О СОБЕСЕДНИКЕ (ПОМНИ ЭТО ВСЕГДА):\n{context}"
+    except Exception as e:
+        logger.error(f"Ошибка чтения памяти: {e}")
+        return ""
+
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     data = await request.json()
     raw_user_message = data.get("text") or ""
     mode = data.get("mode") or "private"
     user_image = data.get("image") or ""
-    requested_model = data.get("model") or "auto"  # Получаем принудительную модель из интерфейса
+    requested_model = data.get("model") or "auto"
     
     time_match = re.search(r"Текущие дата и время:\s*([^\]]+)", raw_user_message)
     client_time = time_match.group(1).strip() if time_match else "Неизвестно"
@@ -46,6 +108,14 @@ async def chat_endpoint(request: Request):
     groq_key = os.environ.get("GROQ_KEY") or os.environ.get("GROG_KEY")
     gemini_key = os.environ.get("GEMINI_API_KEY")
     or_key = os.environ.get("OPENROUTER_API_KEY")
+    
+    # Подтягиваем умную память только в приватной комнате
+    memory_context = ""
+    if mode == "private":
+        memory_context = get_all_memory_context()
+
+    # Вшиваем контекст памяти прямо в системные инструкции ИИ
+    system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. Отвечай кратко, с юмором, на русском.{memory_context}"
     
     history_messages = []
     if mode == "private":
@@ -59,8 +129,6 @@ async def chat_endpoint(request: Request):
             for r in rows[::-1]:
                 history_messages.append({"role": r[0], "content": r[1]})
 
-    system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. Отвечай кратко, с юмором, на русском."
-    
     text_messages = [{"role": "system", "content": system_prompt}]
     for msg in history_messages:
         text_messages.append({"role": msg["role"], "content": msg["content"]})
@@ -70,11 +138,9 @@ async def chat_endpoint(request: Request):
     model_used = "none"
     
     async with httpx.AsyncClient() as client:
-        
-        # 1. ПОПЫТКА GEMINI (Если авто-режим или выбран вручную)
+        # 1. ПОПЫТКА GEMINI
         if (requested_model in ["auto", "gemini"]) and gemini_key:
             try:
-                # Формируем структуру под картинку или под текст
                 if user_image:
                     if "," in user_image:
                         img_data = user_image.split(",")[1]
@@ -110,7 +176,7 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой Gemini: {e}")
 
-        # 2. ПОПЫТКА OPENROUTER (Если авто-режим или выбран вручную, и первая модель не ответила)
+        # 2. ПОПЫТКА OPENROUTER
         if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "openrouter") and or_key:
             try:
                 if user_image:
@@ -139,10 +205,9 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой OpenRouter: {e}")
 
-        # 3. ПОПЫТКА GROQ (Каскад последней надежды или ручной выбор)
+        # 3. ПОПЫТКА GROQ
         if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "groq") and groq_key:
             try:
-                # Если была картинка, добавляем текстовую подсказку для Groq в промпт
                 groq_messages = text_messages.copy()
                 if user_image:
                     groq_messages[-1]["content"] = f"[Пользователь отправил скриншот. Проанализируй контекст обсуждения] {user_message}".strip()
@@ -159,7 +224,6 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой Groq: {e}")
             
-    # Сохраняем историю в БД (с краткой меткой контекста скриншота, чтобы не жрать токены!)
     if mode == "private" and not reply.startswith("Ошибка"):
         conn = get_db_connection()
         if conn:
@@ -173,6 +237,19 @@ async def chat_endpoint(request: Request):
             conn.commit()
             cur.close()
             conn.close()
+
+            # ТРИГГЕРЫ ЗАПОМИНАНИЯ (Ищем ключевые слова в твоей речи)
+            memory_triggers = {
+                "Любимый стиль тату": r"(?:люблю|нравятся?|тащусь от) тату (?:в стиле|стиля?)?\s*([\w\s-]+)",
+                "Город проживания": r"(?:живу в|город|из города)\s*([\w\s-]+)",
+                "День рождения": r"мой день рождения\s*([\d\.\w]+)"
+            }
+
+            for fact_key, pattern in memory_triggers.items():
+                match = re.search(pattern, user_message, re.IGNORECASE)
+                if match:
+                    extracted_fact = match.group(1).strip()
+                    save_memory_fact(fact_key, extracted_fact)
             
     return {"text": reply, "model_used": model_used}
 
