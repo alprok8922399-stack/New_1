@@ -19,7 +19,6 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# СЕКРЕТНЫЙ КЛЮЧ АДМИНА
 ADMIN_KEY = os.environ.get("ADMIN_SECRET_KEY")
 
 def get_db_connection():
@@ -31,7 +30,6 @@ def get_db_connection():
         logger.error(f"БД ошибка: {e}")
         return None
 
-# АВТОМАТИЧЕСКОЕ СОЗДАНИЕ ТАБЛИЦЫ ДЛЯ ПАМЯТИ ПРИ СТАРТЕ
 @app.on_event("startup")
 def startup_event():
     conn = get_db_connection()
@@ -48,11 +46,10 @@ def startup_event():
             conn.commit()
             cur.close()
             conn.close()
-            logger.info("Таблица chat_memory успешно проверена/создана.")
+            logger.info("Таблица chat_memory проверена.")
         except Exception as e:
             logger.error(f"Ошибка инициализации таблицы памяти: {e}")
 
-# ФУНКЦИЯ ЗАПИСИ ФАКТА В ПАМЯТЬ
 def save_memory_fact(key, value):
     conn = get_db_connection()
     if conn:
@@ -67,13 +64,11 @@ def save_memory_fact(key, value):
             conn.commit()
             cur.close()
             conn.close()
-            logger.info(f"Умная память: записано [{key}: {value}]")
             return True
         except Exception as e:
             logger.error(f"Ошибка записи в память: {e}")
     return False
 
-# ФУНКЦИЯ ЧТЕНИЯ ВСЕЙ ПАМЯТИ
 def get_all_memory_context():
     conn = get_db_connection()
     if not conn: return ""
@@ -85,7 +80,7 @@ def get_all_memory_context():
         conn.close()
         if not rows: return ""
         context = "\n".join([f"- {r[0]}: {r[1]}" for r in rows])
-        return f"\n\nВАЖНАЯ ИНФОРМАЦИЯ О СОБЕСЕДНИКЕ (ПОМНИ ЭТО ВСЕГДА):\n{context}"
+        return f"\n\nВАЖНАЯ ИНФОРМАЦИЯ О СОБЕСЕДНИКЕ:\n{context}"
     except Exception as e:
         logger.error(f"Ошибка чтения памяти: {e}")
         return ""
@@ -109,12 +104,51 @@ async def chat_endpoint(request: Request):
     gemini_key = os.environ.get("GEMINI_API_KEY")
     or_key = os.environ.get("OPENROUTER_API_KEY")
     
-    # Подтягиваем умную память только в приватной комнате
+    # ----------------------------------------------------
+    # АВТОПЕРЕХВАТ ГЕНЕРАЦИИ КАРТИНОК (Пункт 2)
+    # ----------------------------------------------------
+    image_triggers = [r"\bнарисуй\b", r"\bсгенерируй\b", r"\bсоздай картинку\b", r"\bизобрази\b", r"\bнарисуй мне\b"]
+    is_image_request = any(re.search(trigger, user_message, re.IGNORECASE) for trigger in image_triggers)
+
+    if is_image_request and or_key:
+        try:
+            async with httpx.AsyncClient() as client:
+                # Отправляем запрос на генерацию в OpenRouter (используем бесплатный/дешевый SDXL)
+                response = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {or_key.strip()}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "stabilityai/stable-diffusion-xl", 
+                        "messages": [{"role": "user", "content": user_message}]
+                    },
+                    timeout=45.0
+                )
+                if response.status_code == 200:
+                    res_json = response.json()
+                    # OpenRouter для картинок возвращает текст со ссылкой или сразу URL
+                    reply_text = res_json['choices'][0]['message']['content']
+                    
+                    # Если ссылка пришла текстом, вытаскиваем её или оформляем в тег img
+                    urls = re.findall(r'(https?://[^\s]+)', reply_text)
+                    if urls:
+                        img_url = urls[0].replace(')', '').replace(']', '') # Чистим хвосты макросов
+                        reply = f"Вот твой рисунок по запросу «{user_message}»:\n\n<img src='{img_url}' style='max-width: 100%; border-radius: 12px; margin-top: 8px;' />"
+                    else:
+                        reply = reply_text
+                        
+                    return {"text": reply, "model_used": "openrouter"}
+        except Exception as e:
+            logger.error(f"Ошибка генерации картинок: {e}")
+            # Если генерация упала, каскад пойдет дальше в обычный текст
+
+    # Если это не генерация картинок, идет стандартный текстовый каскад:
     memory_context = ""
     if mode == "private":
         memory_context = get_all_memory_context()
 
-    # Вшиваем контекст памяти прямо в системные инструкции ИИ
     system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. Отвечай кратко, с юмором, на русском.{memory_context}"
     
     history_messages = []
@@ -176,7 +210,7 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой Gemini: {e}")
 
-        # 2. ПОПЫТКА OPENROUTER
+        # 2. ПОПЫТКА OPENROUTER (Текст)
         if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "openrouter") and or_key:
             try:
                 if user_image:
@@ -238,7 +272,6 @@ async def chat_endpoint(request: Request):
             cur.close()
             conn.close()
 
-            # ТРИГГЕРЫ ЗАПОМИНАНИЯ (Ищем ключевые слова в твоей речи)
             memory_triggers = {
                 "Любимый стиль тату": r"(?:люблю|нравятся?|тащусь от) тату (?:в стиле|стиля?)?\s*([\w\s-]+)",
                 "Город проживания": r"(?:живу в|город|из города)\s*([\w\s-]+)",
