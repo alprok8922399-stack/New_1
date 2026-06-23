@@ -2,6 +2,7 @@ import os
 import httpx
 import logging
 import re
+import json
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
@@ -41,7 +42,7 @@ async def chat_endpoint(request: Request):
     data = await request.json()
     raw_user_message = data.get("text") or ""
     mode = data.get("mode") or "private"
-    user_image = data.get("image") or ""  # Картинка в формате data:image/jpeg;base64,...
+    user_image = data.get("image") or ""  # data:image/jpeg;base64,...
     
     # Извлечение системной инфы
     time_match = re.search(r"Текущие дата и время:\s*([^\]]+)", raw_user_message)
@@ -84,9 +85,9 @@ async def chat_endpoint(request: Request):
     
     async with httpx.AsyncClient() as client:
         
-        # ЕСЛИ ЕСТЬ КАРТИНКА — ПРОБУЕМ ОБРАБОТАТЬ ЕЁ С ПОЛНОЙ ЗАЩИТОЙ ОТ СБОЕВ
+        # ЕСЛИ ЕСТЬ КАРТИНКА — ПРОБУЕМ ОБРАБОТАТЬ ЕЁ С ТОТАЛЬНОЙ ЗАЩИТОЙ
         if user_image:
-            # 1. Попытка через родной Gemini API (Переключили на глобальный стабильный v1)
+            # 1. Попытка через родной Gemini API (ПОЛНОСТЬЮ НОВЫЙ URL И ФОРМАТ)
             if gemini_key:
                 try:
                     if "," in user_image:
@@ -96,35 +97,42 @@ async def chat_endpoint(request: Request):
                         img_data = user_image
                         mime_type = "image/jpeg"
 
+                    # НОВЫЙ ОФИЦИАЛЬНЫЙ ФОРМАТ ЗАПРОСА GOOGLE GENIMI
+                    # Он отличается от стандарта OpenAI.
                     gemini_native_payload = {
-                        "contents": [
-                            {
-                                "parts": [
-                                    {"text": f"{system_prompt}\n\nПользователь: {user_message if user_message else 'Посмотри на этот скриншот'}"},
-                                    {
-                                        "inlineData": {
-                                            "mimeType": mime_type,
-                                            "data": img_data
-                                        }
+                        "contents": [{
+                            "parts": [
+                                {"text": f"{system_prompt}\n\nПользователь: {user_message if user_message else 'Посмотри на этот скриншот'}"},
+                                {
+                                    "inline_data": {
+                                        "mime_type": mime_type,
+                                        "data": img_data
                                     }
-                                ]
-                            }
-                        ]
+                                }
+                            ]
+                        }]
                     }
                     
-                    # Заменили v1beta на стабильный v1
+                    # ПЕРЕШЛИ НА НОВЫЙ ГЛОБАЛЬНЫЙ API ЭНДПОИНТ V1
+                    # Обрати внимание: url изменился, v1beta убран.
                     response = await client.post(
                         f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={gemini_key.strip()}",
                         headers={"Content-Type": "application/json"},
-                        json=gemini_native_payload,
+                        data=json.dumps(gemini_native_payload),
                         timeout=30.0
                     )
+                    
+                    # Логируем ответ для отладки
+                    if response.status_code != 200:
+                        logger.error(f"Сбой родного Gemini API ({response.status_code}): {response.text}")
+
                     if response.status_code == 200:
-                        reply = response.json()['candidates'][0]['content']['parts'][0]['text']
+                        res_json = response.json()
+                        reply = res_json['candidates'][0]['content']['parts'][0]['text']
                 except Exception as e:
                     logger.error(f"Ошибка картинки в родном Gemini: {e}")
 
-            # 2. Попытка через OpenRouter с картинкой (если родной Gemini упал)
+            # 2. Попытка через OpenRouter с картинкой (страховка)
             if (reply.startswith("Ошибка") or "Ошибка" in reply) and or_key:
                 try:
                     or_image_messages = [{"role": "system", "content": system_prompt}]
@@ -149,7 +157,7 @@ async def chat_endpoint(request: Request):
                 except Exception as e:
                     logger.error(f"Ошибка картинки в OpenRouter: {e}")
 
-        # ЕСЛИ КАРТИНКИ НЕТ ИЛИ ВСЕ СБОЙНУЛО — ИДЕМ ПО СТАНДАРТНОМУ ТЕКСТОВОМУ КАСКАДУ
+        # ЕСЛИ КАРТИНКИ НЕТ ИЛИ ВСЕ СБОЙНУЛО — СТАНДАРТНЫЙ ТЕКСТОВЫЙ КАСКАД
         if not user_image or (reply.startswith("Ошибка") or "Ошибка" in reply):
             # 1. Попытка Groq
             if groq_key:
@@ -177,9 +185,10 @@ async def chat_endpoint(request: Request):
                         reply = response.json()['choices'][0]['message']['content']
                 except: pass
 
-            # 3. Попытка Gemini (текстовый эндпоинт)
+            # 3. Попытка Gemini (текстовый)
             if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
                 try:
+                    # Используем совместимый эндпоинт для обычного текста
                     response = await client.post(
                         "https://generativelanguage.googleapis.com/v1/openai/chat/completions",
                         headers={"Authorization": f"Bearer {gemini_key.strip()}", "Content-Type": "application/json"},
