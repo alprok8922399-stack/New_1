@@ -87,7 +87,7 @@ async def chat_endpoint(request: Request):
         
         # ЕСЛИ ЕСТЬ КАРТИНКА — ПРОБУЕМ ОБРАБОТАТЬ ЕЁ
         if user_image:
-            # 1. Попытка через родной Gemini API (v1beta + inline_data)
+            # 1. Попытка через родной Gemini API (v1beta + ИСПРАВЛЕННАЯ МОДЕЛЬ gemini-2.5-flash)
             if gemini_key:
                 try:
                     if "," in user_image:
@@ -111,9 +111,9 @@ async def chat_endpoint(request: Request):
                         }]
                     }
                     
-                    # ИСПРАВЛЕНО: Вернули v1beta, так как только она поддерживает работу с flash-картинками напрямую
+                    # ИСПРАВЛЕНО: Заменили модель на актуальную gemini-2.5-flash
                     response = await client.post(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key.strip()}",
+                        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key.strip()}",
                         headers={"Content-Type": "application/json"},
                         data=json.dumps(gemini_native_payload),
                         timeout=30.0
@@ -181,17 +181,19 @@ async def chat_endpoint(request: Request):
                         reply = response.json()['choices'][0]['message']['content']
                 except: pass
 
-            # 3. Попытка Gemini (текстовый через v1beta openai)
+            # 3. Попытка Gemini (текстовый)
             if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
                 try:
                     response = await client.post(
-                        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                        headers={"Authorization": f"Bearer {gemini_key.strip()}", "Content-Type": "application/json"},
-                        json={"model": "gemini-1.5-flash", "messages": text_messages},
+                        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key.strip()}",
+                        headers={"Content-Type": "application/json"},
+                        json={
+                            "contents": [{"parts": [{"text": "\n".join([m["content"] for m in text_messages])}]}]
+                        },
                         timeout=30.0
                     )
                     if response.status_code == 200:
-                        reply = response.json()['choices'][0]['message']['content']
+                        reply = response.json()['candidates'][0]['content']['parts'][0]['text']
                 except: pass
             
     # Сохраняем в БД
