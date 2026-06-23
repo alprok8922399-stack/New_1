@@ -75,13 +75,6 @@ async def chat_endpoint(request: Request):
             if time_match:
                 time_info = f"Текущие дата и время у пользователя (МСК): {time_match.group(1)}.\n\n"
 
-        # Требование по ссылкам для системного промпта
-        web_search_instruction = (
-            "У тебя есть доступ к интернету. Если пользователь просит найти что-то на сайтах "
-            "или зайти по ссылке — используй поиск, читай информацию и ОБЯЗАТЕЛЬНО в конце своего ответа "
-            "давай точные и кликабельные ссылки (URL) на сайты, где ты эту информацию искал."
-        )
-
         # 1. НАСТРОЙКА СИСТЕМНЫХ ПРОМТОВ В ЗАВИСИМОСТИ ОТ РЕЖИМА
         if mode == "public":
             system_prompt = (
@@ -89,7 +82,6 @@ async def chat_endpoint(request: Request):
                 f"Ты — крутой, вежливый и отзывчивый ИИ-помощник. Твой стиль общения — живой, "
                 f"свободный, понятный и по-человечески теплый. Никакой лишней официальщины. "
                 f"Отвечай всегда только на русском языке, просто и емко. Не расписывай длинные простыни текста.\n"
-                f"{web_search_instruction}\n"
                 f"ВАЖНО: Твоего собеседника зовут {guest_name}. Обращайся к нему по этому имени! "
                 f"Не используй имя Алексей, сейчас ты общаешься именно с пользователем по имени {guest_name}."
             )
@@ -102,7 +94,6 @@ async def chat_endpoint(request: Request):
                 "Отвечай всегда только на русском языке, просто, емко и по-человечески. "
                 "Старайся писать коротко и по делу, не расписывай длинные простыни текста, "
                 "если только Алексей сам не попросит ответить детально или развернуто. "
-                f"{web_search_instruction}\n"
                 "Если Алексей просит шутку — шути смешно, жизненно, избегай избитых шаблонов."
             )
 
@@ -125,9 +116,11 @@ async def chat_endpoint(request: Request):
         messages_for_ai = [{"role": "system", "content": system_prompt}]
         
         if mode == "public":
+            # Для публичного чата берем только ту историю, которую прислал клиент
             for msg in client_history[:-1]:
                 messages_for_ai.append({"role": msg.get("role"), "content": msg.get("content")})
         else:
+            # Для Алексея достаем контекст из вечной базы PostgreSQL
             history_messages = []
             if conn:
                 try:
@@ -152,7 +145,7 @@ async def chat_endpoint(request: Request):
             
         messages_for_ai.append({"role": "user", "content": current_content})
 
-        # 4. ЗАПРОС К OPENROUTER С ВКЛЮЧЕННЫМ ПЛАГИНОМ ПОИСКА
+        # 4. ЗАПРОС К OPENROUTER (БЕЗ ПЛАГИНОВ ИНТЕРНЕТА)
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         
         async with httpx.AsyncClient() as client:
@@ -162,8 +155,7 @@ async def chat_endpoint(request: Request):
                 json={
                     "model": "openrouter/auto", 
                     "messages": messages_for_ai,
-                    "max_tokens": 400,
-                    "plugins": [{"id": "web"}]  # Подключаем официальный веб-поиск OpenRouter
+                    "max_tokens": 400
                 },
                 timeout=30.0
             )
