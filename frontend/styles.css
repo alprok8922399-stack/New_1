@@ -278,34 +278,46 @@ textarea {
 
 /* Оформление блока кода */
 .code-block-wrapper {
-    background-color: #1e1e1e;
-    color: #d4d4d4;
-    padding: 10px;
-    border-radius: 8px;
-    margin: 10px 0;
+    background-color: #171717;
+    color: #ececec;
+    padding: 14px;
+    border-radius: 12px;
+    margin: 14px 0;
     position: relative;
     font-family: 'Courier New', Courier, monospace;
+    border: 1px solid #262626;
+    overflow: hidden;
 }
 
 .code-block-wrapper pre {
     margin: 0;
     overflow-x: auto;
-    white-space: pre-wrap;
+    white-space: pre;
+    display: block;
+    width: 100%;
+}
+
+.code-block-wrapper code {
+    font-family: inherit;
+    font-size: 14px;
+    display: inline-block;
+    padding-right: 20px;
 }
 
 .copy-code-btn {
     position: absolute;
-    top: 5px;
-    right: 5px;
-    background: #444;
-    color: white;
+    top: 6px;
+    right: 8px;
+    background: #2f2f2f;
+    color: #b4b4b4;
     border: none;
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 11px;
 }
 
-.copy-code-btn:hover {
-    background: #666;
+.copy-code-btn:active {
+    background: #444;
+    color: #fff;
 }
