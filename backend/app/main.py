@@ -84,69 +84,73 @@ async def chat_endpoint(request: Request):
     
     async with httpx.AsyncClient() as client:
         
-        # ЕСЛИ ЕСТЬ КАРТИНКА — ПУСКАЕМ СНАЧАЛА ЧЕРЕЗ РОДНОЙ GEMINI API
-        if user_image and gemini_key:
-            try:
-                # Извлекаем чистый base64 и mime-тип из строки "data:image/jpeg;base64,..."
-                img_data = user_image.split(",")[1] if "," in user_image else user_image
-                mime_type = "image/jpeg"
-                if "data:" in user_image and ";base64" in user_image:
-                    mime_type = user_image.split(";")[0].replace("data:", "")
+        # ЕСЛИ ЕСТЬ КАРТИНКА — ПРОБУЕМ ОРАБОТАТЬ ЕЁ С ПОЛНОЙ ЗАЩИТОЙ ОТ СБОЕВ
+        if user_image:
+            # 1. Попытка через родной Gemini API
+            if gemini_key:
+                try:
+                    if "," in user_image:
+                        img_data = user_image.split(",")[1]
+                        mime_type = user_image.split(";")[0].replace("data:", "")
+                    else:
+                        img_data = user_image
+                        mime_type = "image/jpeg"
 
-                # Формируем родной запрос для контента Google Gemini
-                gemini_native_payload = {
-                    "contents": [
-                        {
-                            "role": "user",
-                            "parts": [
-                                {"text": f"{system_prompt}\n\nПользователь: {user_message if user_message else 'Посмотри на этот скриншот'}"},
-                                {
-                                    "inlineData": {
-                                        "mimeType": mime_type,
-                                        "data": img_data
+                    gemini_native_payload = {
+                        "contents": [
+                            {
+                                "role": "user",
+                                "parts": [
+                                    {"text": f"{system_prompt}\n\nПользователь: {user_message if user_message else 'Посмотри на этот скриншот'}"},
+                                    {
+                                        "inlineData": {
+                                            "mimeType": mime_type,
+                                            "data": img_data
+                                        }
                                     }
-                                }
-                            ]
-                        }
-                    ]
-                }
-                
-                response = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}",
-                    headers={"Content-Type": "application/json"},
-                    json=gemini_native_payload,
-                    timeout=30.0
-                )
-                if response.status_code == 200:
-                    reply = response.json()['candidates'][0]['content']['parts'][0]['text']
-            except: pass
+                                ]
+                            }
+                        ]
+                    }
+                    
+                    response = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}",
+                        headers={"Content-Type": "application/json"},
+                        json=gemini_native_payload,
+                        timeout=30.0
+                    )
+                    if response.status_code == 200:
+                        reply = response.json()['candidates'][0]['content']['parts'][0]['text']
+                except Exception as e:
+                    logger.error(f"Ошибка картинки в родном Gemini: {e}")
 
-        # ЕСЛИ КАРТИНКА ЕСТЬ, НО GEMINI ВДРУГ УПАЛ — СТРАХУЕМ ЧЕРЕЗ OPENROUTER С КАРТИНКОЙ
-        if user_image and (reply.startswith("Ошибка") or "Ошибка" in reply) and or_key:
-            try:
-                or_image_messages = [{"role": "system", "content": system_prompt}]
-                for msg in history_messages:
-                    or_image_messages.append({"role": msg["role"], "content": msg["content"]})
-                or_image_messages.append({
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": user_message if user_message else "Посмотри на этот скриншот"},
-                        {"type": "image_url", "image_url": {"url": user_image}}
-                    ]
-                })
-                
-                response = await client.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {or_key}", "Content-Type": "application/json"},
-                    json={"model": "google/gemini-2.5-flash", "messages": or_image_messages},
-                    timeout=30.0
-                )
-                if response.status_code == 200:
-                    reply = response.json()['choices'][0]['message']['content']
-            except: pass
+            # 2. Попытка через OpenRouter с картинкой (если родной Gemini упал)
+            if (reply.startswith("Ошибка") or "Ошибка" in reply) and or_key:
+                try:
+                    or_image_messages = [{"role": "system", "content": system_prompt}]
+                    for msg in history_messages:
+                        or_image_messages.append({"role": msg["role"], "content": msg["content"]})
+                    or_image_messages.append({
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": user_message if user_message else "Посмотри на этот скриншот"},
+                            {"type": "image_url", "image_url": {"url": user_image}}
+                        ]
+                    })
+                    
+                    response = await client.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {or_key}", "Content-Type": "application/json"},
+                        json={"model": "google/gemini-2.5-flash", "messages": or_image_messages},
+                        timeout=30.0
+                    )
+                    if response.status_code == 200:
+                        reply = response.json()['choices'][0]['message']['content']
+                except Exception as e:
+                    logger.error(f"Ошибка картинки в OpenRouter: {e}")
 
-        # ЕСЛИ КАРТИНКИ НЕТ — СТАНДАРТНЫЙ НАШ КАСКАД (Groq -> OpenRouter -> Gemini текстовый)
-        if not user_image:
+        # ЕСЛИ КАРТИНКИ НЕТ ИЛИ ВСЕ СБОЙНУЛО — ИДЕМ ПО СТАНДАРТНОМУ ТЕКСТОВОМУ КАСКАДУ
+        if not user_image or (reply.startswith("Ошибка") or "Ошибка" in reply):
             # 1. Попытка Groq
             if groq_key:
                 try:
@@ -173,7 +177,7 @@ async def chat_endpoint(request: Request):
                         reply = response.json()['choices'][0]['message']['content']
                 except: pass
 
-            # 3. Попытка Gemini (через OpenAI совместимый эндпоинт для обычного текста)
+            # 3. Попытка Gemini (текстовый эндпоинт)
             if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
                 try:
                     response = await client.post(
