@@ -85,9 +85,9 @@ async def chat_endpoint(request: Request):
     
     async with httpx.AsyncClient() as client:
         
-        # ЕСЛИ ЕСТЬ КАРТИНКА — ПРОБУЕМ ОБРАБОТАТЬ ЕЁ С ТОТАЛЬНОЙ ЗАЩИТОЙ
+        # ЕСЛИ ЕСТЬ КАРТИНКА — ПРОБУЕМ ОБРАБОТАТЬ ЕЁ
         if user_image:
-            # 1. Попытка через родной Gemini API (ПОЛНОСТЬЮ НОВЫЙ URL И ФОРМАТ)
+            # 1. Попытка через родной Gemini API (v1beta + inline_data)
             if gemini_key:
                 try:
                     if "," in user_image:
@@ -97,8 +97,6 @@ async def chat_endpoint(request: Request):
                         img_data = user_image
                         mime_type = "image/jpeg"
 
-                    # НОВЫЙ ОФИЦИАЛЬНЫЙ ФОРМАТ ЗАПРОСА GOOGLE GENIMI
-                    # Он отличается от стандарта OpenAI.
                     gemini_native_payload = {
                         "contents": [{
                             "parts": [
@@ -113,16 +111,14 @@ async def chat_endpoint(request: Request):
                         }]
                     }
                     
-                    # ПЕРЕШЛИ НА НОВЫЙ ГЛОБАЛЬНЫЙ API ЭНДПОИНТ V1
-                    # Обрати внимание: url изменился, v1beta убран.
+                    # ИСПРАВЛЕНО: Вернули v1beta, так как только она поддерживает работу с flash-картинками напрямую
                     response = await client.post(
-                        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={gemini_key.strip()}",
+                        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key.strip()}",
                         headers={"Content-Type": "application/json"},
                         data=json.dumps(gemini_native_payload),
                         timeout=30.0
                     )
                     
-                    # Логируем ответ для отладки
                     if response.status_code != 200:
                         logger.error(f"Сбой родного Gemini API ({response.status_code}): {response.text}")
 
@@ -185,12 +181,11 @@ async def chat_endpoint(request: Request):
                         reply = response.json()['choices'][0]['message']['content']
                 except: pass
 
-            # 3. Попытка Gemini (текстовый)
+            # 3. Попытка Gemini (текстовый через v1beta openai)
             if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
                 try:
-                    # Используем совместимый эндпоинт для обычного текста
                     response = await client.post(
-                        "https://generativelanguage.googleapis.com/v1/openai/chat/completions",
+                        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                         headers={"Authorization": f"Bearer {gemini_key.strip()}", "Content-Type": "application/json"},
                         json={"model": "gemini-1.5-flash", "messages": text_messages},
                         timeout=30.0
