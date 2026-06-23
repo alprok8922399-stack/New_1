@@ -84,7 +84,7 @@ async def chat_endpoint(request: Request):
     reply = "Ошибка: все сервисы недоступны"
     
     async with httpx.AsyncClient() as client:
-        # 1. Попытка Groq
+        # 1. Первая попытка: БЫСТРЫЙ И БЕСПЛАТНЫЙ GROQ
         if groq_key:
             try:
                 response = await client.post(
@@ -97,26 +97,26 @@ async def chat_endpoint(request: Request):
                     reply = response.json()['choices'][0]['message']['content']
             except: pass
 
-        # 2. Попытка Gemini (если Groq не ответил)
-        if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
-            try:
-                response = await client.post(
-                    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                    headers={"Authorization": f"Bearer {gemini_key}", "Content-Type": "application/json"},
-                    json={"model": "gemini-1.5-flash", "messages": full_messages},
-                    timeout=30.0
-                )
-                if response.status_code == 200:
-                    reply = response.json()['choices'][0]['message']['content']
-            except: pass
-
-        # 3. Попытка OpenRouter (если Gemini не ответил)
+        # 2. Вторая попытка: НАДЕЖНЫЙ OPENROUTER (если Groq выдал ошибку)
         if (reply.startswith("Ошибка") or "Ошибка" in reply) and or_key:
             try:
                 response = await client.post(
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers={"Authorization": f"Bearer {or_key}", "Content-Type": "application/json"},
                     json={"model": "meta-llama/llama-3.3-70b-instruct", "messages": full_messages},
+                    timeout=30.0
+                )
+                if response.status_code == 200:
+                    reply = response.json()['choices'][0]['message']['content']
+            except: pass
+
+        # 3. Третья попытка: ЗАПАСНОЙ БЕСПЛАТНЫЙ GEMINI (если OpenRouter тоже не ответил)
+        if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
+            try:
+                response = await client.post(
+                    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                    headers={"Authorization": f"Bearer {gemini_key}", "Content-Type": "application/json"},
+                    json={"model": "gemini-1.5-flash", "messages": full_messages},
                     timeout=30.0
                 )
                 if response.status_code == 200:
