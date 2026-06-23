@@ -86,7 +86,7 @@ async def chat_endpoint(request: Request):
         
         # ЕСЛИ ЕСТЬ КАРТИНКА — ПРОБУЕМ ОБРАБОТАТЬ ЕЁ С ПОЛНОЙ ЗАЩИТОЙ ОТ СБОЕВ
         if user_image:
-            # 1. Попытка через родной Gemini API (Исправили эндпоинт на рабочий)
+            # 1. Попытка через родной Gemini API (Переключили на глобальный стабильный v1)
             if gemini_key:
                 try:
                     if "," in user_image:
@@ -112,9 +112,9 @@ async def chat_endpoint(request: Request):
                         ]
                     }
                     
-                    # ИСКАЗИТЕЛИ ИСПРАВЛЕНЫ: перешли на стабильный v1beta url генерации контента
+                    # Заменили v1beta на стабильный v1
                     response = await client.post(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}",
+                        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={gemini_key.strip()}",
                         headers={"Content-Type": "application/json"},
                         json=gemini_native_payload,
                         timeout=30.0
@@ -140,7 +140,7 @@ async def chat_endpoint(request: Request):
                     
                     response = await client.post(
                         "https://openrouter.ai/api/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {or_key}", "Content-Type": "application/json"},
+                        headers={"Authorization": f"Bearer {or_key.strip()}", "Content-Type": "application/json"},
                         json={"model": "google/gemini-2.5-flash", "messages": or_image_messages},
                         timeout=30.0
                     )
@@ -156,7 +156,7 @@ async def chat_endpoint(request: Request):
                 try:
                     response = await client.post(
                         "https://api.groq.com/openai/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                        headers={"Authorization": f"Bearer {groq_key.strip()}", "Content-Type": "application/json"},
                         json={"model": "llama-3.3-70b-versatile", "messages": text_messages},
                         timeout=30.0
                     )
@@ -169,7 +169,7 @@ async def chat_endpoint(request: Request):
                 try:
                     response = await client.post(
                         "https://openrouter.ai/api/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {or_key}", "Content-Type": "application/json"},
+                        headers={"Authorization": f"Bearer {or_key.strip()}", "Content-Type": "application/json"},
                         json={"model": "meta-llama/llama-3.3-70b-instruct", "messages": text_messages},
                         timeout=30.0
                     )
@@ -177,12 +177,12 @@ async def chat_endpoint(request: Request):
                         reply = response.json()['choices'][0]['message']['content']
                 except: pass
 
-            # 3. Попытка Gemini (текстовый эндпоинт OpenAI-совместимый)
+            # 3. Попытка Gemini (текстовый эндпоинт)
             if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
                 try:
                     response = await client.post(
-                        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                        headers={"Authorization": f"Bearer {gemini_key}", "Content-Type": "application/json"},
+                        "https://generativelanguage.googleapis.com/v1/openai/chat/completions",
+                        headers={"Authorization": f"Bearer {gemini_key.strip()}", "Content-Type": "application/json"},
                         json={"model": "gemini-1.5-flash", "messages": text_messages},
                         timeout=30.0
                     )
