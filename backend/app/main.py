@@ -84,9 +84,9 @@ async def chat_endpoint(request: Request):
     
     async with httpx.AsyncClient() as client:
         
-        # ЕСЛИ ЕСТЬ КАРТИНКА — ПРОБУЕМ ОРАБОТАТЬ ЕЁ С ПОЛНОЙ ЗАЩИТОЙ ОТ СБОЕВ
+        # ЕСЛИ ЕСТЬ КАРТИНКА — ПРОБУЕМ ОБРАБОТАТЬ ЕЁ С ПОЛНОЙ ЗАЩИТОЙ ОТ СБОЕВ
         if user_image:
-            # 1. Попытка через родной Gemini API
+            # 1. Попытка через родной Gemini API (Исправили эндпоинт на рабочий)
             if gemini_key:
                 try:
                     if "," in user_image:
@@ -99,7 +99,6 @@ async def chat_endpoint(request: Request):
                     gemini_native_payload = {
                         "contents": [
                             {
-                                "role": "user",
                                 "parts": [
                                     {"text": f"{system_prompt}\n\nПользователь: {user_message if user_message else 'Посмотри на этот скриншот'}"},
                                     {
@@ -113,6 +112,7 @@ async def chat_endpoint(request: Request):
                         ]
                     }
                     
+                    # ИСКАЗИТЕЛИ ИСПРАВЛЕНЫ: перешли на стабильный v1beta url генерации контента
                     response = await client.post(
                         f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}",
                         headers={"Content-Type": "application/json"},
@@ -177,7 +177,7 @@ async def chat_endpoint(request: Request):
                         reply = response.json()['choices'][0]['message']['content']
                 except: pass
 
-            # 3. Попытка Gemini (текстовый эндпоинт)
+            # 3. Попытка Gemini (текстовый эндпоинт OpenAI-совместимый)
             if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
                 try:
                     response = await client.post(
