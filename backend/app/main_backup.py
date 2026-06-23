@@ -2,19 +2,11 @@ import os
 import httpx
 import logging
 import re
+import json
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 
-# Класс для приветствия
-class Greeting:
-    def __init__(self, name):
-        self.name = name
-
-    def get_greeting(self):
-        return f"Привет, {self.name}! Как у тебя дела сегодня?"
-
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -41,8 +33,9 @@ async def chat_endpoint(request: Request):
     data = await request.json()
     raw_user_message = data.get("text") or ""
     mode = data.get("mode") or "private"
+    user_image = data.get("image") or ""
+    requested_model = data.get("model") or "auto"  # Получаем принудительную модель из интерфейса
     
-    # Извлечение системной инфы
     time_match = re.search(r"Текущие дата и время:\s*([^\]]+)", raw_user_message)
     client_time = time_match.group(1).strip() if time_match else "Неизвестно"
     name_match = re.search(r"Имя собеседника:\s*([^\]]+)", raw_user_message)
@@ -50,12 +43,10 @@ async def chat_endpoint(request: Request):
 
     user_message = re.sub(r"^\[Системное инфо.*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
     
-    # Ключи из твоих настроек
     groq_key = os.environ.get("GROQ_KEY") or os.environ.get("GROG_KEY")
     gemini_key = os.environ.get("GEMINI_API_KEY")
     or_key = os.environ.get("OPENROUTER_API_KEY")
     
-    # История из БД
     history_messages = []
     if mode == "private":
         conn = get_db_connection()
@@ -70,71 +61,120 @@ async def chat_endpoint(request: Request):
 
     system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. Отвечай кратко, с юмором, на русском."
     
-    full_messages = [{"role": "system", "content": system_prompt}]
-    
-    if not history_messages and mode == "private":
-        greeter = Greeting(user_name)
-        full_messages.append({"role": "assistant", "content": greeter.get_greeting()})
-    
+    text_messages = [{"role": "system", "content": system_prompt}]
     for msg in history_messages:
-        full_messages.append({"role": msg["role"], "content": msg["content"]})
+        text_messages.append({"role": msg["role"], "content": msg["content"]})
+    text_messages.append({"role": "user", "content": user_message if user_message else "Посмотри на этот скриншот"})
     
-    full_messages.append({"role": "user", "content": user_message})
-    
-    reply = "Ошибка: все сервисы недоступны"
+    reply = "Ошибка: выбранный сервис недоступен"
+    model_used = "none"
     
     async with httpx.AsyncClient() as client:
-        # 1. Первая попытка: БЫСТРЫЙ И БЕСПЛАТНЫЙ GROQ
-        if groq_key:
+        
+        # 1. ПОПЫТКА GEMINI (Если авто-режим или выбран вручную)
+        if (requested_model in ["auto", "gemini"]) and gemini_key:
             try:
+                # Формируем структуру под картинку или под текст
+                if user_image:
+                    if "," in user_image:
+                        img_data = user_image.split(",")[1]
+                        mime_type = user_image.split(";")[0].replace("data:", "")
+                    else:
+                        img_data = user_image
+                        mime_type = "image/jpeg"
+                    
+                    gemini_payload = {
+                        "contents": [{
+                            "parts": [
+                                {"text": f"{system_prompt}\n\nПользователь: {user_message if user_message else 'Посмотри на скриншот'}"},
+                                {"inline_data": {"mime_type": mime_type, "data": img_data}}
+                            ]
+                        }]
+                    }
+                else:
+                    gemini_payload = {
+                        "contents": [{
+                            "parts": [{"text": f"{system_prompt}\n\nПользователь: {user_message}"}]
+                        }]
+                    }
+
                 response = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-                    json={"model": "llama-3.3-70b-versatile", "messages": full_messages},
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key.strip()}",
+                    headers={"Content-Type": "application/json"},
+                    data=json.dumps(gemini_payload),
                     timeout=30.0
                 )
                 if response.status_code == 200:
-                    reply = response.json()['choices'][0]['message']['content']
-            except: pass
+                    reply = response.json()['candidates'][0]['content']['parts'][0]['text']
+                    model_used = "gemini"
+            except Exception as e:
+                logger.error(f"Сбой Gemini: {e}")
 
-        # 2. Вторая попытка: НАДЕЖНЫЙ OPENROUTER (если Groq выдал ошибку)
-        if (reply.startswith("Ошибка") or "Ошибка" in reply) and or_key:
+        # 2. ПОПЫТКА OPENROUTER (Если авто-режим или выбран вручную, и первая модель не ответила)
+        if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "openrouter") and or_key:
             try:
+                if user_image:
+                    or_messages = [{"role": "system", "content": system_prompt}]
+                    for msg in history_messages:
+                        or_messages.append({"role": msg["role"], "content": msg["content"]})
+                    or_messages.append({
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": user_message if user_message else "Посмотри на скриншот"},
+                            {"type": "image_url", "image_url": {"url": user_image}}
+                        ]
+                    })
+                else:
+                    or_messages = text_messages
+
                 response = await client.post(
                     "https://openrouter.ai/api/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {or_key}", "Content-Type": "application/json"},
-                    json={"model": "meta-llama/llama-3.3-70b-instruct", "messages": full_messages},
+                    headers={"Authorization": f"Bearer {or_key.strip()}", "Content-Type": "application/json"},
+                    json={"model": "google/gemini-2.5-flash", "messages": or_messages},
                     timeout=30.0
                 )
                 if response.status_code == 200:
                     reply = response.json()['choices'][0]['message']['content']
-            except: pass
+                    model_used = "openrouter"
+            except Exception as e:
+                logger.error(f"Сбой OpenRouter: {e}")
 
-        # 3. Третья попытка: ЗАПАСНОЙ БЕСПЛАТНЫЙ GEMINI (если OpenRouter тоже не ответил)
-        if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
+        # 3. ПОПЫТКА GROQ (Каскад последней надежды или ручной выбор)
+        if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "groq") and groq_key:
             try:
+                # Если была картинка, добавляем текстовую подсказку для Groq в промпт
+                groq_messages = text_messages.copy()
+                if user_image:
+                    groq_messages[-1]["content"] = f"[Пользователь отправил скриншот. Проанализируй контекст обсуждения] {user_message}".strip()
+
                 response = await client.post(
-                    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                    headers={"Authorization": f"Bearer {gemini_key}", "Content-Type": "application/json"},
-                    json={"model": "gemini-1.5-flash", "messages": full_messages},
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {groq_key.strip()}", "Content-Type": "application/json"},
+                    json={"model": "llama-3.3-70b-versatile", "messages": groq_messages},
                     timeout=30.0
                 )
                 if response.status_code == 200:
                     reply = response.json()['choices'][0]['message']['content']
-            except: pass
+                    model_used = "groq"
+            except Exception as e:
+                logger.error(f"Сбой Groq: {e}")
             
-    # Сохраняем в БД
+    # Сохраняем историю в БД (с краткой меткой контекста скриншота, чтобы не жрать токены!)
     if mode == "private" and not reply.startswith("Ошибка"):
         conn = get_db_connection()
         if conn:
             cur = conn.cursor()
-            cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", user_message))
+            db_user_text = user_message if user_message else "Отправлен скриншот"
+            if user_image and user_message:
+                db_user_text = f"[Скриншот] {user_message}"
+            
+            cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", db_user_text))
             cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", reply))
             conn.commit()
             cur.close()
             conn.close()
             
-    return {"text": reply}
+    return {"text": reply, "model_used": model_used}
 
 @app.get("/api/history")
 async def get_history():
