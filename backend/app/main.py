@@ -41,6 +41,7 @@ async def chat_endpoint(request: Request):
     data = await request.json()
     raw_user_message = data.get("text") or ""
     mode = data.get("mode") or "private"
+    user_image = data.get("image") or ""  # Получаем картинку в формате Base64
     
     # Извлечение системной инфы
     time_match = re.search(r"Текущие дата и время:\s*([^\]]+)", raw_user_message)
@@ -68,7 +69,7 @@ async def chat_endpoint(request: Request):
             for r in rows[::-1]:
                 history_messages.append({"role": r[0], "content": r[1]})
 
-    system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. Отвечай кратко, с юмором, на русском."
+    system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. Отвечай кратко, с юмором, на русском. Если передана картинка или скриншот, внимательно изучи её и помоги пользователю."
     
     full_messages = [{"role": "system", "content": system_prompt}]
     
@@ -79,13 +80,23 @@ async def chat_endpoint(request: Request):
     for msg in history_messages:
         full_messages.append({"role": msg["role"], "content": msg["content"]})
     
-    full_messages.append({"role": "user", "content": user_message})
+    # Формируем последнее сообщение пользователя в зависимости от наличия картинки
+    if user_image:
+        # Для OpenRouter/Gemini с картинкой нужен специальный формат структуры контента
+        user_content = [
+            {"type": "text", "text": user_message if user_message else "Посмотри на этот скриншот"},
+            {"type": "image_url", "image_url": {"url": user_image}}
+        ]
+    else:
+        user_content = user_message
+
+    full_messages.append({"role": "user", "content": user_content})
     
     reply = "Ошибка: все сервисы недоступны"
     
     async with httpx.AsyncClient() as client:
-        # 1. Первая попытка: БЫСТРЫЙ И БЕСПЛАТНЫЙ GROQ
-        if groq_key:
+        # 1. Первая попытка: GROQ (Только если НЕТ картинки, так как Groq не умеет в зрение)
+        if groq_key and not user_image:
             try:
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
@@ -97,20 +108,22 @@ async def chat_endpoint(request: Request):
                     reply = response.json()['choices'][0]['message']['content']
             except: pass
 
-        # 2. Вторая попытка: НАДЕЖНЫЙ OPENROUTER (если Groq выдал ошибку)
+        # 2. Вторая попытка: НАДЕЖНЫЙ OPENROUTER (Сюда идем сразу, если ЕСТЬ картинка, или если Groq упал)
         if (reply.startswith("Ошибка") or "Ошибка" in reply) and or_key:
+            # Для картинок в OpenRouter используем универсальную зрячую модель от Google
+            model_to_use = "google/gemini-2.5-flash" if user_image else "meta-llama/llama-3.3-70b-instruct"
             try:
                 response = await client.post(
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers={"Authorization": f"Bearer {or_key}", "Content-Type": "application/json"},
-                    json={"model": "meta-llama/llama-3.3-70b-instruct", "messages": full_messages},
+                    json={"model": model_to_use, "messages": full_messages},
                     timeout=30.0
                 )
                 if response.status_code == 200:
                     reply = response.json()['choices'][0]['message']['content']
             except: pass
 
-        # 3. Третья попытка: ЗАПАСНОЙ БЕСПЛАТНЫЙ GEMINI (если OpenRouter тоже не ответил)
+        # 3. Третья попытка: ЗАПАСНОЙ БЕСПЛАТНЫЙ GEMINI (Если OpenRouter тоже не ответил)
         if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
             try:
                 response = await client.post(
@@ -123,12 +136,12 @@ async def chat_endpoint(request: Request):
                     reply = response.json()['choices'][0]['message']['content']
             except: pass
             
-    # Сохраняем в БД
+    # Сохраняем в БД (только текст, саму тяжелую картинку в историю базы не пишем)
     if mode == "private" and not reply.startswith("Ошибка"):
         conn = get_db_connection()
         if conn:
             cur = conn.cursor()
-            cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", user_message))
+            cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", user_message if user_message else "Отправлен скриншот"))
             cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", reply))
             conn.commit()
             cur.close()
