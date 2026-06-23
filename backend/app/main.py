@@ -82,7 +82,6 @@ async def chat_endpoint(request: Request):
     
     # Формируем последнее сообщение пользователя в зависимости от наличия картинки
     if user_image:
-        # Для OpenRouter/Gemini с картинкой нужен специальный формат структуры контента
         user_content = [
             {"type": "text", "text": user_message if user_message else "Посмотри на этот скриншот"},
             {"type": "image_url", "image_url": {"url": user_image}}
@@ -95,7 +94,7 @@ async def chat_endpoint(request: Request):
     reply = "Ошибка: все сервисы недоступны"
     
     async with httpx.AsyncClient() as client:
-        # 1. Первая попытка: GROQ (Только если НЕТ картинки, так как Groq не умеет в зрение)
+        # 1. Первая попытка: GROQ (Только если НЕТ картинки)
         if groq_key and not user_image:
             try:
                 response = await client.post(
@@ -108,9 +107,8 @@ async def chat_endpoint(request: Request):
                     reply = response.json()['choices'][0]['message']['content']
             except: pass
 
-        # 2. Вторая попытка: НАДЕЖНЫЙ OPENROUTER (Сюда идем сразу, если ЕСТЬ картинка, или если Groq упал)
+        # 2. Вторая попытка: НАДЕЖНЫЙ OPENROUTER (Сюда идем сразу, если есть картинка)
         if (reply.startswith("Ошибка") or "Ошибка" in reply) and or_key:
-            # Для картинок в OpenRouter используем универсальную зрячую модель от Google
             model_to_use = "google/gemini-2.5-flash" if user_image else "meta-llama/llama-3.3-70b-instruct"
             try:
                 response = await client.post(
@@ -123,20 +121,29 @@ async def chat_endpoint(request: Request):
                     reply = response.json()['choices'][0]['message']['content']
             except: pass
 
-        # 3. Третья попытка: ЗАПАСНОЙ БЕСПЛАТНЫЙ GEMINI (Если OpenRouter тоже не ответил)
+        # 3. Третья попытка: ЗАПАСНОЙ БЕСПЛАТНЫЙ GEMINI (Если OpenRouter не ответил, очищаем контент до текста)
         if (reply.startswith("Ошибка") or "Ошибка" in reply) and gemini_key:
+            # Если в full_messages сидит массив с картинкой, заменяем его на чистый текст для стабильности эндпоинта
+            safe_messages = []
+            for m in full_messages:
+                if m["role"] == "user" and isinstance(m["content"], list):
+                    # Вытаскиваем текстовое описание из массива
+                    text_part = m["content"][0]["text"]
+                    safe_messages.append({"role": "user", "content": text_part})
+                else:
+                    safe_messages.append(m)
             try:
                 response = await client.post(
                     "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                     headers={"Authorization": f"Bearer {gemini_key}", "Content-Type": "application/json"},
-                    json={"model": "gemini-1.5-flash", "messages": full_messages},
+                    json={"model": "gemini-1.5-flash", "messages": safe_messages},
                     timeout=30.0
                 )
                 if response.status_code == 200:
                     reply = response.json()['choices'][0]['message']['content']
             except: pass
             
-    # Сохраняем в БД (только текст, саму тяжелую картинку в историю базы не пишем)
+    # Сохраняем в БД
     if mode == "private" and not reply.startswith("Ошибка"):
         conn = get_db_connection()
         if conn:
