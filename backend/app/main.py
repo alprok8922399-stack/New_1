@@ -20,41 +20,79 @@ app.add_middleware(
 )
 
 async def search_internet(query: str, max_results: int = 3) -> str:
-    """Ищет информацию в интернете через DuckDuckGo и возвращает результаты со ссылками."""
+    """Ищет информацию в интернете через стабильный API DuckDuckGo без парсинга тяжелого HTML."""
     async with httpx.AsyncClient() as client:
         try:
-            url = f"https://html.duckduckgo.com/html/?q={httpx.encode_uri(query)}"
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-            response = await client.get(url, headers=headers, timeout=10.0)
+            # Шаг 1: Получаем специальный токен верификации (vqd) для поиска
+            vqd_url = "https://duckduckgo.com/"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            vqd_res = await client.get(vqd_url, params={"q": query}, headers=headers, timeout=5.0)
             
-            if response.status_code != 200:
-                return "Не удалось получить результаты поиска."
+            vqd_match = re.search(r'vqd=([\d-]+)&', vqd_res.text)
+            if not vqd_match:
+                vqd_match = re.search(r'vqd=["\']([^"\']+)["\']', vqd_res.text)
                 
-            html = response.text
-            results = []
-            
-            # Поиск блоков результатов на странице HTML
-            matches = re.findall(r'<a class="result__url" href="([^"]+)">.*?<a class="result__snippet"[^>]*>(.*?)</a>', html, re.DOTALL)
-            
-            if not matches:
-                links = re.findall(r'href="([^"]+)" class="result__snippet"', html)
-                snippets = re.findall(r'class="result__snippet">([^<]+)', html)
-                matches = list(zip(links, snippets))
+            if not vqd_match:
+                return "Не удалось авторизовать поисковый запрос."
+                
+            vqd = vqd_match.group(1)
 
-            for link, snippet in matches[:max_results]:
-                clean_snippet = re.sub(r'<[^>]+>', '', snippet).strip()
-                if "//duckduckgo.com/l/?kh=-1&uddg=" in link:
-                    link = link.split("uddg=")[1].split("&")[0]
-                    link = httpx.unquote(link)
-                results.append(f"- {clean_snippet}\n  Ссылка: {link}")
+            # Шаг 2: Делаем запрос к официальному JSON-эндпоинту без риска блокировки HTML верстки
+            search_url = "https://links.duckduckgo.com/d.js"
+            params = {
+                "q": query,
+                "l": "wt-wt",
+                "p": "1",
+                "s": "0",
+                "dl": "en",
+                "ct": "US",
+                "ss_mkt": "us",
+                "vqd": vqd,
+                "b": ""
+            }
+            
+            response = await client.get(search_url, params=params, headers=headers, timeout=10.0)
+            if response.status_code != 200:
+                return "Поисковый сервер временно недоступен."
+
+            # Ответ приходит в виде текста с JSON-массивом внутри функции
+            data_text = response.text
+            # Извлекаем чистые данные результатов
+            if "DDG.page" in data_text:
+                return "Поиск временно ограничен."
+
+            # Парсим ссылки и описания через регулярки из чистого ответа
+            links = re.findall(r'"u":"([^"]+)"', data_text)
+            snippets = re.findall(r'"t":"([^"]+)"', data_text) # Текст/Описание результатов
+            
+            if not links:
+                # Пробуем альтернативный парсинг для стандартного JSON формата
+                try:
+                    res_json = response.json()
+                    results = []
+                    for item in res_json.get("results", [])[:max_results]:
+                        results.append(f"- {item.get('text', '')}\n  Ссылка: {item.get('url', '')}")
+                    if results:
+                        return "\n\n".join(results)
+                except:
+                    pass
+                return "Поиск не дал надежных результатов."
+
+            results = []
+            for link, snippet in list(zip(links, snippets))[:max_results]:
+                # Очищаем спецсимволы юникода, если они есть
+                clean_snippet = snippet.encode().decode('unicode-escape', errors='ignore')
+                clean_snippet = re.sub(r'<[^>]+>', '', clean_snippet).strip()
+                clean_link = link.encode().decode('unicode-escape', errors='ignore')
+                results.append(f"- {clean_snippet}\n  Ссылка: {clean_link}")
                 
             if not results:
-                return "Поиск не дал результатов."
+                return "Поиск пуст."
                 
             return "\n\n".join(results)
         except Exception as e:
             logger.error(f"Ошибка поиска: {e}")
-            return "Произошла ошибка при поиске в интернете."
+            return "Произошла ошибка при поиске информации."
 
 async def check_if_search_needed(user_message: str) -> bool:
     """Проверяет триггер-слова в сообщении для запуска поиска."""
