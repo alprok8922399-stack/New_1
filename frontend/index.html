@@ -178,6 +178,7 @@
         function formatAiText(text) {
             let rawText = text || "";
             
+            // 1. Форматируем блоки кода ```код```
             rawText = rawText.replace(/```([\s\S]*?)```/g, (match, p1) => {
                 return `<div class="code-block-wrapper">
                             <button class="copy-code-btn" onclick="copyCode(this)">Копировать</button>
@@ -185,18 +186,66 @@
                         </div>`;
             });
 
-            rawText = rawText.replace(/\*\*(.*?)\*\//g, '<strong>$1</strong>');
+            // 2. Исправленная регулярка для жирного текста **текст**
+            rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
             
-            // Новая регулярка для превращения [Название](URL) в кликабельную ссылку
+            // 3. Превращаем [Название](URL) в кликабельную ссылку
             rawText = rawText.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
             
-            const paragraphs = rawText.split('\n');
-            return paragraphs.map(p => {
-                if (p.trim() === "") return '<div style="height: 8px;"></div>';
-                if (p.startsWith('<div class="code-block-wrapper">')) return p;
-                return `<p>${p}</p>`;
-            }).join('');
+            // 4. Логика обработки абзацев и списков (маркированных и нумерованных)
+            const lines = rawText.split('\n');
+            let resultHtml = "";
+            let inUl = false;
+            let inOl = false;
+
+            lines.forEach(line => {
+                let trimmed = line.trim();
+
+                // Пропускаем уже готовые блоки кода
+                if (trimmed.startsWith('<div class="code-block-wrapper">') || trimmed.endsWith('</div>') || trimmed.startsWith('<pre>') || trimmed.startsWith('<code>')) {
+                    if (inUl) { resultHtml += "</ul>"; inUl = false; }
+                    if (inOl) { resultHtml += "</ol>"; inOl = false; }
+                    resultHtml += line + "\n";
+                    return;
+                }
+
+                if (trimmed === "") {
+                    if (inUl) { resultHtml += "</ul>"; inUl = false; }
+                    if (inOl) { resultHtml += "</ol>"; inOl = false; }
+                    resultHtml += '<div style="height: 8px;"></div>';
+                    return;
+                }
+
+                // Проверяем на маркированный список (начинается с -, *, •, ◦)
+                const bulletMatch = line.match(/^(\s*)([-*•◦])\s+(.*)$/);
+                if (bulletMatch) {
+                    if (inOl) { resultHtml += "</ol>"; inOl = false; }
+                    if (!inUl) { resultHtml += "<ul>"; inUl = true; }
+                    resultHtml += `<li>${bulletMatch[3]}</li>`;
+                    return;
+                }
+
+                // Проверяем на нумерованный список (начинается с цифры с точкой, например: 1.)
+                const digitMatch = line.match(/^(\s*)(\d+)\.\s+(.*)$/);
+                if (digitMatch) {
+                    if (inUl) { resultHtml += "</ul>"; inUl = false; }
+                    if (!inOl) { resultHtml += "<ol>"; inOl = true; }
+                    resultHtml += `<li>${digitMatch[3]}</li>`;
+                    return;
+                }
+
+                // Обычная строка текста
+                if (inUl) { resultHtml += "</ul>"; inUl = false; }
+                if (inOl) { resultHtml += "</ol>"; inOl = false; }
+                resultHtml += `<p>${line}</p>`;
+            });
+
+            // Закрываем списки, если они остались открытыми в конце текста
+            if (inUl) resultHtml += "</ul>";
+            if (inOl) resultHtml += "</ol>";
+
+            return resultHtml;
         }
 
         function copyToClipboard(text) {
