@@ -28,6 +28,40 @@ def get_db_connection():
         logger.error(f"БД ошибка: {e}")
         return None
 
+async def search_tavily(query: str, api_key: str) -> str:
+    """Функция для поиска информации в интернете через Tavily API"""
+    if not api_key:
+        return ""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.tavily.com/search",
+                json={
+                    "api_key": api_key.strip(),
+                    "query": query,
+                    "search_depth": "basic",
+                    "include_answer": False,
+                    "max_results": 3
+                },
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                results = response.json().get("results", [])
+                if not results:
+                    return "\n[Поиск в интернете не дал результатов]\n"
+                
+                search_context = "\n--- РЕЗУЛЬТАТЫ ПОИСКА В ИНТЕРНЕТЕ ---\n"
+                for idx, res in enumerate(results, 1):
+                    search_context += f"Источник {idx}: {res.get('title')}\nURL: {res.get('url')}\nСодержание: {res.get('content')}\n\n"
+                search_context += "-------------------------------------\n"
+                return search_context
+            else:
+                logger.error(f"Ошибка Tavily API: {response.text}")
+                return ""
+    except Exception as e:
+        logger.error(f"Сбой при поиске Tavily: {e}")
+        return ""
+
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     data = await request.json()
@@ -38,7 +72,7 @@ async def chat_endpoint(request: Request):
     
     time_match = re.search(r"Текущие дата и время:\s*([^\]]+)", raw_user_message)
     client_time = time_match.group(1).strip() if time_match else "Неизвестно"
-    name_match = re.search(r"Имя собеседника:\s*([^\]]+)", raw_user_message)
+    name_match = re.search(r"Имя собесейника:\s*([^\]]+)", raw_user_message)
     user_name = name_match.group(1).strip() if name_match else "Алексей"
 
     user_message = re.sub(r"^\[Системное инфо.*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
@@ -46,7 +80,16 @@ async def chat_endpoint(request: Request):
     groq_key = os.environ.get("GROQ_KEY") or os.environ.get("GROG_KEY")
     gemini_key = os.environ.get("GEMINI_API_KEY")
     or_key = os.environ.get("OPENROUTER_API_KEY")
+    tavily_key = os.environ.get("TAVILY_API_KEY")
     
+    # АВТОМАТИЧЕСКИЙ ПОИСК В ИНТЕРНЕТЕ (TAVILY)
+    # Если пользователь просит "найди", "поиск", "интернет", "ссылку" и т.д.
+    search_data = ""
+    keywords = ["найди", "поиск", "интернет", "гугл", "ссылк", "узнай", "информац"]
+    if any(word in user_message.lower() for word in keywords) and tavily_key:
+        logger.info(f"Запуск веб-поиска для запроса: {user_message}")
+        search_data = await search_tavily(user_message, tavily_key)
+
     history_messages = []
     if mode == "private":
         conn = get_db_connection()
@@ -59,24 +102,35 @@ async def chat_endpoint(request: Request):
             for r in rows[::-1]:
                 history_messages.append({"role": r[0], "content": r[1]})
 
-    system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. Отвечай кратко, с юмором, на русском."
+    system_prompt = (
+        f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. "
+        f"Отвечай кратко, с юмором, на русском. "
+        f"ВАЖНО: Если к запросу прикреплены 'РЕЗУЛЬТАТЫ ПОИСКА В ИНТЕРНЕТЕ', обязательно используй их для ответа "
+        f"и выводи точные кликабельные ссылки (URL) на источники, которые тебе предоставлены."
+    )
     
     text_messages = [{"role": "system", "content": system_prompt}]
     for msg in history_messages:
         text_messages.append({"role": msg["role"], "content": msg["content"]})
-    text_messages.append({"role": "user", "content": user_message if user_message else "Посмотри на этот скриншот"})
+        
+    # Добавляем результаты поиска к сообщению пользователя, если они есть
+    final_user_content = user_message
+    if search_data:
+        final_user_content = f"{user_message}\n{search_data}"
+        
+    text_messages.append({"role": "user", "content": final_user_content if final_user_content else "Посмотри на этот скриншот"})
     
     reply = "Ошибка: выбранный сервис недоступен"
     model_used = "none"
     
     async with httpx.AsyncClient() as client:
         
-        # 1. ПОПЫТКА GROQ (Первый в каскаде «Авто» или ручной выбор)
+        # 1. ПОПЫТКА GROQ (Первый в каскаде «Авто»)
         if (requested_model in ["auto", "groq"]) and groq_key:
             try:
                 groq_messages = text_messages.copy()
                 if user_image:
-                    groq_messages[-1]["content"] = f"[Пользователь отправил скриншот. Проанализируй контекст обсуждения] {user_message}".strip()
+                    groq_messages[-1]["content"] = f"[Пользователь отправил скриншот. Проанализируй контекст обсуждения] {final_user_content}".strip()
 
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
@@ -90,7 +144,7 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой Groq: {e}")
 
-        # 2. ПОПЫТКА GEMINI (Второй в каскаде «Авто» или ручной выбор, если Groq не ответил)
+        # 2. ПОПЫТКА GEMINI (Второй в каскаде «Авто», если Groq не ответил)
         if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "gemini") and gemini_key:
             try:
                 if user_image:
@@ -104,7 +158,7 @@ async def chat_endpoint(request: Request):
                     gemini_payload = {
                         "contents": [{
                             "parts": [
-                                {"text": f"{system_prompt}\n\nПользователь: {user_message if user_message else 'Посмотри на скриншот'}"},
+                                {"text": f"{system_prompt}\n\nПользователь: {final_user_content if final_user_content else 'Посмотри на скриншот'}"},
                                 {"inline_data": {"mime_type": mime_type, "data": img_data}}
                             ]
                         }]
@@ -112,7 +166,7 @@ async def chat_endpoint(request: Request):
                 else:
                     gemini_payload = {
                         "contents": [{
-                            "parts": [{"text": f"{system_prompt}\n\nПользователь: {user_message}"}]
+                            "parts": [{"text": f"{system_prompt}\n\nПользователь: {final_user_content}"}]
                         }]
                     }
 
@@ -128,7 +182,7 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой Gemini: {e}")
 
-        # 3. ПОПЫТКА OPENROUTER (Третий, финальный в каскаде «Авто» или ручной выбор, если первые два упали)
+        # 3. ПОПЫТКА OPENROUTER (Третий, финальный в каскаде «Авто»)
         if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "openrouter") and or_key:
             try:
                 if user_image:
@@ -138,7 +192,7 @@ async def chat_endpoint(request: Request):
                     or_messages.append({
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": user_message if user_message else "Посмотри на скриншот"},
+                            {"type": "text", "text": final_user_content if final_user_content else "Посмотри на скриншот"},
                             {"type": "image_url", "image_url": {"url": user_image}}
                         ]
                     })
@@ -148,7 +202,7 @@ async def chat_endpoint(request: Request):
                 response = await client.post(
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers={"Authorization": f"Bearer {or_key.strip()}", "Content-Type": "application/json"},
-                    json={"model": "openrouter/auto", "messages": or_messages}, # Исправлено на авто-перебор бесплатных моделей
+                    json={"model": "openrouter/auto", "messages": or_messages},
                     timeout=30.0
                 )
                 if response.status_code == 200:
