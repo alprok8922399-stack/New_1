@@ -3,7 +3,6 @@ import httpx
 import logging
 import re
 import json
-import urllib.parse
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
@@ -20,7 +19,48 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-ADMIN_KEY = os.environ.get("ADMIN_SECRET_KEY")
+async def search_internet(query: str, max_results: int = 3) -> str:
+    """Ищет информацию в интернете через DuckDuckGo и возвращает результаты со ссылками."""
+    async with httpx.AsyncClient() as client:
+        try:
+            url = f"https://html.duckduckgo.com/html/?q={httpx.encode_uri(query)}"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            response = await client.get(url, headers=headers, timeout=10.0)
+            
+            if response.status_code != 200:
+                return "Не удалось получить результаты поиска."
+                
+            html = response.text
+            results = []
+            
+            # Поиск блоков результатов на странице HTML
+            matches = re.findall(r'<a class="result__url" href="([^"]+)">.*?<a class="result__snippet"[^>]*>(.*?)</a>', html, re.DOTALL)
+            
+            if not matches:
+                links = re.findall(r'href="([^"]+)" class="result__snippet"', html)
+                snippets = re.findall(r'class="result__snippet">([^<]+)', html)
+                matches = list(zip(links, snippets))
+
+            for link, snippet in matches[:max_results]:
+                clean_snippet = re.sub(r'<[^>]+>', '', snippet).strip()
+                if "//duckduckgo.com/l/?kh=-1&uddg=" in link:
+                    link = link.split("uddg=")[1].split("&")[0]
+                    link = httpx.unquote(link)
+                results.append(f"- {clean_snippet}\n  Ссылка: {link}")
+                
+            if not results:
+                return "Поиск не дал результатов."
+                
+            return "\n\n".join(results)
+        except Exception as e:
+            logger.error(f"Ошибка поиска: {e}")
+            return "Произошла ошибка при поиске в интернете."
+
+async def check_if_search_needed(user_message: str) -> bool:
+    """Проверяет триггер-слова в сообщении для запуска поиска."""
+    keywords = ["найди", "погугли", "интернет", "ссылк", "новости", "что сейчас", "какой сегодня", "актуальн", "узнай"]
+    msg_lower = user_message.lower()
+    return any(kw in msg_lower for kw in keywords)
 
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
@@ -31,82 +71,13 @@ def get_db_connection():
         logger.error(f"БД ошибка: {e}")
         return None
 
-@app.on_event("startup")
-def startup_event():
-    conn = get_db_connection()
-    if conn:
-        try:
-            cur = conn.cursor()
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS chat_memory (
-                    id SERIAL PRIMARY KEY,
-                    key VARCHAR(100) UNIQUE NOT NULL,
-                    value TEXT NOT NULL
-                );
-            """)
-            conn.commit()
-            cur.close()
-            conn.close()
-            logger.info("Таблица chat_memory проверена.")
-        except Exception as e:
-            logger.error(f"Ошибка инициализации таблицы памяти: {e}")
-
-def save_memory_fact(key, value):
-    conn = get_db_connection()
-    if conn:
-        try:
-            cur = conn.cursor()
-            cur.execute("SELECT id FROM chat_memory WHERE key = %s", (key,))
-            row = cur.fetchone()
-            if row:
-                cur.execute("UPDATE chat_memory SET value = %s WHERE id = %s", (value, row[0]))
-            else:
-                cur.execute("INSERT INTO chat_memory (key, value) VALUES (%s, %s)", (key, value))
-            conn.commit()
-            cur.close()
-            conn.close()
-            return True
-        except Exception as e:
-            logger.error(f"Ошибка записи в память: {e}")
-    return False
-
-def get_all_memory_context():
-    conn = get_db_connection()
-    if not conn: return ""
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT key, value FROM chat_memory")
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-        if not rows: return ""
-        context = "\n".join([f"- {r[0]}: {r[1]}" for r in rows])
-        return f"\n\nВАЖНАЯ ИНФОРМАЦИЯ О СОБЕСЕДНИКЕ:\n{context}"
-    except Exception as e:
-        logger.error(f"Ошибка чтения памяти: {e}")
-        return ""
-
-# ФУНКЦИЯ НЕВИДИМОГО ТЕКСТОВОГО ПЕРЕВОДА НА АНГЛИЙСКИЙ
-async def translate_text_simple(text):
-    async with httpx.AsyncClient() as client:
-        try:
-            url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=ru&tl=en&dt=t&q={urllib.parse.quote(text)}"
-            response = await client.get(url, timeout=5.0)
-            if response.status_code == 200:
-                translated = response.json()[0][0][0]
-                logger.info(f"Перевод: «{text}» -> «{translated}»")
-                return translated
-        except Exception as e:
-            logger.error(f"Ошибка перевода: {e}")
-    return text
-
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     data = await request.json()
     raw_user_message = data.get("text") or ""
     mode = data.get("mode") or "private"
     user_image = data.get("image") or ""
-    requested_model = data.get("model") or "auto"
+    requested_model = data.get("model") or "auto"  # Получаем принудительную модель из интерфейса
     
     time_match = re.search(r"Текущие дата и время:\s*([^\]]+)", raw_user_message)
     client_time = time_match.group(1).strip() if time_match else "Неизвестно"
@@ -115,57 +86,19 @@ async def chat_endpoint(request: Request):
 
     user_message = re.sub(r"^\[Системное инфо.*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
     
+    # Запуск интернет-поиска при обнаружении ключевых слов
+    search_results = ""
+    if await check_if_search_needed(user_message):
+        logger.info(f"Запуск поиска в интернете для запроса: {user_message}")
+        search_query = re.sub(r"\b(найди|погугли|в интернете|скажи|интернет|пожалуйста)\b", "", user_message, flags=re.IGNORECASE).strip()
+        if not search_query:
+            search_query = user_message
+            
+        search_results = await search_internet(search_query)
+
     groq_key = os.environ.get("GROQ_KEY") or os.environ.get("GROG_KEY")
     gemini_key = os.environ.get("GEMINI_API_KEY")
     or_key = os.environ.get("OPENROUTER_API_KEY")
-    
-    # ----------------------------------------------------
-    # АВТОПЕРЕХВАТ ГЕНЕРАЦИИ С ДЕЙСТВИТЕЛЬНЫМ СХРАНЕНИЕМ В БД
-    # ----------------------------------------------------
-    image_triggers = [r"\bнарисуй\b", r"\bсгенерируй\b", r"\bсоздай картинку\b", r"\bизобрази\b", r"\bрисунок\b"]
-    is_image_request = any(re.search(trigger, user_message, re.IGNORECASE) for trigger in image_triggers)
-
-    if is_image_request:
-        try:
-            clean_prompt = user_message
-            for trigger in image_triggers:
-                clean_prompt = re.sub(trigger, "", clean_prompt, flags=re.IGNORECASE).strip()
-            
-            if not clean_prompt:
-                clean_prompt = "beautiful funny cyber raccoon"
-            else:
-                # Переводим чистый текст без лишнего мусора
-                clean_prompt = await translate_text_simple(clean_prompt)
-
-            encoded_prompt = urllib.parse.quote(clean_prompt)
-            # Стабильный Flux для генерации качественных картинок
-            img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true&private=true&model=flux"
-            
-            reply = f"Вот твой рисунок по запросу «{user_message}»:\n\n<img src='{img_url}' style='max-width: 100%; border-radius: 12px; margin-top: 8px;' />"
-            
-            # ТЕПЕРЬ ИСТОРИЯ ЗАПИСЫВАЕТСЯ НАМЕРТВО
-            if mode == "private":
-                conn = get_db_connection()
-                if conn:
-                    cur = conn.cursor()
-                    db_history_text = f"Я успешно сгенерировал и показал тебе картинку по твоему запросу: «{user_message}»."
-                    cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", user_message))
-                    cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", db_history_text))
-                    conn.commit()
-                    cur.close()
-                    conn.close()
-                    
-            return {"text": reply, "model_used": "gemini"}
-            
-        except Exception as e:
-            logger.error(f"Ошибка генерации картинок: {e}")
-
-    # Обычный текстовый каскад
-    memory_context = ""
-    if mode == "private":
-        memory_context = get_all_memory_context()
-
-    system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. Отвечай кратко, с юмором, на русском.{memory_context}"
     
     history_messages = []
     if mode == "private":
@@ -179,6 +112,12 @@ async def chat_endpoint(request: Request):
             for r in rows[::-1]:
                 history_messages.append({"role": r[0], "content": r[1]})
 
+    system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. Отвечай кратко, с юмором, на русском."
+    
+    # Добавляем результаты поиска в системный промпт, если они есть
+    if search_results:
+        system_prompt += f"\n\nИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА ДЛЯ ТВОЕГО ОТВЕТА (используй эти данные и обязательно прикрепи ссылки к своему ответу):\n{search_results}"
+
     text_messages = [{"role": "system", "content": system_prompt}]
     for msg in history_messages:
         text_messages.append({"role": msg["role"], "content": msg["content"]})
@@ -188,9 +127,11 @@ async def chat_endpoint(request: Request):
     model_used = "none"
     
     async with httpx.AsyncClient() as client:
-        # 1. ПОПЫТКА GEMINI
+        
+        # 1. ПОПЫТКА GEMINI (Если авто-режим или выбран вручную)
         if (requested_model in ["auto", "gemini"]) and gemini_key:
             try:
+                # Формируем структуру под картинку или под текст
                 if user_image:
                     if "," in user_image:
                         img_data = user_image.split(",")[1]
@@ -226,7 +167,7 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой Gemini: {e}")
 
-        # 2. ПОПЫТКА OPENROUTER (Текст)
+        # 2. ПОПЫТКА OPENROUTER (Если авто-режим или выбран вручную, и первая модель не ответила)
         if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "openrouter") and or_key:
             try:
                 if user_image:
@@ -255,9 +196,10 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой OpenRouter: {e}")
 
-        # 3. ПОПЫТКА GROQ
+        # 3. ПОПЫТКА GROQ (Каскад последней надежды или ручной выбор)
         if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "groq") and groq_key:
             try:
+                # Если была картинка, добавляем текстовую подсказку для Groq в промпт
                 groq_messages = text_messages.copy()
                 if user_image:
                     groq_messages[-1]["content"] = f"[Пользователь отправил скриншот. Проанализируй контекст обсуждения] {user_message}".strip()
@@ -274,6 +216,7 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой Groq: {e}")
             
+    # Сохраняем историю в БД (с краткой меткой контекста скриншота, чтобы не жрать токены!)
     if mode == "private" and not reply.startswith("Ошибка"):
         conn = get_db_connection()
         if conn:
@@ -287,18 +230,6 @@ async def chat_endpoint(request: Request):
             conn.commit()
             cur.close()
             conn.close()
-
-            memory_triggers = {
-                "Любимый стиль тату": r"(?:люблю|нравятся?|тащусь от) тату (?:в стиле|стиля?)?\s*([\w\s-]+)",
-                "Город проживания": r"(?:живу в|город|из города)\s*([\w\s-]+)",
-                "День рождения": r"мой день рождения\s*([\d\.\w]+)"
-            }
-
-            for fact_key, pattern in memory_triggers.items():
-                match = re.search(pattern, user_message, re.IGNORECASE)
-                if match:
-                    extracted_fact = match.group(1).strip()
-                    save_memory_fact(fact_key, extracted_fact)
             
     return {"text": reply, "model_used": model_used}
 
