@@ -2,11 +2,11 @@ import os
 import httpx
 import logging
 import re
-import json
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 
+# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -19,276 +19,218 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-async def search_internet(query: str, max_results: int = 3) -> str:
-    """Ищет информацию в интернете через стабильный API DuckDuckGo без парсинга тяжелого HTML."""
-    async with httpx.AsyncClient() as client:
-        try:
-            # Шаг 1: Получаем специальный токен верификации (vqd) для поиска
-            vqd_url = "https://duckduckgo.com/"
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-            vqd_res = await client.get(vqd_url, params={"q": query}, headers=headers, timeout=5.0)
-            
-            vqd_match = re.search(r'vqd=([\d-]+)&', vqd_res.text)
-            if not vqd_match:
-                vqd_match = re.search(r'vqd=["\']([^"\']+)["\']', vqd_res.text)
-                
-            if not vqd_match:
-                return "Не удалось авторизовать поисковый запрос."
-                
-            vqd = vqd_match.group(1)
-
-            # Шаг 2: Делаем запрос к официальному JSON-эндпоинту без риска блокировки HTML верстки
-            search_url = "https://links.duckduckgo.com/d.js"
-            params = {
-                "q": query,
-                "l": "wt-wt",
-                "p": "1",
-                "s": "0",
-                "dl": "en",
-                "ct": "US",
-                "ss_mkt": "us",
-                "vqd": vqd,
-                "b": ""
-            }
-            
-            response = await client.get(search_url, params=params, headers=headers, timeout=10.0)
-            if response.status_code != 200:
-                return "Поисковый сервер временно недоступен."
-
-            # Ответ приходит в виде текста с JSON-массивом внутри функции
-            data_text = response.text
-            # Извлекаем чистые данные результатов
-            if "DDG.page" in data_text:
-                return "Поиск временно ограничен."
-
-            # Парсим ссылки и описания через регулярки из чистого ответа
-            links = re.findall(r'"u":"([^"]+)"', data_text)
-            snippets = re.findall(r'"t":"([^"]+)"', data_text) # Текст/Описание результатов
-            
-            if not links:
-                # Пробуем альтернативный парсинг для стандартного JSON формата
-                try:
-                    res_json = response.json()
-                    results = []
-                    for item in res_json.get("results", [])[:max_results]:
-                        results.append(f"- {item.get('text', '')}\n  Ссылка: {item.get('url', '')}")
-                    if results:
-                        return "\n\n".join(results)
-                except:
-                    pass
-                return "Поиск не дал надежных результатов."
-
-            results = []
-            for link, snippet in list(zip(links, snippets))[:max_results]:
-                # Очищаем спецсимволы юникода, если они есть
-                clean_snippet = snippet.encode().decode('unicode-escape', errors='ignore')
-                clean_snippet = re.sub(r'<[^>]+>', '', clean_snippet).strip()
-                clean_link = link.encode().decode('unicode-escape', errors='ignore')
-                results.append(f"- {clean_snippet}\n  Ссылка: {clean_link}")
-                
-            if not results:
-                return "Поиск пуст."
-                
-            return "\n\n".join(results)
-        except Exception as e:
-            logger.error(f"Ошибка поиска: {e}")
-            return "Произошла ошибка при поиске информации."
-
-async def check_if_search_needed(user_message: str) -> bool:
-    """Проверяет триггер-слова в сообщении для запуска поиска."""
-    keywords = ["найди", "погугли", "интернет", "ссылк", "новости", "что сейчас", "какой сегодня", "актуальн", "узнай"]
-    msg_lower = user_message.lower()
-    return any(kw in msg_lower for kw in keywords)
-
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
-    if not db_url: return None
+    if not db_url:
+        return None
     try:
-        return psycopg2.connect(db_url, connect_timeout=3)
+        conn = psycopg2.connect(db_url, connect_timeout=3)
+        return conn
     except Exception as e:
-        logger.error(f"БД ошибка: {e}")
+        logger.error(f"Не удалось подключиться к БД: {e}")
         return None
 
-@app.post("/api/chat")
-async def chat_endpoint(request: Request):
-    data = await request.json()
-    raw_user_message = data.get("text") or ""
-    mode = data.get("mode") or "private"
-    user_image = data.get("image") or ""
-    requested_model = data.get("model") or "auto"  # Получаем принудительную модель из интерфейса
-    
-    time_match = re.search(r"Текущие дата и время:\s*([^\]]+)", raw_user_message)
-    client_time = time_match.group(1).strip() if time_match else "Неизвестно"
-    name_match = re.search(r"Имя собеседника:\s*([^\]]+)", raw_user_message)
-    user_name = name_match.group(1).strip() if name_match else "Алексей"
-
-    user_message = re.sub(r"^\[Системное инфо.*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
-    
-    # Запуск интернет-поиска при обнаружении ключевых слов
-    search_results = ""
-    if await check_if_search_needed(user_message):
-        logger.info(f"Запуск поиска в интернете для запроса: {user_message}")
-        search_query = re.sub(r"\b(найди|погугли|в интернете|скажи|интернет|пожалуйста)\b", "", user_message, flags=re.IGNORECASE).strip()
-        if not search_query:
-            search_query = user_message
-            
-        search_results = await search_internet(search_query)
-
-    groq_key = os.environ.get("GROQ_KEY") or os.environ.get("GROG_KEY")
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    or_key = os.environ.get("OPENROUTER_API_KEY")
-    
-    history_messages = []
-    if mode == "private":
-        conn = get_db_connection()
-        if conn:
+@app.on_event("startup")
+def startup_event():
+    conn = get_db_connection()
+    if conn:
+        try:
             cur = conn.cursor()
-            cur.execute("SELECT role, content FROM chat_messages ORDER BY id DESC LIMIT 9")
-            rows = cur.fetchall()
-            cur.close()
-            conn.close()
-            for r in rows[::-1]:
-                history_messages.append({"role": r[0], "content": r[1]})
-
-    system_prompt = f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. Отвечай кратко, с юмором, на русском."
-    
-    # Добавляем результаты поиска в системный промпт, если они есть
-    if search_results:
-        system_prompt += f"\n\nИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА ДЛЯ ТВОЕГО ОТВЕТА (используй эти данные и обязательно прикрепи ссылки к своему ответу):\n{search_results}"
-
-    text_messages = [{"role": "system", "content": system_prompt}]
-    for msg in history_messages:
-        text_messages.append({"role": msg["role"], "content": msg["content"]})
-    text_messages.append({"role": "user", "content": user_message if user_message else "Посмотри на этот скриншот"})
-    
-    reply = "Ошибка: выбранный сервис недоступен"
-    model_used = "none"
-    
-    async with httpx.AsyncClient() as client:
-        
-        # 1. ПОПЫТКА GEMINI (Если авто-режим или выбран вручную)
-        if (requested_model in ["auto", "gemini"]) and gemini_key:
-            try:
-                # Формируем структуру под картинку или под текст
-                if user_image:
-                    if "," in user_image:
-                        img_data = user_image.split(",")[1]
-                        mime_type = user_image.split(";")[0].replace("data:", "")
-                    else:
-                        img_data = user_image
-                        mime_type = "image/jpeg"
-                    
-                    gemini_payload = {
-                        "contents": [{
-                            "parts": [
-                                {"text": f"{system_prompt}\n\nПользователь: {user_message if user_message else 'Посмотри на скриншот'}"},
-                                {"inline_data": {"mime_type": mime_type, "data": img_data}}
-                            ]
-                        }]
-                    }
-                else:
-                    gemini_payload = {
-                        "contents": [{
-                            "parts": [{"text": f"{system_prompt}\n\nПользователь: {user_message}"}]
-                        }]
-                    }
-
-                response = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key.strip()}",
-                    headers={"Content-Type": "application/json"},
-                    data=json.dumps(gemini_payload),
-                    timeout=30.0
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id SERIAL PRIMARY KEY,
+                    role VARCHAR(20) NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-                if response.status_code == 200:
-                    reply = response.json()['candidates'][0]['content']['parts'][0]['text']
-                    model_used = "gemini"
-            except Exception as e:
-                logger.error(f"Сбой Gemini: {e}")
-
-        # 2. ПОПЫТКА OPENROUTER (Если авто-режим или выбран вручную, и первая модель не ответила)
-        if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "openrouter") and or_key:
-            try:
-                if user_image:
-                    or_messages = [{"role": "system", "content": system_prompt}]
-                    for msg in history_messages:
-                        or_messages.append({"role": msg["role"], "content": msg["content"]})
-                    or_messages.append({
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": user_message if user_message else "Посмотри на скриншот"},
-                            {"type": "image_url", "image_url": {"url": user_image}}
-                        ]
-                    })
-                else:
-                    or_messages = text_messages
-
-                response = await client.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {or_key.strip()}", "Content-Type": "application/json"},
-                    json={"model": "google/gemini-2.5-flash", "messages": or_messages},
-                    timeout=30.0
-                )
-                if response.status_code == 200:
-                    reply = response.json()['choices'][0]['message']['content']
-                    model_used = "openrouter"
-            except Exception as e:
-                logger.error(f"Сбой OpenRouter: {e}")
-
-        # 3. ПОПЫТКА GROQ (Каскад последней надежды или ручной выбор)
-        if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "groq") and groq_key:
-            try:
-                # Если была картинка, добавляем текстовую подсказку для Groq в промпт
-                groq_messages = text_messages.copy()
-                if user_image:
-                    groq_messages[-1]["content"] = f"[Пользователь отправил скриншот. Проанализируй контекст обсуждения] {user_message}".strip()
-
-                response = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {groq_key.strip()}", "Content-Type": "application/json"},
-                    json={"model": "llama-3.3-70b-versatile", "messages": groq_messages},
-                    timeout=30.0
-                )
-                if response.status_code == 200:
-                    reply = response.json()['choices'][0]['message']['content']
-                    model_used = "groq"
-            except Exception as e:
-                logger.error(f"Сбой Groq: {e}")
-            
-    # Сохраняем историю в БД (с краткой меткой контекста скриншота, чтобы не жрать токены!)
-    if mode == "private" and not reply.startswith("Ошибка"):
-        conn = get_db_connection()
-        if conn:
-            cur = conn.cursor()
-            db_user_text = user_message if user_message else "Отправлен скриншот"
-            if user_image and user_message:
-                db_user_text = f"[Скриншот] {user_message}"
-            
-            cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("user", db_user_text))
-            cur.execute("INSERT INTO chat_messages (role, content) VALUES (%s, %s)", ("assistant", reply))
+            """)
             conn.commit()
             cur.close()
             conn.close()
+            logger.info("База данных успешно проверена.")
+        except Exception as e:
+            logger.error(f"Ошибка при создании таблицы: {e}")
+
+@app.post("/api/chat")
+async def chat_endpoint(request: Request):
+    try:
+        data = await request.json()
+        user_message = data.get("text") or ""
+        image_base64 = data.get("image") or ""
+        mode = data.get("mode") or "private"
+        client_history = data.get("history") or []
+        client_time = data.get("clientTime") or "Неизвестно"
+        
+        # Автоматически вытаскиваем реальное имя гостя из скрытой строки фронтенда
+        guest_name = "Пользователь"
+        if "Имя собеседника:" in user_message:
+            match = re.search(r"Имя собеседника:\s*([^\s\]]+)", user_message)
+            if match:
+                guest_name = match.group(1)
+
+        # Вытаскиваем точную дату из строки, чтобы не дублировать
+        time_info = f"Текущие дата и время у пользователя (МСК): {client_time}.\n\n"
+        if "Текущие дата и время:" in user_message:
+            time_match = re.search(r"Текущие дата и время:\s*([^\]\n]+)", user_message)
+            if time_match:
+                time_info = f"Текущие дата и время у пользователя (МСК): {time_match.group(1)}.\n\n"
+
+        # 1. НАСТРОЙКА СИСТЕМНЫХ ПРОМТОВ В ЗАВИСИМОСТИ ОТ РЕЖИМА
+        if mode == "public":
+            system_prompt = (
+                f"{time_info}"
+                f"Ты — крутой, вежливый и отзывчивый ИИ-помощник. Твой стиль общения — живой, "
+                f"свободный, понятный и по-человечески теплый. Никакой лишней официальщины. "
+                f"Отвечай всегда только на русском языке, просто и емко. Не расписывай длинные простыни текста.\n"
+                f"ВАЖНО: Твоего собеседника зовут {guest_name}. Обращайся к нему по этому имени! "
+                f"Не используй имя Алексей, сейчас ты общаешься именно с пользователем по имени {guest_name}."
+            )
+        else:
+            system_prompt = (
+                f"{time_info}"
+                "Ты — близкий друг и крутой ИИ-помощник Алексея. Твой стиль общения — живой, "
+                "свободный, с юмором и иронией, как в реальном разговоре. Никакой официальщины, "
+                "никаких фраз 'Чем могу быть полезен' или 'Как я могу помочь'. "
+                "Отвечай всегда только на русском языке, просто, емко и по-человечески. "
+                "Старайся писать коротко и по делу, не расписывай длинные простыни текста, "
+                "если только Алексей сам не попросит ответить детально или развернуто. "
+                "Если Алексей просит шутку — шути смешно, жизненно, избегай избитых шаблонов."
+            )
+
+        # 2. ЗАПИСЬ В БД ТОЛЬКО ДЛЯ ЛИЧНОГО РЕЖИМА АЛЕКСЕЯ
+        conn = None
+        if mode != "public":
+            conn = get_db_connection()
+            if conn:
+                try:
+                    cur = conn.cursor()
+                    cur.execute(
+                        "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
+                        ("user", user_message)
+                    )
+                    conn.commit()
+                except Exception as e:
+                    logger.error(f"Не удалось записать сообщение пользователя: {e}")
+
+        # 3. СБОР КОНТЕКСТА ИСТОРИИ
+        messages_for_ai = [{"role": "system", "content": system_prompt}]
+        
+        if mode == "public":
+            # Для публичного чата берем только ту историю, которую прислал клиент
+            for msg in client_history[:-1]:
+                messages_for_ai.append({"role": msg.get("role"), "content": msg.get("content")})
+        else:
+            # Для Алексея достаем контекст из вечной базы PostgreSQL
+            history_messages = []
+            if conn:
+                try:
+                    cur.execute("""
+                        SELECT role, content 
+                        FROM chat_messages 
+                        WHERE id < (SELECT MAX(id) FROM chat_messages)
+                        ORDER BY id DESC 
+                        LIMIT 10
+                    """)
+                    rows = cur.fetchall()
+                    for row in rows[::-1]:
+                        history_messages.append({"role": row[0], "content": row[1]})
+                except Exception as e:
+                    logger.error(f"Не удалось достать контекст для ИИ: {e}")
+            messages_for_ai.extend(history_messages)
+
+        # Формируем текущее сообщение (с поддержкой фото, если есть)
+        current_content = [{"type": "text", "text": user_message}]
+        if image_base64:
+            current_content.append({"type": "image_url", "image_url": {"url": image_base64}})
             
-    return {"text": reply, "model_used": model_used}
+        messages_for_ai.append({"role": "user", "content": current_content})
+
+        # 4. ЗАПРОС К OPENROUTER (ВКЛЮЧАЕМ БЕСПЛАТНЫЙ GEMINI-2.5-FLASH)
+        api_key = os.environ.get("OPENROUTER_API_KEY", "")
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": "google/gemini-2.5-flash:free", 
+                    "messages": messages_for_ai,
+                    "max_tokens": 400
+                },
+                timeout=30.0
+            )
+            
+            if response.status_code == 200:
+                reply = response.json()['choices'][0]['message']['content']
+                
+                # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
+                if mode != "public" and conn:
+                    try:
+                        cur.execute(
+                            "INSERT INTO chat_messages (role, content) VALUES (%s, %s)",
+                            ("assistant", reply)
+                        )
+                        conn.commit()
+                    except Exception as e:
+                        logger.error(f"Не удалось записать ответ ИИ: {e}")
+                
+                if conn:
+                    cur.close()
+                    conn.close()
+
+                return {"text": reply}
+            else:
+                if conn:
+                    cur.close()
+                    conn.close()
+                return {"text": f"Ошибка OpenRouter: {response.text}"}
+                
+    except Exception as e:
+        return {"text": f"Ошибка бэкенда: {str(e)}"}
 
 @app.get("/api/history")
 async def get_history():
     conn = get_db_connection()
-    if not conn: return []
-    cur = conn.cursor()
-    cur.execute("SELECT id, role, content FROM chat_messages ORDER BY id DESC LIMIT 10")
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    return [{"id": r[0], "role": r[1], "content": r[2]} for r in rows[::-1]]
+    if not conn:
+        return []
+    
+    try:
+        cur = conn.cursor() 
+        cur.execute("""
+            SELECT id, role, content 
+            FROM chat_messages 
+            ORDER BY id DESC 
+            LIMIT 15
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        if not rows:
+            return []
+            
+        history_summary = []
+        for row in rows[::-1]:
+            history_summary.append({"id": row[0], "role": row[1], "content": row[2]})
+            
+        return history_summary
+        
+    except Exception as e:
+        logger.error(f"Ошибка при получении истории: {e}")
+        return []
 
 @app.delete("/api/delete/{msg_id}")
 async def delete_message(msg_id: int):
     conn = get_db_connection()
-    if not conn: return {"status": "error"}
-    cur = conn.cursor()
-    cur.execute("DELETE FROM chat_messages WHERE id = %s", (msg_id,))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return {"status": "success"}
+    if not conn:
+        return {"status": "error", "message": "Нет подключения к БД"}
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM chat_messages WHERE id = %s", (msg_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "success", "message": f"Сообщение {msg_id} удалено"}
+    except Exception as e:
+        logger.error(f"Ошибка при удалении сообщения {msg_id}: {e}")
+        return {"status": "error", "message": str(e)}
