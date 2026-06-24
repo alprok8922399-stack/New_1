@@ -88,7 +88,7 @@
                 if(selectedModel === 'groq') visibleName = "Groq (Llama)";
                 
                 activeModelName.textContent = `Модель: ${visibleName}`;
-                statusDot.className = "status-dot manual"; // Оранжевый/синий при ручном переключении
+                statusDot.className = "status-dot manual"; 
             });
         });
 
@@ -219,6 +219,8 @@
             
             const wrapper = document.createElement('div');
             wrapper.className = 'message-wrapper';
+            // Добавляем специальный класс для определения роли при сборке истории
+            wrapper.classList.add(isUser ? 'role-user' : 'role-assistant');
             if (messageId) {
                 wrapper.setAttribute('data-id', messageId); 
             }
@@ -271,6 +273,24 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
+        // Функция сбора локальной истории с экрана (нужно для Гостей)
+        function getLocalChatHistory() {
+            const wrappers = messagesContainer.querySelectorAll('.message-wrapper');
+            const history = [];
+            wrappers.forEach(w => {
+                const isUser = w.classList.contains('role-user');
+                const msgDiv = w.querySelector('.message');
+                if (msgDiv) {
+                    history.push({
+                        role: isUser ? 'user' : 'assistant',
+                        content: msgDiv.innerText || msgDiv.textContent || ""
+                    });
+                }
+            });
+            // Берем последние 10 сообщений гостя, чтобы не перегружать контекст
+            return history.slice(-10);
+        }
+
         async function loadChatHistory() {
             try {
                 const response = await fetch("https://new-1-5155.onrender.com/api/history");
@@ -295,6 +315,9 @@
             
             const currentDateTime = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
             const textWithTime = `[Системное инфо: Текущие дата и время: ${currentDateTime}. Режим комнаты: ${chatMode}. Имя собеседника: ${userDisplayName}]\n${text}`;
+
+            // Получаем историю до добавления нового сообщения
+            const localHistory = getLocalChatHistory();
 
             appendMessage(textWithTime, true, selectedImageBase64); 
             const imgToSend = selectedImageBase64;
@@ -326,14 +349,16 @@
                         text: textWithTime, 
                         image: imgToSend,
                         mode: chatMode,
-                        model: selectedModel // Отправляем ручной выбор на бэкенд!
+                        model: selectedModel,
+                        history: localHistory // ТЕПЕРЬ ИСТОРИЯ ПЕРЕДАЕТСЯ НА СЕРВЕР ИДЕАЛЬНО!
                     })
                 });
                 const data = await response.json();
                 appendMessage(data.text, false); 
                 
-                // Красим индикатор в цвет той модели, которая реально ответила
-                updateStatusDot(data.model_used);
+                if (data.model_used) {
+                    updateStatusDot(data.model_used);
+                }
             } catch (e) {
                 appendMessage("Ошибка соединения.", false);
                 statusDot.className = "status-dot error";
@@ -341,4 +366,4 @@
         });
     </script>
 </body>
-    </html>
+</html>
