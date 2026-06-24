@@ -185,8 +185,11 @@
                         </div>`;
             });
 
-            rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            rawText = rawText.replace(/\*\*(.*?)\*\//g, '<strong>$1</strong>');
             rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // Новая регулярка для превращения [Название](URL) в кликабельную ссылку
+            rawText = rawText.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
             
             const paragraphs = rawText.split('\n');
             return paragraphs.map(p => {
@@ -219,7 +222,6 @@
             
             const wrapper = document.createElement('div');
             wrapper.className = 'message-wrapper';
-            // Добавляем специальный класс для определения роли при сборке истории
             wrapper.classList.add(isUser ? 'role-user' : 'role-assistant');
             if (messageId) {
                 wrapper.setAttribute('data-id', messageId); 
@@ -273,7 +275,6 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        // Функция сбора локальной истории с экрана (нужно для Гостей)
         function getLocalChatHistory() {
             const wrappers = messagesContainer.querySelectorAll('.message-wrapper');
             const history = [];
@@ -287,7 +288,6 @@
                     });
                 }
             });
-            // Берем последние 10 сообщений гостя, чтобы не перегружать контекст
             return history.slice(-10);
         }
 
@@ -316,7 +316,6 @@
             const currentDateTime = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
             const textWithTime = `[Системное инфо: Текущие дата и время: ${currentDateTime}. Режим комнаты: ${chatMode}. Имя собеседника: ${userDisplayName}]\n${text}`;
 
-            // Получаем историю до добавления нового сообщения
             const localHistory = getLocalChatHistory();
 
             appendMessage(textWithTime, true, selectedImageBase64); 
@@ -350,7 +349,7 @@
                         image: imgToSend,
                         mode: chatMode,
                         model: selectedModel,
-                        history: localHistory // ТЕПЕРЬ ИСТОРИЯ ПЕРЕДАЕТСЯ НА СЕРВЕР ИДЕАЛЬНО!
+                        history: localHistory
                     })
                 });
                 const data = await response.json();
