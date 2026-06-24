@@ -72,7 +72,7 @@ async def chat_endpoint(request: Request):
     
     time_match = re.search(r"Текущие дата и время:\s*([^\]]+)", raw_user_message)
     client_time = time_match.group(1).strip() if time_match else "Неизвестно"
-    name_match = re.search(r"Имя собесейника:\s*([^\]]+)", raw_user_message)
+    name_match = re.search(r"Имя собеседника:\s*([^\]]+)", raw_user_message)
     user_name = name_match.group(1).strip() if name_match else "Алексей"
 
     user_message = re.sub(r"^\[Системное инфо.*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
@@ -105,8 +105,10 @@ async def chat_endpoint(request: Request):
     system_prompt = (
         f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. "
         f"Отвечай кратко, с юмором, на русском. "
-        f"ВАЖНО: Если к запросу прикреплены 'РЕЗУЛЬТАТЫ ПОИСКА В ИНТЕРНЕТЕ', обязательно используй их для ответа "
-        f"и выводи точные кликабельные ссылки (URL) на источники, которые тебе предоставлены."
+        f"ОФОРМЛЕНИЕ: Делай текст структурированным и красивым, используй списки, жирный шрифт для акцентов и подходящие эмодзи. "
+        f"ВАЖНО: Если к запросу прикреплены 'РЕЗУЛЬТАТЫ ПОИСКА В ИНТЕРНЕТЕ', обязательно используй их для ответа. "
+        f"Все ссылки на источники делай СТРОГО кликабельными, упаковывая их в формат Markdown, например: [Название сайта](URL-ссылка). "
+        f"Пользователь должен иметь возможность нажать на название источника и перейти по ссылке."
     )
     
     text_messages = [{"role": "system", "content": system_prompt}]
