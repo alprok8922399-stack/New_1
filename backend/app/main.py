@@ -116,11 +116,9 @@ async def chat_endpoint(request: Request):
         messages_for_ai = [{"role": "system", "content": system_prompt}]
         
         if mode == "public":
-            # Для публичного чата берем только ту историю, которую прислал клиент
             for msg in client_history[:-1]:
                 messages_for_ai.append({"role": msg.get("role"), "content": msg.get("content")})
         else:
-            # Для Алексея достаем контекст из вечной базы PostgreSQL
             history_messages = []
             if conn:
                 try:
@@ -138,14 +136,14 @@ async def chat_endpoint(request: Request):
                     logger.error(f"Не удалось достать контекст для ИИ: {e}")
             messages_for_ai.extend(history_messages)
 
-        # Формируем текущее сообщение (с поддержкой фото, если есть)
+        # Формируем текущее сообщение
         current_content = [{"type": "text", "text": user_message}]
         if image_base64:
             current_content.append({"type": "image_url", "image_url": {"url": image_base64}})
             
         messages_for_ai.append({"role": "user", "content": current_content})
 
-        # 4. ЗАПРОС К OPENROUTER (ВКЛЮЧАЕМ БЕСПЛАТНЫЙ GEMINI-2.5-FLASH)
+        # 4. ЗАПРОС К OPENROUTER (ВКЛЮЧАЕМ АВТО-ПЕРЕБОР БЕСПЛАТНЫХ МОДЕЛЕЙ)
         api_key = os.environ.get("OPENROUTER_API_KEY", "")
         
         async with httpx.AsyncClient() as client:
@@ -153,7 +151,7 @@ async def chat_endpoint(request: Request):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": "google/gemini-2.5-flash:free", 
+                    "model": "openrouter/auto", # <--- ВОТ ОН, АВТОМАТИЧЕСКИЙ КАСКАД БЕСПЛАТНЫХ МОДЕЛЕЙ
                     "messages": messages_for_ai,
                     "max_tokens": 400
                 },
@@ -163,7 +161,6 @@ async def chat_endpoint(request: Request):
             if response.status_code == 200:
                 reply = response.json()['choices'][0]['message']['content']
                 
-                # ОТВЕТ ПИШЕМ В БД ТОЛЬКО ДЛЯ АЛЕКСЕЯ
                 if mode != "public" and conn:
                     try:
                         cur.execute(
@@ -193,7 +190,6 @@ async def get_history():
     conn = get_db_connection()
     if not conn:
         return []
-    
     try:
         cur = conn.cursor() 
         cur.execute("""
@@ -214,7 +210,6 @@ async def get_history():
             history_summary.append({"id": row[0], "role": row[1], "content": row[2]})
             
         return history_summary
-        
     except Exception as e:
         logger.error(f"Ошибка при получении истории: {e}")
         return []
