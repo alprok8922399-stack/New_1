@@ -140,6 +140,44 @@ header {
     color: #e3e3e3; 
 }
 
+/* СТИЛИ ДЛЯ ОТСТУПОВ И ССЫЛОК В ОТВЕТАХ БОТА */
+.message.bot p {
+    margin-bottom: 14px;
+    line-height: 1.6;
+}
+
+.message.bot p:last-child {
+    margin-bottom: 0;
+}
+
+.message.bot ul, .message.bot ol {
+    margin-bottom: 14px;
+    padding-left: 20px;
+}
+
+.message.bot li {
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+.message.bot li:last-child {
+    margin-bottom: 0;
+}
+
+/* Красивые светлые ссылки, которые выделяются на темном фоне */
+.message.bot a {
+    color: #64d2ff;
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 1px dashed rgba(100, 210, 255, 0.4);
+    transition: all 0.2s ease;
+}
+
+.message.bot a:active {
+    color: #0a84ff;
+    border-bottom-color: #0a84ff;
+}
+
 .message.user { 
     background: #2f2f2f; 
     align-self: flex-end; 
@@ -147,21 +185,6 @@ header {
     border-radius: 20px;
     max-width: 85%;
     color: #fff; 
-}
-
-.message p { 
-    margin-bottom: 12px; 
-    line-height: 1.6; 
-}
-
-.message p:last-child { 
-    margin-bottom: 0; 
-}
-
-.message li {
-    margin-left: 20px;
-    margin-bottom: 6px;
-    line-height: 1.6;
 }
 
 .message strong { 
@@ -357,7 +380,7 @@ textarea {
 /* Цвета индикаторов */
 .status-dot.gemini { background: #34c759; box-shadow: 0 0 8px #34c759; }       /* Зеленый */
 .status-dot.openrouter { background: #0a84ff; box-shadow: 0 0 8px #0a84ff; }   /* Синий */
-.status-dot.groq { background: #5856d6; box-shadow: 0 0 8px #5856d6; }         /* Фиолетовый */
+.status-dot.groq { background: #5856d6; box-shadow: 0 0 8px #5856d6; }          /* Фиолетовый */
 .status-dot.manual { background: #ff9500; box-shadow: 0 0 8px #ff9500; }       /* Оранжевый (выбор режима) */
 .status-dot.error { background: #ff3b30; box-shadow: 0 0 8px #ff3b30; }        /* Красный (ошибка) */
 
