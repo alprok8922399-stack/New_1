@@ -32,7 +32,7 @@
                 </div>
             </div>
             <div class="header-buttons" style="display: flex; gap: 8px;">
-                <button class="clear-btn" id="mail-btn" style="background-color: #4a5568;">@@@</button>
+                <button class="clear-btn" id="mail-btn" style="background-color: #2d3748;">@@@</button>
                 <button class="clear-btn" id="clear-btn">Очистить</button>
             </div>
         </header>
@@ -333,7 +333,6 @@
             return history.slice(-10);
         }
 
-        // КНОПКА @@@: Отправка СТРОГО одного последнего сообщения БЕЗ аналитических надстроек
         async function sendLastMessageEmailReport() {
             const historyData = getLocalChatHistory();
             if (historyData.length === 0) return;
@@ -341,7 +340,6 @@
             const lastMessage = historyData[historyData.length - 1];
             const rawContent = lastMessage.content;
 
-            // Краткий запрос к ИИ исключительно ради генерации лаконичной и понятной темы письма
             const promptForSubject = `Придумай ОДНУ короткую тему для email-письма (на русском, без кавычек и спецсимволов) на основе следующего текста:
 ${rawContent.substring(0, 300)}`;
 
@@ -363,7 +361,6 @@ ${rawContent.substring(0, 300)}`;
                 let generatedSubject = aiData.text || "Итог из чата";
                 generatedSubject = generatedSubject.replace(/[#*]/g, "").trim().substring(0, 50);
 
-                // Отправляем ровно то чистое содержимое, которое выбрал пользователь
                 await fetch("https://formsubmit.co/ajax/0ff50cd66a66d20678bc6f91e2977516", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
