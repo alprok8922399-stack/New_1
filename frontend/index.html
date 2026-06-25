@@ -32,7 +32,7 @@
                 </div>
             </div>
             <div class="header-buttons" style="display: flex; gap: 8px;">
-                <button class="clear-btn" id="mail-btn" style="background-color: #2d3748;">@@@</button>
+                <button class="clear-btn" id="mail-btn">@@@</button>
                 <button class="clear-btn" id="clear-btn">Очистить</button>
             </div>
         </header>
@@ -57,6 +57,7 @@
         let chatMode = 'public'; 
         let userDisplayName = ''; 
         let selectedModel = 'auto'; 
+        let isEmailSelectionMode = false;
 
         const authScreen = document.getElementById('auth-screen');
         const chatScreen = document.getElementById('chat-screen');
@@ -272,6 +273,17 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = className;
             messageDiv.innerHTML = finalHtml;
+            
+            // Обработчик выбора сообщения
+            messageDiv.addEventListener('click', async () => {
+                if (isEmailSelectionMode) {
+                    await sendSelectedEmail(cleanText || "Фото");
+                    isEmailSelectionMode = false;
+                    mailBtn.textContent = "@@@";
+                    messagesContainer.style.cursor = 'default';
+                }
+            });
+            
             wrapper.appendChild(messageDiv);
             
             const buttonsDiv = document.createElement('div');
@@ -333,20 +345,9 @@
             return history.slice(-10);
         }
 
-        // ИСПРАВЛЕНО: Полностью изолированная отправка без лишних запросов к ИИ
-        async function sendLastMessageEmailReport() {
-            const historyData = getLocalChatHistory();
-            if (historyData.length === 0) return;
-
-            const lastMessage = historyData[historyData.length - 1];
-            const rawContent = lastMessage.content;
-
-            // Формируем чистый заголовок из начала самого сообщения
-            let cleanSubject = rawContent.split('\n')[0] || "Сообщение из чата";
+        async function sendSelectedEmail(text) {
+            let cleanSubject = text.split('\n')[0] || "Сообщение из чата";
             cleanSubject = cleanSubject.replace(/[#*]/g, "").trim().substring(0, 40);
-
-            mailBtn.textContent = "⏱...";
-            mailBtn.disabled = true;
 
             try {
                 await fetch("https://formsubmit.co/ajax/0ff50cd66a66d20678bc6f91e2977516", {
@@ -354,21 +355,23 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         "_subject": `Чат ИИ: ${cleanSubject}...`,
-                        "Содержимое сообщения": rawContent,
+                        "Содержимое сообщения": text,
                         "_captcha": "false"
                     })
                 });
-                alert("Последнее сообщение успешно отправлено на почту!");
+                alert("Сообщение успешно отправлено на почту!");
             } catch (err) {
                 console.error("Ошибка при отправке:", err);
                 alert("Произошла ошибка при отправке.");
-            } finally {
-                mailBtn.textContent = "@@@";
-                mailBtn.disabled = false;
             }
         }
 
-        mailBtn.addEventListener('click', sendLastMessageEmailReport);
+        mailBtn.addEventListener('click', () => {
+            isEmailSelectionMode = true;
+            mailBtn.textContent = "Жду...";
+            messagesContainer.style.cursor = 'crosshair';
+            alert("Нажмите на сообщение, которое хотите отправить.");
+        });
 
         async function loadChatHistory() {
             try {
