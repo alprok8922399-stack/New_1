@@ -1,417 +1,141 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chat</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
+const messagesContainer = document.getElementById('messages');
+const inputArea = document.getElementById('input');
+const sendBtn = document.getElementById('send-btn');
 
-    <div class="auth-container" id="auth-screen">
-        <div class="auth-box">
-            <h2>Введите ваше имя</h2>
-            <input type="text" id="username-input" placeholder="Ваше имя..." autofocus>
-            <button id="login-btn">Войти</button>
-        </div>
-    </div>
+// Автоматическое расширение поля ввода при написании текста
+inputArea.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+});
 
-    <div class="chat-container" id="chat-screen">
-        <header>
-            <div class="header-left">
-                <div class="header-title" id="chat-header-title">Друг и помощник</div>
-                <div class="model-selector-wrapper" id="model-selector-trigger">
-                    <span class="status-dot" id="status-dot"></span>
-                    <span id="active-model-name">Модель: Авто</span>
-                    <div class="model-dropdown" id="model-dropdown">
-                        <div class="dropdown-item active" data-model="auto">🤖 Авто (Каскад)</div>
-                        <div class="dropdown-item" data-model="gemini">✨ Gemini 2.5</div>
-                        <div class="dropdown-item" data-model="openrouter">🚀 OpenRouter</div>
-                        <div class="dropdown-item" data-model="groq">⚡ Groq (Llama)</div>
-                    </div>
-                </div>
+// Функция, которая делает текст ИИ красивым (как у Gemini)
+function formatAiText(text) {
+    let rawText = text || "";
+    
+    // 1. Превращаем двойные звёздочки **текст** в жирный шрифт
+    rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // 2. Превращаем одиночные звёздочки *текст* в красивый курсив
+    rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // 3. Вычищаем сиротливые одиночные звёздочки, если остались
+    rawText = rawText.replace(/\*/g, '');
+    
+    // 4. Разбиваем текст на абзацы по переносам строк
+    const paragraphs = rawText.split('\n');
+    
+    // Заворачиваем каждую строчку в абзац с отступом снизу
+    let formattedHtml = paragraphs.map(p => {
+        if (p.trim() === '---' || p.trim() === '***') {
+            return '<hr style="border: 0; border-top: 1px solid #333; margin: 12px 0;">';
+        }
+        if (p.trim() === "") {
+            return '<div style="height: 10px;"></div>'; // Пустая строка для отступа
+        }
+        return `<p style="margin-bottom: 8px; line-height: 1.5;">${p}</p>`;
+    }).join('');
+    
+    return formattedHtml;
+}
+
+// Функция для копирования текста в буфер обмена
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Текст скопирован!');
+    }).catch(err => {
+        console.error('Не удалось скопировать: ', err);
+    });
+}
+
+// Функция добавления сообщений в ленту
+function appendMessage(text, isUser) {
+    const className = isUser ? 'message user' : 'message bot';
+    
+    // Если пишет пользователь - оставляем обычный текст, если ИИ - форматируем до красоты
+    const finalHtml = isUser ? text.replace(/\n/g, '<br>') : formatAiText(text);
+    
+    // Генерируем кнопки в зависимости от того, кто отправил сообщение
+    let buttonsHtml = '';
+    if (isUser) {
+        buttonsHtml = `
+            <div class="message-buttons" style="text-align: right; margin-top: 4px;">
+                <button class="btn-edit" style="background: none; border: none; color: #888; cursor: pointer; font-size: 12px; margin-right: 8px;">✏️ Редактировать</button>
+                <button class="btn-copy" style="background: none; border: none; color: #888; cursor: pointer; font-size: 12px;">📋 Скопировать</button>
             </div>
-            <button class="clear-btn" id="clear-btn">Очистить</button>
-        </header>
-        <div class="messages" id="messages"></div>
-        
-        <div class="input-area">
-            <div id="image-preview-container" class="preview-hidden">
-                <img id="image-preview" src="" alt="Превью">
-                <button id="cancel-image-btn">×</button>
+        `;
+    } else {
+        buttonsHtml = `
+            <div class="message-buttons" style="text-align: left; margin-top: 4px;">
+                <button class="btn-copy" style="background: none; border: none; color: #888; cursor: pointer; font-size: 12px;">📋 Скопировать</button>
             </div>
-            <div class="input-row">
-                <input type="file" id="file-input" accept="image/*" style="display: none;">
-                <button id="attach-btn">📎</button>
-                <textarea id="input" placeholder="Сообщение..." rows="1"></textarea>
-                <button id="send-btn">➤</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const SECRET_CODE = 'alprok8922399';
-        let chatMode = 'public'; 
-        let userDisplayName = ''; 
-        let selectedModel = 'auto'; // Выбранная модель по умолчанию
-
-        const authScreen = document.getElementById('auth-screen');
-        const chatScreen = document.getElementById('chat-screen');
-        const usernameInput = document.getElementById('username-input');
-        const loginBtn = document.getElementById('login-btn');
-        const chatHeaderTitle = document.getElementById('chat-header-title');
-
-        // Логика меню переключения моделей
-        const modelTrigger = document.getElementById('model-selector-trigger');
-        const modelDropdown = document.getElementById('model-dropdown');
-        const activeModelName = document.getElementById('active-model-name');
-        const statusDot = document.getElementById('status-dot');
-
-        modelTrigger.addEventListener('click', (e) => {
-            e.stopPropagation();
-            modelDropdown.classList.toggle('show');
+        `;
+    }
+    
+    // Создаем элемент сообщения
+    const messageElement = document.createElement('div');
+    messageElement.className = className;
+    messageElement.innerHTML = `
+        <div class="message-text">${finalHtml}</div>
+        ${buttonsHtml}
+    `;
+    
+    // Навешиваем событие на кнопку копирования
+    const copyBtn = messageElement.querySelector('.btn-copy');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => copyToClipboard(text));
+    }
+    
+    // Навешиваем событие на кнопку редактирования (пока просто заготовка для логики)
+    const editBtn = messageElement.querySelector('.btn-edit');
+    if (editBtn) {
+        editBtn.addEventListener('click', () => {
+            inputArea.value = text;
+            inputArea.focus();
+            inputArea.style.height = 'auto';
+            inputArea.style.height = (inputArea.scrollHeight) + 'px';
         });
+    }
+    
+    messagesContainer.appendChild(messageElement);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
 
-        document.addEventListener('click', () => {
-            modelDropdown.classList.remove('show');
+// Загрузка истории чата из базы данных
+async function loadChatHistory() {
+    try {
+        const response = await fetch("https://new-1-5155.onrender.com/api/history");
+        const history = await response.json();
+        messagesContainer.innerHTML = ""; 
+        history.forEach(msg => {
+            const isUser = msg.role === 'user';
+            appendMessage(msg.content || msg.text, isUser);
         });
+    } catch (e) {
+        console.error("Ошибка загрузки истории:", e);
+    }
+}
 
-        document.querySelectorAll('.dropdown-item').forEach(item => {
-            item.addEventListener('click', function() {
-                document.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
-                this.classList.add('active');
-                selectedModel = this.getAttribute('data-model');
-                
-                let visibleName = "Авто";
-                if(selectedModel === 'gemini') visibleName = "Gemini 2.5";
-                if(selectedModel === 'openrouter') visibleName = "OpenRouter";
-                if(selectedModel === 'groq') visibleName = "Groq (Llama)";
-                
-                activeModelName.textContent = `Модель: ${visibleName}`;
-                statusDot.className = "status-dot manual"; 
-            });
+// Нажатие на кнопку отправки
+sendBtn.addEventListener('click', async () => {
+    const text = inputArea.value.trim();
+    if (!text) return;
+    
+    appendMessage(text, true); // Сразу выводим сообщение пользователя
+    inputArea.value = '';
+    inputArea.style.height = '40px'; // Возвращаем исходный размер полю ввода
+
+    try {
+        const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
         });
+        const data = await response.json();
+        appendMessage(data.text, false); // Выводим красивый ответ бота
+    } catch (e) {
+        appendMessage("Ошибка соединения. Кажется, сервер спит.", false);
+    }
+});
 
-        function updateStatusDot(backendModel) {
-            statusDot.className = "status-dot"; // Сброс классов
-            if (backendModel === 'gemini') {
-                statusDot.classList.add('gemini');
-            } else if (backendModel === 'openrouter') {
-                statusDot.classList.add('openrouter');
-            } else if (backendModel === 'groq') {
-                statusDot.classList.add('groq');
-            } else {
-                statusDot.classList.add('error');
-            }
-        }
-
-        function handleLogin() {
-            const enteredName = usernameInput.value.trim();
-            if (!enteredName) return;
-
-            if (enteredName === SECRET_CODE) {
-                chatMode = 'private';
-                userDisplayName = 'Алексей';
-                chatHeaderTitle.textContent = 'Друг и помощник';
-                authScreen.style.display = 'none';
-                chatScreen.style.display = 'flex';
-                loadChatHistory();
-            } else {
-                chatMode = 'public';
-                userDisplayName = enteredName;
-                chatHeaderTitle.textContent = `Чат для: ${enteredName}`;
-                authScreen.style.display = 'none';
-                chatScreen.style.display = 'flex';
-                messagesContainer.innerHTML = ""; 
-            }
-        }
-
-        loginBtn.addEventListener('click', handleLogin);
-        usernameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleLogin();
-        });
-
-        const messagesContainer = document.getElementById('messages');
-        const inputArea = document.getElementById('input');
-        const sendBtn = document.getElementById('send-btn');
-        const attachBtn = document.getElementById('attach-btn');
-        const fileInput = document.getElementById('file-input');
-        const previewContainer = document.getElementById('image-preview-container');
-        const imagePreview = document.getElementById('image-preview');
-        const cancelImageBtn = document.getElementById('cancel-image-btn');
-        const clearBtn = document.getElementById('clear-btn');
-
-        let selectedImageBase64 = "";
-        let currentEditingMessageId = null; 
-
-        inputArea.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-        });
-
-        attachBtn.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                selectedImageBase64 = event.target.result;
-                imagePreview.src = selectedImageBase64;
-                previewContainer.classList.remove('preview-hidden');
-            };
-            reader.readAsDataURL(file);
-        });
-
-        cancelImageBtn.addEventListener('click', () => {
-            selectedImageBase64 = "";
-            fileInput.value = "";
-            previewContainer.classList.add('preview-hidden');
-        });
-
-        function copyCode(btn) {
-            const code = btn.nextElementSibling.innerText;
-            navigator.clipboard.writeText(code);
-            btn.textContent = 'Скопировано!';
-            setTimeout(() => btn.textContent = 'Копировать', 2000);
-        }
-
-        function formatAiText(text) {
-            let rawText = text || "";
-            
-            // 1. Форматируем блоки кода ```код```
-            rawText = rawText.replace(/```([\s\S]*?)```/g, (match, p1) => {
-                return `<div class="code-block-wrapper">
-                            <button class="copy-code-btn" onclick="copyCode(this)">Копировать</button>
-                            <pre><code>${p1.trim()}</code></pre>
-                        </div>`;
-            });
-
-            // 2. Исправленная регулярка для жирного текста **текст**
-            rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
-            
-            // 3. Превращаем [Название](URL) в кликабельную ссылку
-            rawText = rawText.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-            
-            // 4. Логика обработки абзацев и списков (маркированных и нумерованных)
-            const lines = rawText.split('\n');
-            let resultHtml = "";
-            let inUl = false;
-            let inOl = false;
-
-            lines.forEach(line => {
-                let trimmed = line.trim();
-
-                // Пропускаем уже готовые блоки кода
-                if (trimmed.startsWith('<div class="code-block-wrapper">') || trimmed.endsWith('</div>') || trimmed.startsWith('<pre>') || trimmed.startsWith('<code>')) {
-                    if (inUl) { resultHtml += "</ul>"; inUl = false; }
-                    if (inOl) { resultHtml += "</ol>"; inOl = false; }
-                    resultHtml += line + "\n";
-                    return;
-                }
-
-                if (trimmed === "") {
-                    if (inUl) { resultHtml += "</ul>"; inUl = false; }
-                    if (inOl) { resultHtml += "</ol>"; inOl = false; }
-                    resultHtml += '<div style="height: 8px;"></div>';
-                    return;
-                }
-
-                // Проверяем на маркированный список (начинается с -, *, •, ◦)
-                const bulletMatch = line.match(/^(\s*)([-*•◦])\s+(.*)$/);
-                if (bulletMatch) {
-                    if (inOl) { resultHtml += "</ol>"; inOl = false; }
-                    if (!inUl) { resultHtml += "<ul>"; inUl = true; }
-                    resultHtml += `<li>${bulletMatch[3]}</li>`;
-                    return;
-                }
-
-                // Проверяем на нумерованный список (начинается с цифры с точкой, например: 1.)
-                const digitMatch = line.match(/^(\s*)(\d+)\.\s+(.*)$/);
-                if (digitMatch) {
-                    if (inUl) { resultHtml += "</ul>"; inUl = false; }
-                    if (!inOl) { resultHtml += "<ol>"; inOl = true; }
-                    resultHtml += `<li>${digitMatch[3]}</li>`;
-                    return;
-                }
-
-                // Обычная строка текста
-                if (inUl) { resultHtml += "</ul>"; inUl = false; }
-                if (inOl) { resultHtml += "</ol>"; inOl = false; }
-                resultHtml += `<p>${line}</p>`;
-            });
-
-            // Закрываем списки, если они остались открытыми в конце текста
-            if (inUl) resultHtml += "</ul>";
-            if (inOl) resultHtml += "</ol>";
-
-            return resultHtml;
-        }
-
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).catch(err => {
-                console.error('Не удалось скопировать: ', err);
-            });
-        }
-
-        function appendMessage(text, isUser, imageUrl = "", messageId = null) {
-            if ((!text || text.trim() === "") && !imageUrl) return;
-
-            let cleanText = text;
-            if (isUser) {
-                cleanText = cleanText.replace(/^\[Системное инфо.*?\]\s*/s, "");
-            }
-
-            const className = isUser ? 'message user' : 'message bot';
-            let finalHtml = isUser ? cleanText.replace(/\n/g, '<br>') : formatAiText(cleanText);
-            
-            if (imageUrl) {
-                finalHtml = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">` + finalHtml;
-            }
-            
-            const wrapper = document.createElement('div');
-            wrapper.className = 'message-wrapper';
-            wrapper.classList.add(isUser ? 'role-user' : 'role-assistant');
-            if (messageId) {
-                wrapper.setAttribute('data-id', messageId); 
-            }
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = className;
-            messageDiv.innerHTML = finalHtml;
-            wrapper.appendChild(messageDiv);
-            
-            const buttonsDiv = document.createElement('div');
-            buttonsDiv.className = 'message-buttons';
-            
-            if (isUser) {
-                buttonsDiv.style.justifyContent = 'flex-end';
-                buttonsDiv.innerHTML = `
-                    <button class="btn-edit" title="Редактировать">
-                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"/></svg>
-                    </button>
-                    <button class="btn-copy" title="Копировать">
-                        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    </button>
-                `;
-            } else {
-                buttonsDiv.style.justifyContent = 'flex-start';
-                buttonsDiv.innerHTML = `
-                    <button class="btn-copy" title="Копировать">
-                        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    </button>
-                `;
-            }
-            wrapper.appendChild(buttonsDiv);
-
-            const copyBtn = buttonsDiv.querySelector('.btn-copy');
-            if (copyBtn) {
-                copyBtn.addEventListener('click', () => copyToClipboard(cleanText || "Фото"));
-            }
-
-            const editBtn = buttonsDiv.querySelector('.btn-edit');
-            if (editBtn) {
-                editBtn.addEventListener('click', () => {
-                    inputArea.value = cleanText;
-                    inputArea.focus();
-                    inputArea.style.height = 'auto';
-                    inputArea.style.height = (inputArea.scrollHeight) + 'px';
-                    currentEditingMessageId = messageId; 
-                });
-            }
-            
-            messagesContainer.appendChild(wrapper);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function getLocalChatHistory() {
-            const wrappers = messagesContainer.querySelectorAll('.message-wrapper');
-            const history = [];
-            wrappers.forEach(w => {
-                const isUser = w.classList.contains('role-user');
-                const msgDiv = w.querySelector('.message');
-                if (msgDiv) {
-                    history.push({
-                        role: isUser ? 'user' : 'assistant',
-                        content: msgDiv.innerText || msgDiv.textContent || ""
-                    });
-                }
-            });
-            return history.slice(-10);
-        }
-
-        async function loadChatHistory() {
-            try {
-                const response = await fetch("https://new-1-5155.onrender.com/api/history");
-                const history = await response.json();
-                messagesContainer.innerHTML = ""; 
-                history.forEach(msg => {
-                    const textContent = msg.content || msg.text || "";
-                    appendMessage(textContent, msg.role === 'user', "", msg.id);
-                });
-            } catch (e) {
-                console.error("Ошибка загрузки истории:", e);
-            }
-        }
-
-        clearBtn.addEventListener('click', () => {
-            messagesContainer.innerHTML = "";
-        });
-
-        sendBtn.addEventListener('click', async () => {
-            const text = inputArea.value.trim();
-            if (!text && !selectedImageBase64) return;
-            
-            const currentDateTime = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
-            const textWithTime = `[Системное инфо: Текущие дата и время: ${currentDateTime}. Режим комнаты: ${chatMode}. Имя собеседника: ${userDisplayName}]\n${text}`;
-
-            const localHistory = getLocalChatHistory();
-
-            appendMessage(textWithTime, true, selectedImageBase64); 
-            const imgToSend = selectedImageBase64;
-            
-            if (currentEditingMessageId !== null) {
-                try {
-                    await fetch(`https://new-1-5155.onrender.com/api/delete/${currentEditingMessageId}`, {
-                        method: 'DELETE'
-                    });
-                    const oldWrapper = document.querySelector(`[data-id="${currentEditingMessageId}"]`);
-                    if (oldWrapper) oldWrapper.remove();
-                } catch (e) {
-                    console.error("Не удалось удалить старое сообщение:", e);
-                }
-                currentEditingMessageId = null; 
-            }
-            
-            inputArea.value = '';
-            inputArea.style.height = '40px'; 
-            selectedImageBase64 = "";
-            fileInput.value = "";
-            previewContainer.classList.add('preview-hidden');
-
-            try {
-                const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        text: textWithTime, 
-                        image: imgToSend,
-                        mode: chatMode,
-                        model: selectedModel,
-                        history: localHistory
-                    })
-                });
-                const data = await response.json();
-                appendMessage(data.text, false); 
-                
-                if (data.model_used) {
-                    updateStatusDot(data.model_used);
-                }
-            } catch (e) {
-                appendMessage("Ошибка соединения.", false);
-                statusDot.className = "status-dot error";
-            }
-        });
-    </script>
-</body>
-</html>
+// Запуск истории при открытии страницы
+document.addEventListener('DOMContentLoaded', loadChatHistory);
