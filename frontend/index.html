@@ -333,6 +333,7 @@
             return history.slice(-10);
         }
 
+        // ИСПРАВЛЕНО: Полностью изолированная отправка без лишних запросов к ИИ
         async function sendLastMessageEmailReport() {
             const historyData = getLocalChatHistory();
             if (historyData.length === 0) return;
@@ -340,32 +341,19 @@
             const lastMessage = historyData[historyData.length - 1];
             const rawContent = lastMessage.content;
 
-            const promptForSubject = `Придумай ОДНУ короткую тему для email-письма (на русском, без кавычек и спецсимволов) на основе следующего текста:
-${rawContent.substring(0, 300)}`;
+            // Формируем чистый заголовок из начала самого сообщения
+            let cleanSubject = rawContent.split('\n')[0] || "Сообщение из чата";
+            cleanSubject = cleanSubject.replace(/[#*]/g, "").trim().substring(0, 40);
 
             mailBtn.textContent = "⏱...";
             mailBtn.disabled = true;
 
             try {
-                const aiResponse = await fetch("https://new-1-5155.onrender.com/api/chat", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        text: promptForSubject, 
-                        mode: chatMode,
-                        model: selectedModel,
-                        history: []
-                    })
-                });
-                const aiData = await aiResponse.json();
-                let generatedSubject = aiData.text || "Итог из чата";
-                generatedSubject = generatedSubject.replace(/[#*]/g, "").trim().substring(0, 50);
-
                 await fetch("https://formsubmit.co/ajax/0ff50cd66a66d20678bc6f91e2977516", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        "_subject": `Чат ИИ: ${generatedSubject}`,
+                        "_subject": `Чат ИИ: ${cleanSubject}...`,
                         "Содержимое сообщения": rawContent,
                         "_captcha": "false"
                     })
