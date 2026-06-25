@@ -72,7 +72,7 @@ async def chat_endpoint(request: Request):
     
     time_match = re.search(r"Текущие дата и время:\s*([^\]]+)", raw_user_message)
     client_time = time_match.group(1).strip() if time_match else "Неизвестно"
-    name_match = re.search(r"Имя собесейника:\s*([^\]]+)", raw_user_message)
+    name_match = re.search(r"Имя собеседника:\s*([^\]]+)", raw_user_message)
     user_name = name_match.group(1).strip() if name_match else "Алексей"
 
     user_message = re.sub(r"^\[Системное инфо.*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
@@ -83,7 +83,6 @@ async def chat_endpoint(request: Request):
     tavily_key = os.environ.get("TAVILY_API_KEY")
     
     # АВТОМАТИЧЕСКИЙ ПОИСК В ИНТЕРНЕТЕ (TAVILY)
-    # Если пользователь просит "найди", "поиск", "интернет", "ссылку" и т.д.
     search_data = ""
     keywords = ["найди", "поиск", "интернет", "гугл", "ссылк", "узнай", "информац"]
     if any(word in user_message.lower() for word in keywords) and tavily_key:
@@ -102,18 +101,23 @@ async def chat_endpoint(request: Request):
             for r in rows[::-1]:
                 history_messages.append({"role": r[0], "content": r[1]})
 
+    # ОБНОВЛЕННЫЙ ПРОМПТ ДЛЯ КРАСИВОГО СТРУКТУРИРОВАННОГО ОТВЕТА С ЭМОДЗИ И ОТСТУПАМИ
     system_prompt = (
-        f"Ты — friend and helper. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. "
-        f"Отвечай кратко, с юмором, на русском. "
-        f"ВАЖНО: Если к запросу прикреплены 'РЕЗУЛЬТАТЫ ПОИСКА В ИНТЕРНЕТЕ', обязательно используй их для ответа "
-        f"и выводи точные кликабельные ссылки (URL) на источники, которые тебе предоставлены."
+        f"Ты — друг и помощник. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. "
+        f"Отвечай развернуто, структурировано, с легким юмором, строго на русском языке. "
+        f"ОФОРМЛЕНИЕ И СТИЛЬ: Твой ответ ОБЯЗАТЕЛЬНО должен быть визуально привлекательным. "
+        f"Разделяй мысли на логические абзацы. Используй списки (маркированные или нумерованные) для перечислений. "
+        f"Обязательно используй жирный шрифт для выделения важных заголовков и ключевых моментов. "
+        f"Щедро используй тематические эмодзи (например: 🚀, ⚙️, ✨, 🛠️, 📊, 📝) в начале заголовков и пунктов списков, чтобы оживить текст. "
+        f"ВАЖНО: Если к запросу прикреплены 'РЕЗУЛЬТАТЫ ПОИСКА В ИНТЕРНЕТЕ', обязательно используй их для ответа. "
+        f"Все ссылки на источники делай СТРОГО кликабельными, упаковывая их в формат Markdown, например: [Название сайта](URL-ссылка). "
+        f"Пользователь должен иметь возможность нажать на название источника и перейти по ссылке."
     )
     
     text_messages = [{"role": "system", "content": system_prompt}]
     for msg in history_messages:
         text_messages.append({"role": msg["role"], "content": msg["content"]})
         
-    # Добавляем результаты поиска к сообщению пользователя, если они есть
     final_user_content = user_message
     if search_data:
         final_user_content = f"{user_message}\n{search_data}"
@@ -125,7 +129,7 @@ async def chat_endpoint(request: Request):
     
     async with httpx.AsyncClient() as client:
         
-        # 1. ПОПЫТКА GROQ (Первый в каскаде «Авто»)
+        # 1. ПОПЫТКА GROQ
         if (requested_model in ["auto", "groq"]) and groq_key:
             try:
                 groq_messages = text_messages.copy()
@@ -144,7 +148,7 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой Groq: {e}")
 
-        # 2. ПОПЫТКА GEMINI (Второй в каскаде «Авто», если Groq не ответил)
+        # 2. ПОПЫТКА GEMINI
         if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "gemini") and gemini_key:
             try:
                 if user_image:
@@ -182,7 +186,7 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой Gemini: {e}")
 
-        # 3. ПОПЫТКА OPENROUTER (Третий, финальный в каскаде «Авто»)
+        # 3. ПОПЫТКА OPENROUTER
         if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "openrouter") and or_key:
             try:
                 if user_image:
