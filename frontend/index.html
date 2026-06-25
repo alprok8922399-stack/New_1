@@ -5,6 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Chat</title>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        #chat-screen header {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            padding: 10px 16px !important;
+            box-sizing: border-box !important;
+            width: 100% !important;
+            height: auto !important;
+        }
+        .header-left {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 2px !important;
+            align-items: flex-start !important;
+        }
+        .header-buttons {
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 8px !important;
+            align-items: center !important;
+            flex-shrink: 0 !important;
+        }
+        .header-buttons button {
+            margin: 0 !important;
+            height: 36px !important;
+            line-height: 1 !important;
+            white-space: nowrap !important;
+        }
+    </style>
 </head>
 <body>
 
@@ -17,8 +48,8 @@
     </div>
 
     <div class="chat-container" id="chat-screen">
-        <header style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px;">
-            <div class="header-left" style="display: flex; flex-direction: column; gap: 2px;">
+        <header>
+            <div class="header-left">
                 <div class="header-title" id="chat-header-title">Друг и помощник</div>
                 <div class="model-selector-wrapper" id="model-selector-trigger">
                     <span class="status-dot" id="status-dot"></span>
@@ -31,9 +62,9 @@
                     </div>
                 </div>
             </div>
-            <div class="header-buttons" style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
-                <button class="clear-btn" id="mail-btn" style="background-color: #2d3748; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; height: 36px; white-space: nowrap;">@@@</button>
-                <button class="clear-btn" id="clear-btn" style="background-color: #2d3748; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; height: 36px; white-space: nowrap;">Очистить</button>
+            <div class="header-buttons">
+                <button class="clear-btn" id="mail-btn" style="background-color: #2d3748; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;">@@@</button>
+                <button class="clear-btn" id="clear-btn" style="background-color: #2d3748; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Очистить</button>
             </div>
         </header>
         <div class="messages" id="messages"></div>
