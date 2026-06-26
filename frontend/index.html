@@ -182,20 +182,30 @@
             border-bottom-left-radius: 2px; 
         }
 
-        /* Сообщение пользователя — МАЛЕНЬКОЕ, компактное и справа */
+        /* Стили заголовков внутри ответа бота (из ###) */
+        .message.bot h3 {
+            font-size: 17px;
+            font-weight: bold;
+            margin: 10px 0 6px 0;
+            color: #e2e8f0;
+        }
+
+        /* Сообщение пользователя — ограничено в 3 строки */
         .message.user { 
             max-width: 75%; 
             background: #3182ce; 
             color: white; 
             border-bottom-right-radius: 2px; 
-            white-space: nowrap;
+            display: -webkit-box;
+            -webkit-line-clamp: 3; /* Ограничение в 3 строки */
+            -webkit-box-orient: vertical;  
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
         /* Когда сообщение пользователя раскрыто по клику */
         .message.user.expanded {
-            white-space: normal;
+            display: block;
             overflow: visible;
             max-width: 85%;
         }
@@ -302,7 +312,7 @@
             </div>
             <div class="header-buttons">
                 <button id="mail-btn" style="background-color: #4a5568;">@@@</button>
-                <button id="clear-btn" style="background-color: #e53e3e;">Очистить</button>
+                <button id="clear-btn" style="background-color: #4a5568;">Очистить</button>
             </div>
         </header>
         
@@ -422,6 +432,13 @@
             }
         }
 
+        // Функция форматирования текста (обрабатывает ### в жирные заголовки)
+        function formatAiText(text) {
+            if (!text) return "";
+            // Превращаем строки вида "### Любой текст" в полноценные теги заголовков <h3>
+            return text.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
+        }
+
         function appendMessage(text, isUser, imageUrl = "") {
             if (!text && !imageUrl) return;
             const className = isUser ? 'message user' : 'message bot';
@@ -437,30 +454,45 @@
                 const textNode = document.createTextNode(text);
                 messageDiv.appendChild(textNode);
             } else {
-                messageDiv.innerText = text;
+                if (isUser) {
+                    messageDiv.innerText = text;
+                } else {
+                    // Применяем форматирование заголовков для бота
+                    messageDiv.innerHTML = formatAiText(text);
+                }
             }
             
             wrapper.appendChild(messageDiv);
 
-            // Если это длинное сообщение пользователя, добавляем кнопку раскрытия
-            if (isUser && text.length > 30) {
-                const toggleBtn = document.createElement('button');
-                toggleBtn.className = 'toggle-btn';
-                toggleBtn.innerText = '▼';
+            // Если это сообщение пользователя, проверяем, нужно ли добавлять стрелочку
+            if (isUser) {
+                // Добавим кнопку в DOM, чтобы замерить реальную высоту текста
+                messagesContainer.appendChild(wrapper);
                 
-                toggleBtn.addEventListener('click', () => {
-                    if (messageDiv.classList.contains('expanded')) {
-                        messageDiv.classList.remove('expanded');
-                        toggleBtn.innerText = '▼';
-                    } else {
-                        messageDiv.classList.add('expanded');
-                        toggleBtn.innerText = '▲';
-                    }
-                });
-                wrapper.appendChild(toggleBtn);
+                // Если текст выходит за пределы 3 строк (scrollHeight больше клиентской высоты)
+                if (messageDiv.scrollHeight > messageDiv.clientHeight) {
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.className = 'toggle-btn';
+                    toggleBtn.innerText = '▼';
+                    
+                    toggleBtn.addEventListener('click', () => {
+                        if (messageDiv.classList.contains('expanded')) {
+                            messageDiv.classList.remove('expanded');
+                            toggleBtn.innerText = '▼';
+                        } else {
+                            messageDiv.classList.add('expanded');
+                            toggleBtn.innerText = '▲';
+                        }
+                    });
+                    wrapper.appendChild(toggleBtn);
+                } else {
+                    // Если текст короткий, убираем ограничение в 3 строки, чтобы он центрировался красиво
+                    messageDiv.style.display = 'block';
+                }
+            } else {
+                messagesContainer.appendChild(wrapper);
             }
             
-            messagesContainer.appendChild(wrapper);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
@@ -499,4 +531,4 @@
         });
     </script>
 </body>
-    </html>
+</html>
