@@ -182,31 +182,21 @@
             border-bottom-left-radius: 2px; 
         }
 
-        /* Стили заголовков внутри ответа бота (из ###) */
-        .message.bot h3 {
-            font-size: 17px;
-            font-weight: bold;
-            margin: 10px 0 6px 0;
-            color: #e2e8f0;
-        }
-
-        /* Сообщение пользователя — ограничено в 3 строки встроенным CSS */
+        /* Сообщение пользователя — МАЛЕНЬКОЕ, компактное и справа */
         .message.user { 
             max-width: 75%; 
             background: #3182ce; 
             color: white; 
             border-bottom-right-radius: 2px; 
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;  
+            white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        /* Когда сообщение пользователя раскрыто */
+        /* Когда сообщение пользователя раскрыто по клику */
         .message.user.expanded {
-            display: block !important;
-            overflow: visible !important;
+            white-space: normal;
+            overflow: visible;
             max-width: 85%;
         }
 
@@ -312,7 +302,7 @@
             </div>
             <div class="header-buttons">
                 <button id="mail-btn" style="background-color: #4a5568;">@@@</button>
-                <button id="clear-btn" style="background-color: #4a5568;">Очистить</button>
+                <button id="clear-btn" style="background-color: #e53e3e;">Очистить</button>
             </div>
         </header>
         
@@ -432,12 +422,6 @@
             }
         }
 
-        // Функция форматирования текста (обрабатывает ### в жирные заголовки)
-        function formatAiText(text) {
-            if (!text) return "";
-            return text.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
-        }
-
         function appendMessage(text, isUser, imageUrl = "") {
             if (!text && !imageUrl) return;
             const className = isUser ? 'message user' : 'message bot';
@@ -453,18 +437,13 @@
                 const textNode = document.createTextNode(text);
                 messageDiv.appendChild(textNode);
             } else {
-                if (isUser) {
-                    messageDiv.innerText = text;
-                } else {
-                    messageDiv.innerHTML = formatAiText(text);
-                }
+                messageDiv.innerText = text;
             }
             
             wrapper.appendChild(messageDiv);
-            messagesContainer.appendChild(wrapper);
 
-            // Безопасное добавление стрелочки для сообщений пользователя без JS-замеров высоты
-            if (isUser) {
+            // Если это длинное сообщение пользователя, добавляем кнопку раскрытия
+            if (isUser && text.length > 30) {
                 const toggleBtn = document.createElement('button');
                 toggleBtn.className = 'toggle-btn';
                 toggleBtn.innerText = '▼';
@@ -481,6 +460,7 @@
                 wrapper.appendChild(toggleBtn);
             }
             
+            messagesContainer.appendChild(wrapper);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
@@ -519,4 +499,4 @@
         });
     </script>
 </body>
-</html>
+    </html>
