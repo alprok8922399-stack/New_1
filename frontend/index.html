@@ -158,23 +158,59 @@
 
         .message-wrapper {
             display: flex;
+            flex-direction: column;
             width: 100%;
         }
-        .role-user { justify-content: flex-end; }
-        .role-assistant { justify-content: flex-start; }
+        .role-user { align-items: flex-end; }
+        .role-assistant { align-items: flex-start; }
 
-        /* Блок ответа РАСТЯНУТ во всю ширину (max-width: 100%) */
+        /* Базовые стили для плашек сообщений */
         .message {
-            width: 100%;
-            max-width: 100%;
             padding: 14px 16px;
             border-radius: 12px;
             font-size: 15px;
             line-height: 1.45;
             word-break: break-word;
         }
-        .message.user { background: #3182ce; color: white; border-bottom-right-radius: 2px; }
-        .message.bot { background: #2d3748; color: white; border-bottom-left-radius: 2px; }
+
+        /* Сообщение ИИ растянуто во всю ширину */
+        .message.bot { 
+            width: 100%;
+            max-width: 100%;
+            background: #2d3748; 
+            color: white; 
+            border-bottom-left-radius: 2px; 
+        }
+
+        /* Сообщение пользователя — МАЛЕНЬКОЕ, компактное и справа */
+        .message.user { 
+            max-width: 75%; 
+            background: #3182ce; 
+            color: white; 
+            border-bottom-right-radius: 2px; 
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Когда сообщение пользователя раскрыто по клику */
+        .message.user.expanded {
+            white-space: normal;
+            overflow: visible;
+            max-width: 85%;
+        }
+
+        /* Кнопка стрелочки под сообщением пользователя */
+        .toggle-btn {
+            background: none;
+            border: none;
+            color: #a0aec0;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 2px 8px;
+            margin-top: 2px;
+            outline: none;
+        }
 
         /* Поле ввода внизу */
         .input-area {
@@ -321,7 +357,7 @@
             this.style.height = (this.scrollHeight) + 'px';
         });
 
-        // ЛОГИКА СКРЕПКИ (ОЖИВЛЕНИЕ)
+        // ЛОГИКА СКРЕПКИ
         attachBtn.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -396,7 +432,6 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = className;
             
-            // Если есть картинка от скрепки, добавляем её внутрь сообщения
             if (imageUrl) {
                 messageDiv.innerHTML = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">`;
                 const textNode = document.createTextNode(text);
@@ -406,6 +441,25 @@
             }
             
             wrapper.appendChild(messageDiv);
+
+            // Если это длинное сообщение пользователя, добавляем кнопку раскрытия
+            if (isUser && text.length > 30) {
+                const toggleBtn = document.createElement('button');
+                toggleBtn.className = 'toggle-btn';
+                toggleBtn.innerText = '▼';
+                
+                toggleBtn.addEventListener('click', () => {
+                    if (messageDiv.classList.contains('expanded')) {
+                        messageDiv.classList.remove('expanded');
+                        toggleBtn.innerText = '▼';
+                    } else {
+                        messageDiv.classList.add('expanded');
+                        toggleBtn.innerText = '▲';
+                    }
+                });
+                wrapper.appendChild(toggleBtn);
+            }
+            
             messagesContainer.appendChild(wrapper);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
@@ -416,12 +470,10 @@
             let text = inputArea.value.trim();
             if (!text && !selectedImageBase64) return;
 
-            // Локально отображаем текст и картинку
             appendMessage(text, true, selectedImageBase64);
             
             const imgToSend = selectedImageBase64;
             
-            // Сбрасываем поля ввода и превью
             inputArea.value = '';
             inputArea.style.height = '40px';
             selectedImageBase64 = "";
@@ -434,7 +486,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         text: text, 
-                        image: imgToSend, // отправка картинки на бэкенд
+                        image: imgToSend, 
                         mode: chatMode,
                         model: selectedModel
                     })
@@ -447,4 +499,4 @@
         });
     </script>
 </body>
-</html>
+    </html>
