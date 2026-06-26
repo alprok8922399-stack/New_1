@@ -190,23 +190,23 @@
             color: #e2e8f0;
         }
 
-        /* Сообщение пользователя — ограничено в 3 строки */
+        /* Сообщение пользователя — ограничено в 3 строки встроенным CSS */
         .message.user { 
             max-width: 75%; 
             background: #3182ce; 
             color: white; 
             border-bottom-right-radius: 2px; 
             display: -webkit-box;
-            -webkit-line-clamp: 3; /* Ограничение в 3 строки */
+            -webkit-line-clamp: 3;
             -webkit-box-orient: vertical;  
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        /* Когда сообщение пользователя раскрыто по клику */
+        /* Когда сообщение пользователя раскрыто */
         .message.user.expanded {
-            display: block;
-            overflow: visible;
+            display: block !important;
+            overflow: visible !important;
             max-width: 85%;
         }
 
@@ -463,29 +463,22 @@
             wrapper.appendChild(messageDiv);
             messagesContainer.appendChild(wrapper);
 
-            // Безопасная проверка высоты текста только ЕСЛИ чат-экран уже открыт на экране
-            if (isUser && chatScreen.style.display === 'flex') {
-                if (messageDiv.scrollHeight > messageDiv.clientHeight) {
-                    const toggleBtn = document.createElement('button');
-                    toggleBtn.className = 'toggle-btn';
-                    toggleBtn.innerText = '▼';
-                    
-                    toggleBtn.addEventListener('click', () => {
-                        if (messageDiv.classList.contains('expanded')) {
-                            messageDiv.classList.remove('expanded');
-                            toggleBtn.innerText = '▼';
-                        } else {
-                            messageDiv.classList.add('expanded');
-                            toggleBtn.innerText = '▲';
-                        }
-                    });
-                    wrapper.appendChild(toggleBtn);
-                } else {
-                    messageDiv.style.display = 'block';
-                }
-            } else if (isUser) {
-                // Если история грузится до входа, просто даем блоку стандартный вид блочного элемента
-                messageDiv.style.display = 'block';
+            // Безопасное добавление стрелочки для сообщений пользователя без JS-замеров высоты
+            if (isUser) {
+                const toggleBtn = document.createElement('button');
+                toggleBtn.className = 'toggle-btn';
+                toggleBtn.innerText = '▼';
+                
+                toggleBtn.addEventListener('click', () => {
+                    if (messageDiv.classList.contains('expanded')) {
+                        messageDiv.classList.remove('expanded');
+                        toggleBtn.innerText = '▼';
+                    } else {
+                        messageDiv.classList.add('expanded');
+                        toggleBtn.innerText = '▲';
+                    }
+                });
+                wrapper.appendChild(toggleBtn);
             }
             
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
