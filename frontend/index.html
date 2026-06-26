@@ -149,7 +149,7 @@
         .messages {
             flex: 1;
             overflow-y: auto;
-            padding: 16px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
             gap: 12px;
@@ -163,12 +163,14 @@
         .role-user { justify-content: flex-end; }
         .role-assistant { justify-content: flex-start; }
 
+        /* Блок ответа РАСТЯНУТ во всю ширину (max-width: 100%) */
         .message {
-            max-width: 80%;
-            padding: 12px 16px;
-            border-radius: 14px;
+            width: 100%;
+            max-width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
             font-size: 15px;
-            line-height: 1.4;
+            line-height: 1.45;
             word-break: break-word;
         }
         .message.user { background: #3182ce; color: white; border-bottom-right-radius: 2px; }
@@ -180,6 +182,29 @@
             background: #2d3748;
             border-top: 1px solid #4a5568;
             flex-shrink: 0;
+        }
+
+        /* Контейнер для предпросмотра картинок */
+        #image-preview-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #1a202c;
+            padding: 8px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border: 1px solid #4a5568;
+        }
+
+        #image-preview-container button {
+            background: #e53e3e;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-weight: bold;
         }
 
         .input-row {
@@ -262,10 +287,9 @@
     </div>
 
     <script>
-        // Перехватываем ошибки и выводим без падения интерфейса
         window.onerror = function(message, source, lineno) {
             console.log("Ошибка перехвачена: " + message);
-            return true; // Предотвращает стандартный вылет страницы
+            return true; 
         };
 
         const SECRET_CODE = 'alprok8922399';
@@ -282,6 +306,40 @@
         const inputArea = document.getElementById('input');
         const sendBtn = document.getElementById('send-btn');
         const clearBtn = document.getElementById('clear-btn');
+        
+        // Переменные для скрепки
+        const attachBtn = document.getElementById('attach-btn');
+        const fileInput = document.getElementById('file-input');
+        const previewContainer = document.getElementById('image-preview-container');
+        const imagePreview = document.getElementById('image-preview');
+        const cancelImageBtn = document.getElementById('cancel-image-btn');
+        let selectedImageBase64 = "";
+
+        // Авто-расширение ввода текста
+        inputArea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // ЛОГИКА СКРЕПКИ (ОЖИВЛЕНИЕ)
+        attachBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                selectedImageBase64 = event.target.result;
+                imagePreview.src = selectedImageBase64;
+                previewContainer.classList.remove('preview-hidden');
+            };
+            reader.readAsDataURL(file);
+        });
+
+        cancelImageBtn.addEventListener('click', () => {
+            selectedImageBase64 = "";
+            fileInput.value = "";
+            previewContainer.classList.add('preview-hidden');
+        });
 
         function handleLogin(e) {
             if (e) e.preventDefault();
@@ -299,13 +357,11 @@
                 chatHeaderTitle.textContent = `Чат для: ${enteredName}`;
             }
 
-            // Прячем вход, открываем чат
             authScreen.style.display = 'none';
             chatScreen.style.display = 'flex';
             messagesContainer.innerHTML = ""; 
 
             if (chatMode === 'private') {
-                // Обернуто в супер-безопасный режим, не ломает верстку
                 loadChatHistory().catch(err => console.log("История недоступна"));
             }
         }
@@ -330,8 +386,8 @@
             }
         }
 
-        function appendMessage(text, isUser) {
-            if (!text) return;
+        function appendMessage(text, isUser, imageUrl = "") {
+            if (!text && !imageUrl) return;
             const className = isUser ? 'message user' : 'message bot';
             
             const wrapper = document.createElement('div');
@@ -339,7 +395,15 @@
             
             const messageDiv = document.createElement('div');
             messageDiv.className = className;
-            messageDiv.innerText = text; // Безопасное добавление текста
+            
+            // Если есть картинка от скрепки, добавляем её внутрь сообщения
+            if (imageUrl) {
+                messageDiv.innerHTML = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">`;
+                const textNode = document.createTextNode(text);
+                messageDiv.appendChild(textNode);
+            } else {
+                messageDiv.innerText = text;
+            }
             
             wrapper.appendChild(messageDiv);
             messagesContainer.appendChild(wrapper);
@@ -350,10 +414,19 @@
 
         sendBtn.addEventListener('click', async () => {
             let text = inputArea.value.trim();
-            if (!text) return;
+            if (!text && !selectedImageBase64) return;
 
-            appendMessage(text, true);
+            // Локально отображаем текст и картинку
+            appendMessage(text, true, selectedImageBase64);
+            
+            const imgToSend = selectedImageBase64;
+            
+            // Сбрасываем поля ввода и превью
             inputArea.value = '';
+            inputArea.style.height = '40px';
+            selectedImageBase64 = "";
+            fileInput.value = "";
+            previewContainer.classList.add('preview-hidden');
 
             try {
                 const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
@@ -361,6 +434,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         text: text, 
+                        image: imgToSend, // отправка картинки на бэкенд
                         mode: chatMode,
                         model: selectedModel
                     })
