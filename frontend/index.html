@@ -2,39 +2,104 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI Chat</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        /* Жесткая фиксация шапки */
+        /* Полный сброс конфликтов и жесткая фиксация экранов */
+        html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            overflow: hidden !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* Экран авторизации */
+        #auth-screen {
+            display: flex !important;
+            width: 100% !important;
+            height: 100% !important;
+            align-items: center !important;
+            justify-content: center !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 9999 !important;
+            background-color: #1a202c !important;
+        }
+
+        /* Главный контейнер чата */
+        #chat-screen {
+            display: none !important; /* Включается через JS как flex */
+            flex-direction: column !important;
+            width: 100% !important;
+            height: 100% !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            background-color: #1a202c !important;
+            z-index: 9998 !important;
+        }
+
+        /* Жесткая структура шапки (верхней кепки) */
         #chat-screen header {
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-between !important;
             align-items: center !important;
-            padding: 10px 16px !important;
+            padding: 0 16px !important;
             box-sizing: border-box !important;
             width: 100% !important;
             height: 60px !important;
+            min-height: 60px !important;
+            background-color: #2d3748 !important;
+            border-bottom: 1px solid #4a5568 !important;
+            flex-shrink: 0 !important;
         }
+
         .header-left {
             display: flex !important;
             flex-direction: column !important;
-            gap: 2px !important;
+            justify-content: center !important;
             align-items: flex-start !important;
+            overflow: hidden !important;
         }
+
+        .header-title {
+            font-weight: bold !important;
+            color: #fff !important;
+            font-size: 16px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+
+        /* Правый блок с кнопками в ряд */
         .header-buttons {
             display: flex !important;
             flex-direction: row !important;
             gap: 8px !important;
             align-items: center !important;
+            justify-content: flex-end !important;
             flex-shrink: 0 !important;
         }
+
+        /* Сами кнопки в шапке */
         .header-buttons button {
             margin: 0 !important;
             height: 36px !important;
-            line-height: 1 !important;
+            padding: 0 12px !important;
+            border-radius: 6px !important;
+            font-size: 14px !important;
+            border: none !important;
+            cursor: pointer !important;
             white-space: nowrap !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
         }
     </style>
 </head>
@@ -48,7 +113,7 @@
         </div>
     </div>
 
-    <div class="chat-container" id="chat-screen" style="display: none !important;">
+    <div class="chat-container" id="chat-screen">
         <header>
             <div class="header-left">
                 <div class="header-title" id="chat-header-title">Друг и помощник</div>
@@ -64,10 +129,11 @@
                 </div>
             </div>
             <div class="header-buttons">
-                <button class="clear-btn" id="mail-btn" style="background-color: #2d3748; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;">@@@</button>
-                <button class="clear-btn" id="clear-btn" style="background-color: #2d3748; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Очистить</button>
+                <button id="mail-btn" style="background-color: #4a5568 !important; color: white !important;">@@@</button>
+                <button id="clear-btn" style="background-color: #e53e3e !important; color: white !important;">Очистить</button>
             </div>
         </header>
+        
         <div class="messages" id="messages"></div>
         
         <div class="input-area">
@@ -85,9 +151,9 @@
     </div>
 
     <script>
-        // Глобальный перехватчик ошибок, чтобы увидеть проблему на экране телефона
-        window.onerror = function(message, source, lineno, colno, error) {
-            alert("Критическая ошибка JS:\n" + message + "\nВ строке: " + lineno);
+        // Показываем любые скрытые ошибки скрипта через уведомление
+        window.onerror = function(message, source, lineno) {
+            alert("Ошибка скрипта: " + message + "\nЛиния: " + lineno);
             return false;
         };
 
@@ -134,19 +200,17 @@
 
         function updateStatusDot(backendModel) {
             statusDot.className = "status-dot"; 
-            if (backendModel === 'gemini') {
-                statusDot.classList.add('gemini');
-            } else if (backendModel === 'openrouter') {
-                statusDot.classList.add('openrouter');
-            } else if (backendModel === 'groq') {
-                statusDot.classList.add('groq');
-            } else {
-                statusDot.classList.add('error');
-            }
+            if (backendModel === 'gemini') statusDot.classList.add('gemini');
+            else if (backendModel === 'openrouter') statusDot.classList.add('openrouter');
+            else if (backendModel === 'groq') statusDot.classList.add('groq');
+            else statusDot.classList.add('error');
         }
 
         function handleLogin(e) {
-            if (e) e.preventDefault(); // Защита от перезагрузки страницы
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
 
             const enteredName = usernameInput.value.trim();
             if (!enteredName) return;
@@ -155,19 +219,20 @@
                 chatMode = 'private';
                 userDisplayName = 'Алексей';
                 chatHeaderTitle.textContent = 'Друг и помощник';
-                
-                authScreen.style.setProperty('display', 'none', 'important');
-                chatScreen.style.setProperty('display', 'flex', 'important');
-                
-                // Сначала железно пускаем в чат, а историю грузим чуть позже
-                setTimeout(loadChatHistory, 200);
             } else {
                 chatMode = 'public';
                 userDisplayName = enteredName;
                 chatHeaderTitle.textContent = `Чат для: ${enteredName}`;
-                authScreen.style.setProperty('display', 'none', 'important');
-                chatScreen.style.setProperty('display', 'flex', 'important');
-                messagesContainer.innerHTML = ""; 
+            }
+
+            // Жесткое переключение экранов без перезагрузок
+            authScreen.style.setProperty('display', 'none', 'important');
+            chatScreen.style.setProperty('display', 'flex', 'important');
+            messagesContainer.innerHTML = ""; 
+
+            if (chatMode === 'private') {
+                // Загружаем историю отдельно, чтобы она не вешала вход
+                setTimeout(loadChatHistory, 300);
             }
         }
 
@@ -223,138 +288,44 @@
 
         function formatAiText(text) {
             let rawText = text || "";
-            
             rawText = rawText.replace(/```([\s\S]*?)```/g, (match, p1) => {
                 return `<div class="code-block-wrapper">
                             <button class="copy-code-btn" onclick="copyCode(this)">Копировать</button>
                             <pre><code>${p1.trim()}</code></pre>
                         </div>`;
             });
-
             rawText = rawText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             rawText = rawText.replace(/\*(.*?)\*/g, '<em>$1</em>');
-            rawText = rawText.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-
+            
             const lines = rawText.split('\n');
             let resultHtml = "";
-            let inUl = false;
-            let inOl = false;
-
             lines.forEach(line => {
-                let trimmed = line.trim();
-
-                if (trimmed.startsWith('<div class="code-block-wrapper">') || trimmed.endsWith('</div>') || trimmed.startsWith('<pre>') || trimmed.startsWith('<code>')) {
-                    if (inUl) { resultHtml += "</ul>"; inUl = false; }
-                    if (inOl) { resultHtml += "</ol>"; inOl = false; }
-                    resultHtml += line + "\n";
-                    return;
-                }
-
-                if (trimmed === "") {
-                    if (inUl) { resultHtml += "</ul>"; inUl = false; }
-                    if (inOl) { resultHtml += "</ol>"; inOl = false; }
-                    resultHtml += '<div style="height: 8px;"></div>';
-                    return;
-                }
-
-                const bulletMatch = line.match(/^(\s*)([-*•◦])\s+(.*)$/);
-                if (bulletMatch) {
-                    if (inOl) { resultHtml += "</ol>"; inOl = false; }
-                    if (!inUl) { resultHtml += "<ul>"; inUl = true; }
-                    resultHtml += `<li>${bulletMatch[3]}</li>`;
-                    return;
-                }
-
-                const digitMatch = line.match(/^(\s*)(\d+)\.\s+(.*)$/);
-                if (digitMatch) {
-                    if (inUl) { resultHtml += "</ul>"; inUl = false; }
-                    if (!inOl) { resultHtml += "<ol>"; inOl = true; }
-                    resultHtml += `<li>${digitMatch[3]}</li>`;
-                    return;
-                }
-
-                if (inUl) { resultHtml += "</ul>"; inUl = false; }
-                if (inOl) { resultHtml += "</ol>"; inOl = false; }
                 resultHtml += `<p>${line}</p>`;
             });
-
-            if (inUl) resultHtml += "</ul>";
-            if (inOl) resultHtml += "</ol>";
-
             return resultHtml;
         }
 
         function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).catch(err => {
-                console.error('Не удалось скопировать: ', err);
-            });
+            navigator.clipboard.writeText(text);
         }
 
         function appendMessage(text, isUser, imageUrl = "", messageId = null) {
-            if ((!text || text.trim() === "") && !imageUrl) return;
-
-            let cleanText = text;
-            if (isUser) {
-                cleanText = cleanText.replace(/^\[Системное инфо.*?\]\s*/s, "");
-            }
-
+            if (!text && !imageUrl) return;
             const className = isUser ? 'message user' : 'message bot';
-            let finalHtml = isUser ? cleanText.replace(/\n/g, '<br>') : formatAiText(cleanText);
+            let finalHtml = isUser ? text.replace(/\n/g, '<br>') : formatAiText(text);
             
             if (imageUrl) {
                 finalHtml = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">` + finalHtml;
             }
             
             const wrapper = document.createElement('div');
-            wrapper.className = 'message-wrapper';
-            wrapper.classList.add(isUser ? 'role-user' : 'role-assistant');
-            if (messageId) {
-                wrapper.setAttribute('data-id', messageId); 
-            }
+            wrapper.className = `message-wrapper ${isUser ? 'role-user' : 'role-assistant'}`;
+            if (messageId) wrapper.setAttribute('data-id', messageId);
             
             const messageDiv = document.createElement('div');
             messageDiv.className = className;
             messageDiv.innerHTML = finalHtml;
             wrapper.appendChild(messageDiv);
-            
-            const buttonsDiv = document.createElement('div');
-            buttonsDiv.className = 'message-buttons';
-            
-            if (isUser) {
-                buttonsDiv.style.justifyContent = 'flex-end';
-                buttonsDiv.innerHTML = `
-                    <button class="btn-edit" title="Редактировать">
-                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"/></svg>
-                    </button>
-                    <button class="btn-copy" title="Копировать">
-                        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    </button>
-                `;
-            } else {
-                buttonsDiv.style.justifyContent = 'flex-start';
-                buttonsDiv.innerHTML = `
-                    <button class="btn-copy" title="Копировать">
-                        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    </button>
-                `;
-            }
-            wrapper.appendChild(buttonsDiv);
-
-            const copyBtn = buttonsDiv.querySelector('.btn-copy');
-            if (copyBtn) {
-                copyBtn.addEventListener('click', () => copyToClipboard(cleanText || "Фото"));
-            }
-
-            const editBtn = buttonsDiv.querySelector('.btn-edit');
-            if (editBtn) {
-                editBtn.addEventListener('click', () => {
-                    inputArea.value = cleanText;
-                    inputArea.focus();
-                    inputArea.style.height = 'auto';
-                    inputArea.style.height = (inputArea.scrollHeight) + 'px';
-                    currentEditingMessageId = messageId; 
-                });
-            }
             
             messagesContainer.appendChild(wrapper);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -376,64 +347,22 @@
             return history.slice(-10);
         }
 
-        async function sendLastMessageEmailReport() {
-            const historyData = getLocalChatHistory();
-            if (historyData.length === 0) return;
-
-            const lastMessage = historyData[historyData.length - 1];
-            const rawContent = lastMessage.content;
-
-            let cleanSubject = rawContent.split('\n')[0] || "Сообщение из чата";
-            cleanSubject = cleanSubject.replace(/[#*]/g, "").trim().substring(0, 35);
-
-            mailBtn.textContent = "⏱...";
-            mailBtn.disabled = true;
-
-            try {
-                await fetch("https://formsubmit.co/ajax/0ff50cd66a66d20678bc6f91e2977516", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        "_subject": `Чат ИИ: ${cleanSubject}...`,
-                        "Содержимое сообщения": rawContent,
-                        "_captcha": "false"
-                    })
-                });
-                alert("Последнее сообщение успешно отправлено на почту!");
-            } catch (err) {
-                console.error("Ошибка при отправке:", err);
-                alert("Произошла ошибка при отправке.");
-            } finally {
-                mailBtn.textContent = "@@@";
-                mailBtn.disabled = false;
-            }
-        }
-
-        mailBtn.addEventListener('click', sendLastMessageEmailReport);
-
         async function loadChatHistory() {
             try {
                 const response = await fetch("https://new-1-5155.onrender.com/api/history");
                 if (!response.ok) return;
                 const history = await response.json();
-                messagesContainer.innerHTML = ""; 
-                
                 if (Array.isArray(history)) {
                     history.forEach(msg => {
-                        if (msg) {
-                            const textContent = msg.content || msg.text || "";
-                            appendMessage(textContent, msg.role === 'user', "", msg.id);
-                        }
+                        if (msg) appendMessage(msg.content || msg.text || "", msg.role === 'user', "", msg.id);
                     });
                 }
             } catch (e) {
-                console.error("Ошибка загрузки истории:", e);
+                console.error(e);
             }
         }
 
-        clearBtn.addEventListener('click', () => {
-            messagesContainer.innerHTML = "";
-        });
+        clearBtn.addEventListener('click', () => { messagesContainer.innerHTML = ""; });
 
         sendBtn.addEventListener('click', async () => {
             let text = inputArea.value.trim();
@@ -441,29 +370,13 @@
 
             const currentDateTime = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
             const textWithTime = `[Системное инфо: Дата/время: ${currentDateTime}. Режим: ${chatMode}]\n${text}`;
-
             const localHistory = getLocalChatHistory();
 
-            appendMessage(textWithTime, true, selectedImageBase64); 
+            appendMessage(text, true, selectedImageBase64);
             const imgToSend = selectedImageBase64;
-            
-            if (currentEditingMessageId !== null) {
-                try {
-                    await fetch(`https://new-1-5155.onrender.com/api/delete/${currentEditingMessageId}`, {
-                        method: 'DELETE'
-                    });
-                    const oldWrapper = document.querySelector(`[data-id="${currentEditingMessageId}"]`);
-                    if (oldWrapper) oldWrapper.remove();
-                } catch (e) {
-                    console.error("Не удалось удалить старое сообщение:", e);
-                }
-                currentEditingMessageId = null; 
-            }
-            
+
             inputArea.value = '';
-            inputArea.style.height = '40px'; 
-            selectedImageBase64 = "";
-            fileInput.value = "";
+            inputArea.style.height = '40px';
             previewContainer.classList.add('preview-hidden');
 
             try {
@@ -479,15 +392,10 @@
                     })
                 });
                 const data = await response.json();
-                appendMessage(data.text, false); 
-                
-                if (data.model_used) {
-                    updateStatusDot(data.model_used);
-                }
-
+                appendMessage(data.text, false);
+                if (data.model_used) updateStatusDot(data.model_used);
             } catch (e) {
                 appendMessage("Ошибка соединения.", false);
-                statusDot.className = "status-dot error";
             }
         });
     </script>
