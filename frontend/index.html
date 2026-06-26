@@ -435,7 +435,6 @@
         // Функция форматирования текста (обрабатывает ### в жирные заголовки)
         function formatAiText(text) {
             if (!text) return "";
-            // Превращаем строки вида "### Любой текст" в полноценные теги заголовков <h3>
             return text.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
         }
 
@@ -457,19 +456,15 @@
                 if (isUser) {
                     messageDiv.innerText = text;
                 } else {
-                    // Применяем форматирование заголовков для бота
                     messageDiv.innerHTML = formatAiText(text);
                 }
             }
             
             wrapper.appendChild(messageDiv);
+            messagesContainer.appendChild(wrapper);
 
-            // Если это сообщение пользователя, проверяем, нужно ли добавлять стрелочку
-            if (isUser) {
-                // Добавим кнопку в DOM, чтобы замерить реальную высоту текста
-                messagesContainer.appendChild(wrapper);
-                
-                // Если текст выходит за пределы 3 строк (scrollHeight больше клиентской высоты)
+            // Безопасная проверка высоты текста только ЕСЛИ чат-экран уже открыт на экране
+            if (isUser && chatScreen.style.display === 'flex') {
                 if (messageDiv.scrollHeight > messageDiv.clientHeight) {
                     const toggleBtn = document.createElement('button');
                     toggleBtn.className = 'toggle-btn';
@@ -486,11 +481,11 @@
                     });
                     wrapper.appendChild(toggleBtn);
                 } else {
-                    // Если текст короткий, убираем ограничение в 3 строки, чтобы он центрировался красиво
                     messageDiv.style.display = 'block';
                 }
-            } else {
-                messagesContainer.appendChild(wrapper);
+            } else if (isUser) {
+                // Если история грузится до входа, просто даем блоку стандартный вид блочного элемента
+                messageDiv.style.display = 'block';
             }
             
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
