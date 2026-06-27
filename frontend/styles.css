@@ -91,12 +91,14 @@ button {
     font-weight: 500;
 }
 
+/* Кнопка Очистить — теперь приятно светло-серая */
 .btn-danger {
-    background-color: #991b1b;
+    background-color: #d1d5db;
+    color: #1f2937;
 }
 
 .btn-danger:hover {
-    background-color: #7f1d1d;
+    background-color: #9ca3af;
 }
 
 .btn-primary {
@@ -382,4 +384,4 @@ textarea {
     font-weight: 500;
     z-index: 50;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-}
+    }
