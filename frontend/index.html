@@ -425,14 +425,27 @@
             }
         }
 
-        // Функция для форматирования текста (делает ссылки кликабельными и сохраняет переносы строк)
+        // Функция для форматирования текста (делает ссылки аккуратными и сохраняет переносы)
         function formatText(text) {
             if (!text) return "";
+            
             // Защита от HTML
             let safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            // Превращаем URL в теги <a> с красивым синим цветом
-            const urlRegex = /(https?:\/\/[^\s]+)/g;
-            safeText = safeText.replace(urlRegex, '<a href="$1" target="_blank" style="color: #90cdf4; text-decoration: underline;">$1</a>');
+            
+            // 1. Сначала обрабатываем ссылки в формате [Название](URL)
+            safeText = safeText.replace(/\[([^\]]+)\]\s*\((https?:\/\/[^\s)]+)\)/g, function(match, title, url) {
+                return title + '<br><a href="' + url + '" target="_blank" style="color: #90cdf4; text-decoration: underline;">Ссылка</a>';
+            });
+
+            // 2. Обрабатываем "голые" ссылки
+            let parts = safeText.split(/(<a\b[^>]*>.*?<\/a>)/gi);
+            for (let i = 0; i < parts.length; i++) {
+                if (!parts[i].startsWith('<a')) {
+                    parts[i] = parts[i].replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" style="color: #90cdf4; text-decoration: underline;">Ссылка</a>');
+                }
+            }
+            safeText = parts.join('');
+
             // Переносы строк меняем на <br>
             return safeText.replace(/\n/g, "<br>");
         }
