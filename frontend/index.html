@@ -108,6 +108,7 @@
             font-size: 16px;
         }
 
+
         /* Выбор моделей */
         .model-selector-wrapper {
             display: flex;
@@ -219,6 +220,7 @@
             border-top: 1px solid #4a5568;
             flex-shrink: 0;
         }
+
 
         /* Контейнер для предпросмотра картинок */
         #image-preview-container {
@@ -333,6 +335,7 @@
         let userDisplayName = ''; 
         let selectedModel = 'auto'; 
 
+
         const authScreen = document.getElementById('auth-screen');
         const chatScreen = document.getElementById('chat-screen');
         const usernameInput = document.getElementById('username-input');
@@ -422,6 +425,18 @@
             }
         }
 
+        // Функция для форматирования текста (делает ссылки кликабельными и сохраняет переносы строк)
+        function formatText(text) {
+            if (!text) return "";
+            // Защита от HTML
+            let safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            // Превращаем URL в теги <a> с красивым синим цветом
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            safeText = safeText.replace(urlRegex, '<a href="$1" target="_blank" style="color: #90cdf4; text-decoration: underline;">$1</a>');
+            // Переносы строк меняем на <br>
+            return safeText.replace(/\n/g, "<br>");
+        }
+
         function appendMessage(text, isUser, imageUrl = "") {
             if (!text && !imageUrl) return;
             const className = isUser ? 'message user' : 'message bot';
@@ -432,15 +447,17 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = className;
             
+            // Пропускаем текст через нашу новую функцию
+            const formattedText = formatText(text);
+            
             if (imageUrl) {
-                messageDiv.innerHTML = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">`;
-                const textNode = document.createTextNode(text);
-                messageDiv.appendChild(textNode);
+                messageDiv.innerHTML = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">` + formattedText;
             } else {
-                messageDiv.innerText = text;
+                messageDiv.innerHTML = formattedText;
             }
             
             wrapper.appendChild(messageDiv);
+
 
             // Если это длинное сообщение пользователя, добавляем кнопку раскрытия
             if (isUser && text.length > 30) {
@@ -499,4 +516,4 @@
         });
     </script>
 </body>
-    </html>
+</html>
