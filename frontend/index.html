@@ -210,6 +210,7 @@ max-width: 100%;
         const inputArea = document.getElementById('input');
         const sendBtn = document.getElementById('send-btn');
         const clearBtn = document.getElementById('clear-btn');
+        const mailBtn = document.getElementById('mail-btn');
         
         // Переменные для скрепки
         const attachBtn = document.getElementById('attach-btn');
@@ -286,7 +287,7 @@ max-width: 100%;
                     });
                 }
             } catch (e) {
-                console.error("Ошибка сети при загрузке истории:", e);
+                console.error("Ошибка сети при加载 истории:", e);
             }
         }
 
@@ -391,6 +392,28 @@ max-width: 100%;
         }
 
         clearBtn.addEventListener('click', () => { messagesContainer.innerHTML = ""; });
+
+        // ОБРАБОТЧИК ДЛЯ КНОПКИ @@@
+        mailBtn.addEventListener('click', async () => {
+            try {
+                mailBtn.disabled = true;
+                mailBtn.innerText = "⏳";
+                const response = await fetch("https://new-1-5155.onrender.com/api/send_email", {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.status === "success") {
+                    alert("История сообщений успешно отправлена на почту!");
+                } else {
+                    alert("Ошибка при отправке: " + data.message);
+                }
+            } catch (e) {
+                alert("Не удалось связаться с сервером.");
+            } finally {
+                mailBtn.disabled = false;
+                mailBtn.innerText = "@@@";
+            }
+        });
 
         sendBtn.addEventListener('click', async () => {
             let text = inputArea.value.trim();
