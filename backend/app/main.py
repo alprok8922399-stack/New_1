@@ -5,6 +5,7 @@ import re
 import json
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import psycopg2
 
 logging.basicConfig(level=logging.INFO)
@@ -18,6 +19,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+# Модель для приема выбранного текста сообщения
+class EmailRequest(BaseModel):
+    text: str
 
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
@@ -98,6 +103,7 @@ async def chat_endpoint(request: Request):
             rows = cur.fetchall()
             cur.close()
             conn.close()
+     
             for r in rows[::-1]:
                 history_messages.append({"role": r[0], "content": r[1]})
 
@@ -186,6 +192,7 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой Gemini: {e}")
 
+
         # 3. ПОПЫТКА OPENROUTER
         if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "openrouter") and or_key:
             try:
@@ -231,6 +238,32 @@ async def chat_endpoint(request: Request):
             conn.close()
             
     return {"text": reply, "model_used": model_used}
+
+# ЭНДПОИНТ ДЛЯ ОТПРАВКИ СООБЩЕНИЯ ЧЕРЕЗ FORMSUBMIT
+@app.post("/api/send_email")
+async def send_email_endpoint(payload: EmailRequest):
+    YOUR_PROTON_EMAIL = "aleksey.prokudin.89@proton.me"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"https://formsubmit.co/ajax/{YOUR_PROTON_EMAIL}",
+                json={
+                    "Сообщение": payload.text,
+                    "_subject": "Выбранное сообщение из AI Chat",
+                    "_captcha": "false"
+                },
+                timeout=15.0
+            )
+            if response.status_code == 200:
+                logger.info("Успешно отправлено через FormSubmit!")
+                return {"status": "success"}
+            else:
+                logger.error(f"Ошибка FormSubmit: {response.text}")
+                return {"status": "error", "message": f"Сервер вернул код {response.status_code}"}
+    except Exception as e:
+        logger.error(f"Ошибка отправки: {e}")
+        return {"status": "error", "message": str(e)}
 
 @app.get("/api/history")
 async def get_history():
