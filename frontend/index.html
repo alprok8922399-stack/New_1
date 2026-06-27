@@ -1,182 +1,4 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Chat</title>
-    <style>
-        /* Полный и неубиваемый CSS прямо внутри файла */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        html, body {
-            width: 100%;
-            height: 100%;
-            background-color: #1a202c !important;
-            color: #fff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            overflow: hidden;
-        }
-
-        /* Экран входа */
-        #auth-screen {
-            display: flex;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background-color: #1a202c;
-            z-index: 10000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .auth-box {
-            background: #2d3748;
-            padding: 24px;
-            border-radius: 12px;
-            text-align: center;
-            width: 90%;
-            max-width: 360px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-        }
-
-        .auth-box h2 {
-            margin-bottom: 16px;
-            font-size: 20px;
-        }
-
-        .auth-box input {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #4a5568;
-            background: #1a202c;
-            color: #fff;
-            margin-bottom: 16px;
-            font-size: 16px;
-            outline: none;
-        }
-
-        .auth-box button {
-            width: 100%;
-            padding: 12px;
-            background: #3182ce;
-            border: none;
-            color: white;
-            font-size: 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        /* Главный экран чата */
-        #chat-screen {
-            display: none; /* Включается через JS */
-            flex-direction: column;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background-color: #1a202c;
-            z-index: 9999;
-        }
-
-        /* Шапка ("Кепка") */
-        header {
-            display: flex;
-            flex-direction: row;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 16px;
-            width: 100%;
-            height: 60px;
-            min-height: 60px;
-            background-color: #2d3748;
-            border-bottom: 1px solid #4a5568;
-            flex-shrink: 0;
-        }
-
-        .header-left {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .header-title {
-            font-weight: bold;
-            color: #fff;
-            font-size: 16px;
-        }
-
-        /* Выбор моделей */
-        .model-selector-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            color: #a0aec0;
-            margin-top: 2px;
-            cursor: pointer;
-            position: relative;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: #48bb78;
-        }
-
-        .header-buttons {
-            display: flex;
-            flex-direction: row;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .header-buttons button {
-            height: 36px;
-            padding: 0 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            border: none;
-            cursor: pointer;
-            color: white;
-            font-weight: 500;
-        }
-
-        /* Зона сообщений */
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            background: #1a202c;
-        }
-
-        .message-wrapper {
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-        }
-        .role-user { align-items: flex-end; }
-        .role-assistant { align-items: flex-start; }
-
-        /* Базовые стили для плашек сообщений */
-        .message {
-            padding: 14px 16px;
-            border-radius: 12px;
-            font-size: 15px;
-            line-height: 1.45;
-            word-break: break-word;
-        }
-
-        /* Сообщение ИИ растянуто во всю ширину */
-        .message.bot { 
-            width: 100%;
-            max-width: 100%;
+max-width: 100%;
             background: #2d3748; 
             color: white; 
             border-bottom-left-radius: 2px; 
@@ -279,6 +101,52 @@
         #send-btn { background: #3182ce; }
 
         .preview-hidden { display: none !important; }
+
+        /* СТИЛИ ДЛЯ БЛОКОВ КОДА И КНОПКИ КОПИРОВАНИЯ */
+        .code-container {
+            position: relative;
+            margin: 8px 0;
+            background: #1a202c;
+            border-radius: 6px;
+            border: 1px solid #4a5568;
+            overflow: hidden;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #2d3748;
+            padding: 4px 8px;
+            font-size: 12px;
+            color: #a0aec0;
+            border-bottom: 1px solid #4a5568;
+        }
+
+        .copy-btn {
+            background: #4a5568;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .copy-btn:hover {
+            background: #718096;
+        }
+
+        .code-block {
+            margin: 0;
+            padding: 10px;
+            overflow-x: auto;
+            font-family: monospace;
+            white-space: pre;
+            background: #1a202c;
+            color: #e2e8f0;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -422,6 +290,60 @@
             }
         }
 
+        // ФУНКЦИЯ ДЛЯ ФОРМАТИРОВАНИЯ ТЕКСТА И ВЫДЕЛЕНИЯ БЛОКОВ КОДА С КНОПКОЙ КОПИРОВАНИЯ
+        function formatBotMessage(text) {
+            const codeBlockRegex = /```([\s\S]*?)```/g;
+            let parts = [];
+            let lastIndex = 0;
+            let match;
+
+            while ((match = codeBlockRegex.exec(text)) !== null) {
+                if (match.index > lastIndex) {
+                    parts.push(document.createTextNode(text.substring(lastIndex, match.index)));
+                }
+
+                const codeContent = match[1];
+
+                const container = document.createElement('div');
+                container.className = 'code-container';
+
+                const header = document.createElement('div');
+                header.className = 'code-header';
+                header.innerHTML = '<span>Код</span>';
+
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.innerText = 'Копировать';
+                copyBtn.addEventListener('click', () => {
+                    navigator.clipboard.writeText(codeContent).then(() => {
+                        copyBtn.innerText = 'Скопировано!';
+                        setTimeout(() => { copyBtn.innerText = 'Копировать'; }, 2000);
+                    }).catch(err => {
+                        console.error('Не удалось скопировать:', err);
+                    });
+                });
+
+                header.appendChild(copyBtn);
+                container.appendChild(header);
+
+                const pre = document.createElement('pre');
+                pre.className = 'code-block';
+                pre.innerText = codeContent;
+                container.appendChild(pre);
+
+                parts.push(container);
+                lastIndex = codeBlockRegex.lastIndex;
+            }
+
+            if (lastIndex < text.length) {
+                parts.push(document.createTextNode(text.substring(lastIndex)));
+            }
+
+            const fragment = document.createDocumentFragment();
+            parts.forEach(part => fragment.appendChild(part));
+            return fragment;
+        }
+
         function appendMessage(text, isUser, imageUrl = "") {
             if (!text && !imageUrl) return;
             const className = isUser ? 'message user' : 'message bot';
@@ -437,12 +359,16 @@
                 const textNode = document.createTextNode(text);
                 messageDiv.appendChild(textNode);
             } else {
-                messageDiv.innerText = text;
+                if (isUser) {
+                    messageDiv.innerText = text;
+                } else {
+                    messageDiv.innerHTML = '';
+                    messageDiv.appendChild(formatBotMessage(text));
+                }
             }
             
             wrapper.appendChild(messageDiv);
 
-            // Если это длинное сообщение пользователя, добавляем кнопку раскрытия
             if (isUser && text.length > 30) {
                 const toggleBtn = document.createElement('button');
                 toggleBtn.className = 'toggle-btn';
@@ -499,4 +425,4 @@
         });
     </script>
 </body>
-    </html>
+</html>
