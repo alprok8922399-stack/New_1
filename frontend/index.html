@@ -182,20 +182,21 @@
             border-bottom-left-radius: 2px; 
         }
 
-        /* Сообщение пользователя — МАЛЕНЬКОЕ, компактное и справа */
+        /* Сообщение пользователя — аккуратное ограничение по высоте */
         .message.user { 
             max-width: 75%; 
             background: #3182ce; 
             color: white; 
             border-bottom-right-radius: 2px; 
-            white-space: nowrap;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;  
             overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         /* Когда сообщение пользователя раскрыто по клику */
         .message.user.expanded {
-            white-space: normal;
+            display: block;
             overflow: visible;
             max-width: 85%;
         }
@@ -443,7 +444,7 @@
             wrapper.appendChild(messageDiv);
 
             // Если это длинное сообщение пользователя, добавляем кнопку раскрытия
-            if (isUser && text.length > 30) {
+            if (isUser && text.length > 60) {
                 const toggleBtn = document.createElement('button');
                 toggleBtn.className = 'toggle-btn';
                 toggleBtn.innerText = '▼';
