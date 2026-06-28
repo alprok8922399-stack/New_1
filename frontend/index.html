@@ -356,7 +356,6 @@
         let userDisplayName = ''; 
         let selectedModel = 'auto'; 
 
-
         const authScreen = document.getElementById('auth-screen');
         const chatScreen = document.getElementById('chat-screen');
         const usernameInput = document.getElementById('username-input');
@@ -446,12 +445,17 @@
             }
         }
 
-        // Функция для форматирования текста (делает ссылки аккуратными и сохраняет переносы)
+        // Функция для форматирования текста (убирает сырые звёздочки/кавычки, делает ссылки аккуратными)
         function formatText(text) {
             if (!text) return "";
             
             // Защита от HTML
             let safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            
+            // Заменяем маркеры жирности и заголовков на красивый чистый текст без сырых символов
+            safeText = safeText.replace(/###+\s*\*\*(.*?)\*\*/g, '<b style="font-size: 16px; color: #f7fafc; display: block; margin: 8px 0;">$1</b>');
+            safeText = safeText.replace(/###+\s*(.*)/g, '<b style="font-size: 16px; color: #f7fafc; display: block; margin: 8px 0;">$1</b>');
+            safeText = safeText.replace(/\*\*(.*?)\*\*/g, '<b style="color: #fff;">$1</b>');
             
             // 1. Обрабатываем ссылки в формате [Название](URL)
             safeText = safeText.replace(/\[([^\]]+)\]\s*\((https?:\/\/[^\s)]+)\)/g, function(match, title, url) {
