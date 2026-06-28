@@ -182,6 +182,44 @@
             border-bottom-left-radius: 2px; 
         }
 
+        /* Стили для обособленных блоков кода внутри ответов ИИ */
+        .code-block-container {
+            background: #1a202c;
+            border: 1px solid #4a5568;
+            border-radius: 8px;
+            margin: 8px 0;
+            overflow: hidden;
+            width: 100%;
+        }
+        .code-block-header {
+            background: #2d3748;
+            padding: 6px 12px;
+            font-size: 12px;
+            color: #a0aec0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #4a5568;
+        }
+        .code-block-copy-btn {
+            background: #4a5568;
+            color: #fff;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .code-block-content {
+            padding: 12px;
+            overflow-x: auto;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre;
+            color: #e2e8f0;
+            display: block;
+        }
+
         /* Сообщение пользователя — аккуратное ограничение по высоте */
         .message.user { 
             max-width: 75%; 
@@ -423,6 +461,29 @@
             }
         }
 
+        // БЕЗОПАСНЫЙ ПОИСК БЛОКОВ КОДА БЕЗ ТРЕХ ПРЯМЫХ КАВЫЧЕК
+        function formatBotMessageWithCode(text) {
+            // Используем `{3}` чтобы не писать три кавычки подряд в коде
+            const regex = /`{3}(?:[a-zA-Z0-9_-]+)?\n([\s\S]*?)\n`{3}/g;
+            let parts = [];
+            let lastIndex = 0;
+            let match;
+
+            while ((match = regex.exec(text)) !== null) {
+                if (match.index > lastIndex) {
+                    parts.push({ type: 'text', content: text.substring(lastIndex, match.index) });
+                }
+                parts.push({ type: 'code', content: match[1] });
+                lastIndex = regex.lastIndex;
+            }
+
+            if (lastIndex < text.length) {
+                parts.push({ type: 'text', content: text.substring(lastIndex) });
+            }
+
+            return parts;
+        }
+
         function appendMessage(text, isUser, imageUrl = "") {
             if (!text && !imageUrl) return;
             const className = isUser ? 'message user' : 'message bot';
@@ -437,8 +498,49 @@
                 messageDiv.innerHTML = `<img src="${imageUrl}" style="max-width: 100%; display: block; margin-bottom: 8px; border-radius: 8px;">`;
                 const textNode = document.createTextNode(text);
                 messageDiv.appendChild(textNode);
-            } else {
+            } else if (isUser) {
                 messageDiv.innerText = text;
+            } else {
+                // Разбиваем ответ ИИ на текст и блоки кода
+                const fragments = formatBotMessageWithCode(text);
+                if (fragments.length === 0) {
+                    messageDiv.innerText = text;
+                } else {
+                    fragments.forEach(frag => {
+                        if (frag.type === 'text') {
+                            const span = document.createElement('span');
+                            span.innerText = frag.content;
+                            messageDiv.appendChild(span);
+                        } else if (frag.type === 'code') {
+                            const container = document.createElement('div');
+                            container.className = 'code-block-container';
+
+                            const headerDiv = document.createElement('div');
+                            headerDiv.className = 'code-block-header';
+                            headerDiv.innerHTML = '<span>Код</span>';
+
+                            const copyBtn = document.createElement('button');
+                            copyBtn.className = 'code-block-copy-btn';
+                            copyBtn.innerText = 'Копировать';
+                            copyBtn.addEventListener('click', () => {
+                                navigator.clipboard.writeText(frag.content).then(() => {
+                                    copyBtn.innerText = 'Скопировано!';
+                                    setTimeout(() => { copyBtn.innerText = 'Копировать'; }, 2000);
+                                });
+                            });
+
+                            headerDiv.appendChild(copyBtn);
+                            container.appendChild(headerDiv);
+
+                            const codeEl = document.createElement('code');
+                            codeEl.className = 'code-block-content';
+                            codeEl.innerText = frag.content;
+                            container.appendChild(codeEl);
+
+                            messageDiv.appendChild(container);
+                        }
+                    });
+                }
             }
             
             wrapper.appendChild(messageDiv);
