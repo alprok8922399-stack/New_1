@@ -130,17 +130,13 @@ async def chat_endpoint(request: Request):
     
     async with httpx.AsyncClient() as client:
         
-        # 1. ПОПЫТКА GROQ
-        if (requested_model in ["auto", "groq"]) and groq_key:
+        # 1. ПОПЫТКА GROQ (только если нет изображения)
+        if (requested_model in ["auto", "groq"]) and groq_key and not user_image:
             try:
-                groq_messages = text_messages.copy()
-                if user_image:
-                    groq_messages[-1]["content"] = f"[Пользователь отправил скриншот. Проанализируй контекст обсуждения] {final_user_content}".strip()
-
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {groq_key.strip()}", "Content-Type": "application/json"},
-                    json={"model": "llama-3.3-70b-versatile", "messages": groq_messages},
+                    json={"model": "llama-3.3-70b-versatile", "messages": text_messages},
                     timeout=30.0
                 )
                 if response.status_code == 200:
@@ -148,6 +144,10 @@ async def chat_endpoint(request: Request):
                     model_used = "groq"
             except Exception as e:
                 logger.error(f"Сбой Groq: {e}")
+
+        # 2. ПОПЫТКА GEMINI (если Groq не справился ИЛИ есть картинка)
+        if (reply.startswith("Ошибка") or user_image) and (requested_model in ["auto", "gemini"]) and gemini_key:
+            # ... здесь твой код для gemini (он у тебя уже верный) ...
 
         # 2. ПОПЫТКА GEMINI
         if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "gemini") and gemini_key:
