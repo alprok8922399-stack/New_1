@@ -29,7 +29,6 @@ def get_db_connection():
         return None
 
 async def search_tavily(query: str, api_key: str) -> str:
-    """Функция для поиска информации в интернете через Tavily API"""
     if not api_key:
         return ""
     try:
@@ -68,7 +67,7 @@ async def chat_endpoint(request: Request):
     raw_user_message = data.get("text") or ""
     mode = data.get("mode") or "private"
     user_image = data.get("image") or ""
-    requested_model = data.get("model") or "auto"  # Получаем принудительную модель из интерфейса
+    requested_model = data.get("model") or "auto"
     
     time_match = re.search(r"Текущие дата и время:\s*([^\]]+)", raw_user_message)
     client_time = time_match.group(1).strip() if time_match else "Неизвестно"
@@ -82,7 +81,6 @@ async def chat_endpoint(request: Request):
     or_key = os.environ.get("OPENROUTER_API_KEY")
     tavily_key = os.environ.get("TAVILY_API_KEY")
     
-    # АВТОМАТИЧЕСКИЙ ПОИСК В ИНТЕРНЕТЕ (TAVILY)
     search_data = ""
     keywords = ["найди", "поиск", "интернет", "гугл", "ссылк", "узнай", "информац"]
     if any(word in user_message.lower() for word in keywords) and tavily_key:
@@ -102,7 +100,6 @@ async def chat_endpoint(request: Request):
             for r in rows[::-1]:
                 history_messages.append({"role": r[0], "content": r[1]})
 
-    # ОБНОВЛЕННЫЙ ПРОМПТ ДЛЯ КРАСИВОГО СТРУКТУРИРОВАННОГО ОТВЕТА С ЭМОДЗИ И ОТСТУПАМИ
     system_prompt = (
         f"Ты — друг и помощник. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. "
         f"Отвечай развернуто, структурировано, с легким юмором, строго на русском языке. "
@@ -130,13 +127,17 @@ async def chat_endpoint(request: Request):
     
     async with httpx.AsyncClient() as client:
         
-        # 1. ПОПЫТКА GROQ (только если нет изображения)
-        if (requested_model in ["auto", "groq"]) and groq_key and not user_image:
+        # 1. ПОПЫТКА GROQ
+        if (requested_model in ["auto", "groq"]) and groq_key:
             try:
+                groq_messages = text_messages.copy()
+                if user_image:
+                    groq_messages[-1]["content"] = f"[Пользователь отправил скриншот. Проанализируй контекст обсуждения] {final_user_content}".strip()
+
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {groq_key.strip()}", "Content-Type": "application/json"},
-                    json={"model": "llama-3.3-70b-versatile", "messages": text_messages},
+                    json={"model": "llama-3.3-70b-versatile", "messages": groq_messages},
                     timeout=30.0
                 )
                 if response.status_code == 200:
@@ -145,12 +146,8 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой Groq: {e}")
 
-        # 2. ПОПЫТКА GEMINI (если Groq не справился ИЛИ есть картинка)
-        if (reply.startswith("Ошибка") or user_image) and (requested_model in ["auto", "gemini"]) and gemini_key:
-            # ... здесь твой код для gemini (он у тебя уже верный) ...
-
         # 2. ПОПЫТКА GEMINI
-        if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "gemini") and gemini_key:
+        if (reply.startswith("Ошибка") or user_image) and (requested_model in ["auto", "gemini"]) and gemini_key:
             try:
                 if user_image:
                     if "," in user_image:
@@ -187,9 +184,8 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой Gemini: {e}")
 
-
         # 3. ПОПЫТКА OPENROUTER
-        if (reply.startswith("Ошибка") and requested_model == "auto" or requested_model == "openrouter") and or_key:
+        if (reply.startswith("Ошибка") or user_image) and (requested_model in ["auto", "openrouter"]) and or_key:
             try:
                 if user_image:
                     or_messages = [{"role": "system", "content": system_prompt}]
@@ -217,7 +213,6 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой OpenRouter: {e}")
             
-    # Сохраняем историю в БД
     if mode == "private" and not reply.startswith("Ошибка"):
         conn = get_db_connection()
         if conn:
