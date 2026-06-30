@@ -220,6 +220,7 @@
             display: block;
         }
 
+
         /* Сообщение пользователя — аккуратное ограничение по высоте */
         .message.user { 
             max-width: 75%; 
@@ -317,6 +318,7 @@
         }
         #send-btn { background: #3182ce; }
 
+
         .preview-hidden { display: none !important; }
     </style>
 </head>
@@ -367,7 +369,7 @@
             return true; 
         };
 
-        const SECRET_CODE = 'alprok8922399';
+        const SECRET_CODE = 'ю';
         let chatMode = 'public'; 
         let userDisplayName = ''; 
         let selectedModel = 'auto'; 
@@ -382,6 +384,10 @@
         const sendBtn = document.getElementById('send-btn');
         const clearBtn = document.getElementById('clear-btn');
         
+        // Кнопки и элементы, которые нужно скрывать
+        const modelSelectorTrigger = document.getElementById('model-selector-trigger');
+        const mailBtn = document.getElementById('mail-btn');
+
         // Переменные для скрепки
         const attachBtn = document.getElementById('attach-btn');
         const fileInput = document.getElementById('file-input');
@@ -426,10 +432,18 @@
                 chatMode = 'private';
                 userDisplayName = 'Алексей';
                 chatHeaderTitle.textContent = 'Друг и помощник';
+                
+                // Показываем кнопки для Алексея
+                modelSelectorTrigger.style.display = 'flex';
+                mailBtn.style.display = 'block';
             } else {
                 chatMode = 'public';
                 userDisplayName = enteredName;
-                chatHeaderTitle.textContent = `Чат для: ${enteredName}`;
+                chatHeaderTitle.textContent = `Гость: ${enteredName}`;
+                
+                // Прячем кнопки от гостей
+                modelSelectorTrigger.style.display = 'none';
+                mailBtn.style.display = 'none';
             }
 
             authScreen.style.display = 'none';
@@ -463,7 +477,6 @@
 
         // БЕЗОПАСНЫЙ ПОИСК БЛОКОВ КОДА БЕЗ ТРЕХ ПРЯМЫХ КАВЫЧЕК
         function formatBotMessageWithCode(text) {
-            // Используем `{3}` чтобы не писать три кавычки подряд в коде
             const regex = /`{3}(?:[a-zA-Z0-9_-]+)?\n([\s\S]*?)\n`{3}/g;
             let parts = [];
             let lastIndex = 0;
@@ -501,7 +514,6 @@
             } else if (isUser) {
                 messageDiv.innerText = text;
             } else {
-                // Разбиваем ответ ИИ на текст и блоки кода
                 const fragments = formatBotMessageWithCode(text);
                 if (fragments.length === 0) {
                     messageDiv.innerText = text;
@@ -545,7 +557,6 @@
             
             wrapper.appendChild(messageDiv);
 
-            // Если это длинное сообщение пользователя, добавляем кнопку раскрытия
             if (isUser && text.length > 60) {
                 const toggleBtn = document.createElement('button');
                 toggleBtn.className = 'toggle-btn';
@@ -583,12 +594,15 @@
             fileInput.value = "";
             previewContainer.classList.add('preview-hidden');
 
+            const clientTime = new Date().toLocaleString('ru-RU');
+            const payloadText = `[Системное инфо: Текущие дата и время: ${clientTime}, Имя собеседника: ${userDisplayName}] ${text}`;
+
             try {
                 const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        text: text, 
+                        text: payloadText, 
                         image: imgToSend, 
                         mode: chatMode,
                         model: selectedModel
@@ -602,4 +616,4 @@
         });
     </script>
 </body>
-</html>
+    </html>
