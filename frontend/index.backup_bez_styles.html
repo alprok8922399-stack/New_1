@@ -171,6 +171,19 @@
             font-size: 15px;
             line-height: 1.45;
             word-break: break-word;
+            transition: all 0.2s ease;
+        }
+
+        /* Стиль выделения сообщений для отправки на почту */
+        .message.selectable-target {
+            border: 2px dashed #ecc94b !important;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(236, 201, 75, 0.4);
+            opacity: 0.9;
+        }
+        .message.selectable-target:active {
+            transform: scale(0.98);
+            background: #4a5568 !important;
         }
 
         /* Сообщение ИИ растянуто во всю ширину */
@@ -219,7 +232,6 @@
             color: #e2e8f0;
             display: block;
         }
-
 
         /* Сообщение пользователя — аккуратное ограничение по высоте */
         .message.user { 
@@ -318,7 +330,6 @@
         }
         #send-btn { background: #3182ce; }
 
-
         .preview-hidden { display: none !important; }
     </style>
 </head>
@@ -373,6 +384,7 @@
         let chatMode = 'public'; 
         let userDisplayName = ''; 
         let selectedModel = 'auto'; 
+        let isEmailSelectionMode = false; // Режим выбора сообщения для почты
 
         const authScreen = document.getElementById('auth-screen');
         const chatScreen = document.getElementById('chat-screen');
@@ -384,11 +396,9 @@
         const sendBtn = document.getElementById('send-btn');
         const clearBtn = document.getElementById('clear-btn');
         
-        // Кнопки и элементы, которые нужно скрывать
         const modelSelectorTrigger = document.getElementById('model-selector-trigger');
         const mailBtn = document.getElementById('mail-btn');
 
-        // Переменные для скрепки
         const attachBtn = document.getElementById('attach-btn');
         const fileInput = document.getElementById('file-input');
         const previewContainer = document.getElementById('image-preview-container');
@@ -396,13 +406,11 @@
         const cancelImageBtn = document.getElementById('cancel-image-btn');
         let selectedImageBase64 = "";
 
-        // Авто-расширение ввода текста
         inputArea.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = (this.scrollHeight) + 'px';
         });
 
-        // ЛОГИКА СКРЕПКИ
         attachBtn.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -433,7 +441,6 @@
                 userDisplayName = 'Алексей';
                 chatHeaderTitle.textContent = 'Друг и помощник';
                 
-                // Показываем кнопки для Алексея
                 modelSelectorTrigger.style.display = 'flex';
                 mailBtn.style.display = 'block';
             } else {
@@ -441,7 +448,6 @@
                 userDisplayName = enteredName;
                 chatHeaderTitle.textContent = `Гость: ${enteredName}`;
                 
-                // Прячем кнопки от гостей
                 modelSelectorTrigger.style.display = 'none';
                 mailBtn.style.display = 'none';
             }
@@ -475,7 +481,6 @@
             }
         }
 
-        // БЕЗОПАСНЫЙ ПОИСК БЛОКОВ КОДА БЕЗ ТРЕХ ПРЯМЫХ КАВЫЧЕК
         function formatBotMessageWithCode(text) {
             const regex = /`{3}(?:[a-zA-Z0-9_-]+)?\n([\s\S]*?)\n`{3}/g;
             let parts = [];
@@ -555,6 +560,14 @@
                 }
             }
             
+            // Навешиваем клик на плашку сообщения для отправки по почте
+            messageDiv.addEventListener('click', () => {
+                if (!isEmailSelectionMode || !messageDiv.classList.contains('selectable-target')) return;
+                
+                const messageTextToEmail = messageDiv.innerText;
+                sendEmailViaFormSubmit(messageTextToEmail);
+            });
+
             wrapper.appendChild(messageDiv);
 
             if (isUser && text.length > 60) {
@@ -576,6 +589,68 @@
             
             messagesContainer.appendChild(wrapper);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // ЛОГИКА КНОПКИ @@@ (ВЫДЕЛЕНИЕ 5 ПОСЛЕДНИХ СООБЩЕНИЙ)
+        mailBtn.addEventListener('click', () => {
+            const allElements = document.querySelectorAll('.message');
+            if (allElements.length === 0) return;
+
+            if (isEmailSelectionMode) {
+                // Если режим уже включен — выключаем его повторным нажатием
+                cancelEmailSelection();
+                return;
+            }
+
+            isEmailSelectionMode = true;
+            mailBtn.style.backgroundColor = '#ecc94b'; // Подсвечиваем кнопку желтым
+
+            // Берем до 5 последних плашек сообщений
+            const elementsArray = Array.from(allElements);
+            const targets = elementsArray.slice(-5);
+
+            targets.forEach(el => {
+                el.classList.add('selectable-target');
+            });
+        });
+
+        function cancelEmailSelection() {
+            isEmailSelectionMode = false;
+            mailBtn.style.backgroundColor = '#4a5568';
+            document.querySelectorAll('.message').forEach(el => {
+                el.classList.remove('selectable-target');
+            });
+        }
+
+        // ОТПРАВКА НА ПОЧТУ ЧЕРЕЗ FORMSUBMIT.CO
+        async function sendEmailViaFormSubmit(messageText) {
+            // Визуально даем понять пользователю, что отправка пошла
+            mailBtn.innerText = '...';
+            
+            try {
+                const response = await fetch("https://formsubmit.co/ajax/alprok8922399@proton.me", {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    body: JSON.stringify({
+                        "Тема": "Выбранное сообщение из AI Chat",
+                        "Сообщение": messageText
+                    })
+                });
+
+                if (response.ok) {
+                    alert("Сообщение успешно отправлено на вашу почту! 📬");
+                } else {
+                    alert("Не удалось отправить через FormSubmit.");
+                }
+            } catch (err) {
+                alert("Ошибка сети при отправке почты.");
+            } finally {
+                mailBtn.innerText = '@@@';
+                cancelEmailSelection();
+            }
         }
 
         clearBtn.addEventListener('click', () => { messagesContainer.innerHTML = ""; });
@@ -616,4 +691,4 @@
         });
     </script>
 </body>
-    </html>
+</html>
