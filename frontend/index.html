@@ -108,7 +108,7 @@
             font-size: 16px;
         }
 
-        /* Выбор моделей */
+        /* Выбор моделей оформлен в виде красивого кликабельного селектора */
         .model-selector-wrapper {
             display: flex;
             align-items: center;
@@ -116,8 +116,19 @@
             font-size: 12px;
             color: #a0aec0;
             margin-top: 2px;
-            cursor: pointer;
             position: relative;
+        }
+
+        .model-select-dropdown {
+            background: transparent;
+            color: #a0aec0;
+            border: none;
+            font-size: 12px;
+            font-family: inherit;
+            outline: none;
+            cursor: pointer;
+            font-weight: 500;
+            padding-right: 4px;
         }
 
         .status-dot {
@@ -349,7 +360,11 @@
                 <div class="header-title" id="chat-header-title">Друг и помощник</div>
                 <div class="model-selector-wrapper" id="model-selector-trigger">
                     <span class="status-dot" id="status-dot"></span>
-                    <span id="active-model-name">Модель: Авто</span>
+                    <select id="model-select" class="model-select-dropdown">
+                        <option value="gemini" style="background: #2d3748; color: #fff;">Модель: Gemini</option>
+                        <option value="openrouter" style="background: #2d3748; color: #fff;">Модель: OpenRouter</option>
+                        <option value="groq" style="background: #2d3748; color: #fff;">Модель: GROQ</option>
+                    </select>
                 </div>
             </div>
             <div class="header-buttons">
@@ -383,8 +398,8 @@
         const SECRET_CODE = 'ю';
         let chatMode = 'public'; 
         let userDisplayName = ''; 
-        let selectedModel = 'auto'; 
-        let isEmailSelectionMode = false; // Режим выбора сообщения для почты
+        let selectedModel = 'gemini'; // По умолчанию установлена модель Gemini
+        let isEmailSelectionMode = false; 
 
         const authScreen = document.getElementById('auth-screen');
         const chatScreen = document.getElementById('chat-screen');
@@ -397,6 +412,7 @@
         const clearBtn = document.getElementById('clear-btn');
         
         const modelSelectorTrigger = document.getElementById('model-selector-trigger');
+        const modelSelectElement = document.getElementById('model-select');
         const mailBtn = document.getElementById('mail-btn');
 
         const attachBtn = document.getElementById('attach-btn');
@@ -428,6 +444,11 @@
             selectedImageBase64 = "";
             fileInput.value = "";
             previewContainer.classList.add('preview-hidden');
+        });
+
+        // Слушатель изменения модели в выпадающем списке
+        modelSelectElement.addEventListener('change', (e) => {
+            selectedModel = e.target.value;
         });
 
         function handleLogin(e) {
@@ -560,7 +581,6 @@
                 }
             }
             
-            // Навешиваем клик на плашку сообщения для отправки по почте
             messageDiv.addEventListener('click', () => {
                 if (!isEmailSelectionMode || !messageDiv.classList.contains('selectable-target')) return;
                 
@@ -591,21 +611,18 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        // ЛОГИКА КНОПКИ @@@ (ВЫДЕЛЕНИЕ 5 ПОСЛЕДНИХ СООБЩЕНИЙ)
         mailBtn.addEventListener('click', () => {
             const allElements = document.querySelectorAll('.message');
             if (allElements.length === 0) return;
 
             if (isEmailSelectionMode) {
-                // Если режим уже включен — выключаем его повторным нажатием
                 cancelEmailSelection();
                 return;
             }
 
             isEmailSelectionMode = true;
-            mailBtn.style.backgroundColor = '#ecc94b'; // Подсвечиваем кнопку желтым
+            mailBtn.style.backgroundColor = '#ecc94b'; 
 
-            // Берем до 5 последних плашек сообщений
             const elementsArray = Array.from(allElements);
             const targets = elementsArray.slice(-5);
 
@@ -622,9 +639,7 @@
             });
         }
 
-        // ОТПРАВКА НА ПОЧТУ ЧЕРЕЗ FORMSUBMIT.CO
         async function sendEmailViaFormSubmit(messageText) {
-            // Визуально даем понять пользователю, что отправка пошла
             mailBtn.innerText = '...';
             
             try {
