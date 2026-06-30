@@ -384,6 +384,10 @@
         const sendBtn = document.getElementById('send-btn');
         const clearBtn = document.getElementById('clear-btn');
         
+        // Кнопки и элементы, которые нужно скрывать
+        const modelSelectorTrigger = document.getElementById('model-selector-trigger');
+        const mailBtn = document.getElementById('mail-btn');
+
         // Переменные для скрепки
         const attachBtn = document.getElementById('attach-btn');
         const fileInput = document.getElementById('file-input');
@@ -428,10 +432,18 @@
                 chatMode = 'private';
                 userDisplayName = 'Алексей';
                 chatHeaderTitle.textContent = 'Друг и помощник';
+                
+                // Показываем кнопки для Алексея
+                modelSelectorTrigger.style.display = 'flex';
+                mailBtn.style.display = 'block';
             } else {
                 chatMode = 'public';
                 userDisplayName = enteredName;
                 chatHeaderTitle.textContent = `Гость: ${enteredName}`;
+                
+                // Прячем кнопки от гостей
+                modelSelectorTrigger.style.display = 'none';
+                mailBtn.style.display = 'none';
             }
 
             authScreen.style.display = 'none';
@@ -582,7 +594,6 @@
             fileInput.value = "";
             previewContainer.classList.add('preview-hidden');
 
-            // Формируем системную плашку для бэкенда, чтобы передать имя гостя и время телефона
             const clientTime = new Date().toLocaleString('ru-RU');
             const payloadText = `[Системное инфо: Текущие дата и время: ${clientTime}, Имя собеседника: ${userDisplayName}] ${text}`;
 
@@ -605,4 +616,4 @@
         });
     </script>
 </body>
-    </html>
+            </html>
