@@ -96,7 +96,6 @@ async def chat_endpoint(request: Request):
             rows = cur.fetchall()
             cur.close()
             conn.close()
-     
             for r in rows[::-1]:
                 history_messages.append({"role": r[0], "content": r[1]})
 
