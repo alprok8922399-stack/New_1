@@ -220,6 +220,7 @@
             display: block;
         }
 
+
         /* Сообщение пользователя — аккуратное ограничение по высоте */
         .message.user { 
             max-width: 75%; 
@@ -316,6 +317,7 @@
             justify-content: center;
         }
         #send-btn { background: #3182ce; }
+
 
         .preview-hidden { display: none !important; }
     </style>
@@ -429,7 +431,7 @@
             } else {
                 chatMode = 'public';
                 userDisplayName = enteredName;
-                chatHeaderTitle.textContent = `Чат для: ${enteredName}`;
+                chatHeaderTitle.textContent = `Гость: ${enteredName}`;
             }
 
             authScreen.style.display = 'none';
@@ -463,7 +465,6 @@
 
         // БЕЗОПАСНЫЙ ПОИСК БЛОКОВ КОДА БЕЗ ТРЕХ ПРЯМЫХ КАВЫЧЕК
         function formatBotMessageWithCode(text) {
-            // Используем `{3}` чтобы не писать три кавычки подряд в коде
             const regex = /`{3}(?:[a-zA-Z0-9_-]+)?\n([\s\S]*?)\n`{3}/g;
             let parts = [];
             let lastIndex = 0;
@@ -501,7 +502,6 @@
             } else if (isUser) {
                 messageDiv.innerText = text;
             } else {
-                // Разбиваем ответ ИИ на текст и блоки кода
                 const fragments = formatBotMessageWithCode(text);
                 if (fragments.length === 0) {
                     messageDiv.innerText = text;
@@ -545,7 +545,6 @@
             
             wrapper.appendChild(messageDiv);
 
-            // Если это длинное сообщение пользователя, добавляем кнопку раскрытия
             if (isUser && text.length > 60) {
                 const toggleBtn = document.createElement('button');
                 toggleBtn.className = 'toggle-btn';
@@ -583,12 +582,16 @@
             fileInput.value = "";
             previewContainer.classList.add('preview-hidden');
 
+            // Формируем системную плашку для бэкенда, чтобы передать имя гостя и время телефона
+            const clientTime = new Date().toLocaleString('ru-RU');
+            const payloadText = `[Системное инфо: Текущие дата и время: ${clientTime}, Имя собеседника: ${userDisplayName}] ${text}`;
+
             try {
                 const response = await fetch("https://new-1-5155.onrender.com/api/chat", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        text: text, 
+                        text: payloadText, 
                         image: imgToSend, 
                         mode: chatMode,
                         model: selectedModel
@@ -602,4 +605,4 @@
         });
     </script>
 </body>
-</html>
+    </html>
