@@ -493,6 +493,7 @@
                 if (!response.ok) return;
                 const history = await response.json();
                 if (Array.isArray(history)) {
+                    messagesContainer.innerHTML = ""; 
                     history.forEach(msg => {
                         if (msg) appendMessage(msg.content || msg.text || "", msg.role === 'user');
                     });
@@ -521,6 +522,23 @@
             }
 
             return parts;
+        }
+
+        // Функция для сбора последних 10 сообщений из интерфейса
+        function getLocalChatHistory() {
+            const wrappers = messagesContainer.querySelectorAll('.message-wrapper');
+            const history = [];
+            wrappers.forEach(w => {
+                const isUser = w.classList.contains('role-user');
+                const msgDiv = w.querySelector('.message');
+                if (msgDiv) {
+                    history.push({ 
+                        role: isUser ? 'user' : 'assistant', 
+                        content: msgDiv.innerText 
+                    });
+                }
+            });
+            return history.slice(-10);
         }
 
         function appendMessage(text, isUser, imageUrl = "") {
@@ -677,6 +695,7 @@
             appendMessage(text, true, selectedImageBase64);
             
             const imgToSend = selectedImageBase64;
+            const currentHistory = getLocalChatHistory(); // Собираем историю перед очисткой полей
             
             inputArea.value = '';
             inputArea.style.height = '40px';
@@ -695,7 +714,8 @@
                         text: payloadText, 
                         image: imgToSend, 
                         mode: chatMode,
-                        model: selectedModel
+                        model: selectedModel,
+                        history: currentHistory // Отправляем собранную историю на бэкенд
                     })
                 });
                 const data = await response.json();
@@ -706,4 +726,4 @@
         });
     </script>
 </body>
-</html>
+    </html>
