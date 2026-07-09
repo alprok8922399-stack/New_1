@@ -81,8 +81,8 @@ async def chat_endpoint(request: Request):
     name_match = re.search(r"Имя собеседника:\s*([^\]\n]+)", raw_user_message)
     user_name = name_match.group(1).strip() if name_match else "Алексей"
 
-    # Очищаем сообщение от служебных тегов фронтенда
-    user_message = re.sub(r"^\[Системное инфо.*?\]\s*", "", raw_user_message, flags=re.DOTALL).strip()
+    # Точечное удаление тега [Системное info...], чтобы не задеть отправленный код
+    user_message = re.sub(r"^\[Системное инфо:[^\]]+\]\s*", "", raw_user_message).strip()
     if not user_message and raw_user_message:
         user_message = raw_user_message.strip()
     
@@ -97,26 +97,23 @@ async def chat_endpoint(request: Request):
         logger.info(f"Запуск веб-поиска для запроса: {user_message}")
         search_data = await search_tavily(user_message, tavily_key)
 
-    # Загружаем ровно 10 последних сообщений истории из базы данных
+    # Загружаем историю из базы данных
     history_messages = []
     if mode == "private":
         conn = get_db_connection()
         if conn:
             try:
                 cur = conn.cursor()
-                # Берём последние 10 записей
                 cur.execute("SELECT role, content FROM chat_messages ORDER BY id DESC LIMIT 10")
                 rows = cur.fetchall()
                 cur.close()
                 conn.close()
-                # Разворачиваем в хронологический порядок
                 for r in rows[::-1]:
-                    role = "assistant" if r[0] == "user" and r[1] == "Отправлен скриншот" else r[0]
                     history_messages.append({"role": r[0], "content": r[1]})
             except Exception as e:
                 logger.error(f"Ошибка при чтении истории: {e}")
 
-    # Системные промты лаконичности
+    # Системные промты
     if mode == "private":
         system_prompt = (
             f"Ты — друг и помощник. Пользователя зовут {user_name}. Текущие дата и время: {client_time}. "
@@ -171,7 +168,6 @@ async def chat_endpoint(request: Request):
         # 2. Резерв Gemini
         if (reply.startswith("Ошибка") or user_image) and (requested_model in ["auto", "gemini"]) and gemini_key:
             try:
-                # Формируем историю для Gemini внутри одного промта, раз уж мы подстраховываемся
                 gemini_history_text = ""
                 for m in history_messages:
                     name = "Помощник" if m["role"] == "assistant" else "Пользователь"
@@ -241,7 +237,7 @@ async def chat_endpoint(request: Request):
             except Exception as e:
                 logger.error(f"Сбой OpenRouter: {e}")
             
-    # Сохранение в БД при успешном ответе
+    # Сохранение в БД
     if mode == "private" and not reply.startswith("Ошибка"):
         conn = get_db_connection()
         if conn:
